@@ -286,6 +286,67 @@ const RZPA_App = (() => {
     const snapOk = sn.configured !== false;
     const ttOk   = t.configured  !== false;
 
+    // ── Fortæller-kort på dashboard ──────────────────
+    const storyEl = el('rzpa-dashboard-story');
+    if (storyEl) {
+      const metaSpend  = metaOk ? (parseFloat(m.total_spend)||0) : 0;
+      const seoClicks  = parseInt(s.total_clicks)||0;
+      const metaCtr    = metaOk ? (parseFloat(m.avg_ctr)||0) : 0;
+      const top10      = parseInt(s.keywords_top10)||0;
+      let story = '';
+      if (metaSpend > 0 || seoClicks > 0) {
+        story += metaSpend > 0
+          ? `Du brugte <strong>${fmt(metaSpend,0)} kr</strong> på Meta-annoncer i perioden. `
+          : '';
+        story += seoClicks > 0
+          ? `<strong>${fmt(seoClicks)}</strong> fandt jer via Google — gratis besøg. `
+          : '';
+        story += top10 > 0
+          ? `I er på Googles 1. side for <strong>${top10} søgeord</strong>. `
+          : '';
+        story += metaCtr > 0
+          ? `Jeres annonce-klikprocent er <strong>${fmt(metaCtr,2)}%</strong> ${metaCtr>=1.5?'— det er godt! 🚀':metaCtr>=0.5?'— der er plads til forbedring 💡':'— overvej at opdatere annoncerne ⚠️'}.`
+          : '';
+        storyEl.innerHTML = story;
+        storyEl.classList.remove('hidden');
+      }
+    }
+
+    // ── Platform-status-kort på dashboard ────────────
+    // Meta spend og clicks
+    if (metaOk && parseFloat(m.total_spend) > 0) {
+      const ctr = parseFloat(m.avg_ctr)||0;
+      const pill = el('meta-plat-status');
+      if (pill) {
+        pill.textContent = ctr>=1.5?'✓ Kører godt':ctr>=0.5?'⚠ Middel':'✗ Lav klikprocent';
+        pill.className = 'rzpa-pill ' + (ctr>=1.5?'good':ctr>=0.5?'warn':'bad');
+      }
+      setText('meta-plat-clicks', fmt(m.total_clicks));
+      // roi_meta_roas already set elsewhere – override with CTR
+      const roasEl = el('roi_meta_roas');
+      if (roasEl) { roasEl.textContent = fmt(m.avg_ctr,2)+'%'; roasEl.className=''; }
+    }
+    // SEO
+    const seoStatus = el('seo-plat-status');
+    if (seoStatus) {
+      const top10n = parseInt(s.keywords_top10)||0;
+      seoStatus.textContent = top10n>10?'✓ God synlighed':top10n>0?'⚠ Kan forbedres':'Ingen data';
+      seoStatus.className = 'rzpa-pill '+(top10n>10?'good':top10n>0?'warn':'neutral');
+    }
+    setText('seo-plat-clicks', fmt(s.total_clicks)||'–');
+    setText('seo-plat-top10', fmt(s.keywords_top10)||'–');
+    setText('seo-plat-top3', fmt(s.keywords_top3)||'–');
+    // AI
+    const aiStatus = el('ai-plat-status');
+    const aiCount  = parseInt(a.ai_overview_count)||0;
+    if (aiStatus) {
+      aiStatus.textContent = aiCount>5?'✓ God AI-synlighed':aiCount>0?'⚠ Delvis':'Ikke målt';
+      aiStatus.className = 'rzpa-pill '+(aiCount>5?'good':aiCount>0?'warn':'neutral');
+    }
+    setText('ai-plat-count',    fmt(a.ai_overview_count)||'–');
+    setText('ai-plat-snippets', fmt(a.featured_snippet_count)||'–');
+    setText('ai-plat-paa',      fmt(a.paa_count)||'–');
+
     const totalSpend = (metaOk ? parseFloat(m.total_spend)||0 : 0)
                      + (snapOk ? parseFloat(sn.total_spend)||0 : 0)
                      + (ttOk   ? parseFloat(t.total_spend)||0  : 0);
@@ -394,13 +455,20 @@ const RZPA_App = (() => {
     const tbody = el('top_campaigns_tbody');
     if (tbody) {
       const platClass = p => p==='Meta'?'plat-meta':p==='Snap'?'plat-snap':'plat-tiktok';
-      tbody.innerHTML = allCamps.slice(0,8).map(c => `
-        <tr>
-          <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${c.campaign_name}</td>
+      // Sort by clicks for Meta (more meaningful than ROAS for service company)
+      const sortedCamps = [...allCamps].sort((a,b)=>(parseInt(b.clicks)||0)-(parseInt(a.clicks)||0));
+      tbody.innerHTML = sortedCamps.slice(0,8).map(c => {
+        const ctr = parseFloat(c.ctr)||0;
+        const perfHtml = ctr>0
+          ? `<span class="rzpa-pill ${ctr>=1.5?'good':ctr>=0.5?'warn':'bad'}">${fmt(ctr,2)}%</span>`
+          : (c.roas>0?`<span style="color:var(--neon);font-weight:700">${fmt(c.roas,2)}x</span>`:'–');
+        return `<tr>
+          <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${c.campaign_name.replace(/Rezponz\s*[–-]\s*/i,'')}</td>
           <td><span class="${platClass(c.platform)}" style="font-size:11px;font-weight:700;text-transform:uppercase">${c.platform}</span></td>
           <td style="color:var(--text-muted)">${fmt(c.spend,0)} kr</td>
-          <td class="${roasClass(parseFloat(c.roas)||0)}" style="font-weight:700">${c.roas>0?fmt(c.roas,2)+'x':'–'}</td>
-        </tr>`).join('') || '<tr><td colspan="4" class="rzpa-empty">Ingen kampagnedata endnu</td></tr>';
+          <td>${perfHtml}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="4" class="rzpa-empty">Ingen kampagnedata endnu</td></tr>';
     }
   }
 
@@ -422,15 +490,59 @@ const RZPA_App = (() => {
       const s = sum.data || {};
       allKw = kw.data || [];
 
-      renderKPI('kpi_clicks', fmt(s.total_clicks), 'CTR: ' + fmt(s.avg_ctr,2) + '%');
+      renderKPI('kpi_clicks', fmt(s.total_clicks), 'klik fra Google');
       renderKPI('kpi_impr',   fmt(s.total_impressions));
       renderKPI('kpi_ctr',    fmt(s.avg_ctr,2) + '%');
-      renderKPI('kpi_top10',  fmt(s.keywords_top10), (s.keywords_top3||0) + ' i top 3');
+      renderKPI('kpi_top10',  fmt(s.keywords_top10));
+      setText('kpi_top10_sub', (s.keywords_top3||0)+' søgeord i top 3 · '+fmt(s.keywords_top10||0)+' på side 1');
+
+      // ── SEO Story ──────────────────────────────────
+      const seoStory = el('seo-story');
+      if (seoStory) {
+        const clicks = parseInt(s.total_clicks)||0;
+        const top10n = parseInt(s.keywords_top10)||0;
+        const top3n  = parseInt(s.keywords_top3)||0;
+        if (clicks > 0) {
+          seoStory.innerHTML = `<strong>${fmt(clicks)}</strong> personer fandt jer på Google i perioden — helt gratis! `
+            + `I er på Googles 1. side for <strong>${top10n} søgeord</strong>, og <strong>${top3n} af dem er i top 3</strong> (der går størstedelen af klikene). `
+            + (top10n<5?'💡 Tip: Jo flere søgeord I optimerer til side 1, jo mere gratis trafik får I.':'✅ God organisk synlighed — fortsæt med at opdatere indholdet på sitet.');
+          seoStory.classList.remove('hidden');
+        }
+      }
+
+      // ── SEO Health bar ──────────────────────────────
+      const seoHealth = el('rzpa-seo-health');
+      if (seoHealth) {
+        const clicks = parseInt(s.total_clicks)||0;
+        const top10n = parseInt(s.keywords_top10)||0;
+        if (!clicks) {
+          seoHealth.className = 'rzpa-health health-empty';
+          seoHealth.innerHTML = '<span class="h-icon">ℹ️</span><div class="h-text">Ingen SEO-data endnu — klik "Hent data"</div>';
+        } else if (top10n >= 10) {
+          seoHealth.className = 'rzpa-health health-good';
+          seoHealth.innerHTML = `<span class="h-icon">🟢</span><div class="h-text"><strong>God SEO-synlighed!</strong> ${top10n} søgeord på Googles 1. side.<div class="h-sub">Bliv ved med at udgive relevant indhold og sørg for at siderne loader hurtigt.</div></div>`;
+        } else if (top10n > 0) {
+          seoHealth.className = 'rzpa-health health-warn';
+          seoHealth.innerHTML = `<span class="h-icon">🟡</span><div class="h-text"><strong>Begynder at få synlighed.</strong> ${top10n} søgeord på side 1.<div class="h-sub">Se "Muligheder" nedenfor — der er søgeord tæt på side 1 som kan forbedres.</div></div>`;
+        } else {
+          seoHealth.className = 'rzpa-health health-bad';
+          seoHealth.innerHTML = `<span class="h-icon">🔴</span><div class="h-text"><strong>Lav SEO-synlighed.</strong> Ingen søgeord på Googles 1. side.<div class="h-sub">Overvej at oprette SEO-optimerede undersider og blogindlæg.</div></div>`;
+        }
+        seoHealth.style.display = 'flex';
+      }
 
       hBarChart('chart_kw_clicks', allKw.slice(0,8).map(k=>k.keyword), allKw.slice(0,8).map(k=>k.total_clicks));
       renderSeoTable(allKw, d);
       renderPagesTable(pages.data || []);
       renderOpportunities(allKw);
+    }
+
+    function posBadge(p) {
+      const n = parseFloat(p)||0;
+      if (!n) return '<span class="pos-badge pos-out">–</span>';
+      const cls = n<=3?'pos-top3':n<=10?'pos-top10':n<=20?'pos-top20':'pos-out';
+      const lbl = n<=3?'Top 3 🏆':n<=10?'Side 1':n<=20?'Side 2':'Side '+Math.ceil(n/10);
+      return `<span class="pos-badge ${cls}">#${Math.round(n)} ${lbl}</span>`;
     }
 
     function posStyle(p) {
@@ -446,7 +558,7 @@ const RZPA_App = (() => {
       tbody.innerHTML = data.map(k => `
         <tr style="cursor:pointer" onclick="RZPA_App.loadKwTrend('${encodeURIComponent(k.keyword)}',${d})">
           <td style="color:#ddd;font-weight:500">${k.keyword}</td>
-          <td style="${posStyle(k.avg_position)}">#${fmt(k.avg_position,1)}</td>
+          <td>${posBadge(k.avg_position)}</td>
           <td>${fmt(k.total_clicks)}</td>
           <td>${fmt(k.total_impressions)}</td>
           <td>${fmt(k.avg_ctr,2)}%</td>
@@ -464,7 +576,7 @@ const RZPA_App = (() => {
         const url = p.page_url.replace(/^https?:\/\/[^/]+/, '');
         return `<tr>
           <td style="color:#ddd;font-weight:500;max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${p.page_url}">${url || '/'}</td>
-          <td style="${posStyle(p.avg_position)}">#${fmt(p.avg_position,1)}</td>
+          <td>${posBadge(p.avg_position)}</td>
           <td>${fmt(p.total_clicks)}</td>
           <td>${fmt(p.total_impressions)}</td>
           <td>${fmt(p.avg_ctr,2)}%</td>
@@ -484,7 +596,7 @@ const RZPA_App = (() => {
       tbody.innerHTML = opps.slice(0,10).map(k => `
         <tr>
           <td style="color:#ddd;font-weight:500">${k.keyword}</td>
-          <td style="color:var(--warn);font-weight:700">#${fmt(k.avg_position,1)}</td>
+          <td>${posBadge(k.avg_position)}</td>
           <td>${fmt(k.total_impressions)}</td>
           <td>${fmt(k.avg_ctr,2)}%</td>
         </tr>`).join('');
@@ -776,6 +888,54 @@ const RZPA_App = (() => {
     renderKPI('kpi_clicks', fmt(clicks), cpc > 0 ? fmt(cpc,2) + ' kr per klik' : '');
     renderKPI('kpi_ctr',    ctr > 0 ? fmt(ctr,2) + '%' : '–',
       ctr >= 1.5 ? '✅ Over gennemsnit' : ctr >= 0.5 ? '⚠️ Under målet (mål: 1,5%+)' : ctr > 0 ? '❌ Lav – overvej nyt kreativt indhold' : '');
+
+    // ── Fortæller-kort ──────────────────────────────
+    const storyEl = el('meta-story');
+    if (storyEl && spend > 0) {
+      const ctrLabel = ctr>=1.5?'rigtig godt — annoncerne fanger folks opmærksomhed 🚀'
+                      :ctr>=0.5?'okay, men der er plads til forbedring 💡'
+                      :ctr>0?'lav — prøv nyt billede eller tekst på annoncerne ⚠️':'–';
+      storyEl.innerHTML = `I perioden brugte I <strong>${fmt(spend,0)} kr</strong> på Facebook og Instagram. `
+        + `Annoncerne dukkede op <strong>${fmt(impr)} gange</strong>, og <strong>${fmt(clicks)} personer</strong> klikkede videre til jeres hjemmeside. `
+        + (cpc>0?`Det svarer til <strong>${fmt(cpc,2)} kr per besøg</strong>. `:'')
+        + (ctr>0?`Jeres klikprocent er <strong>${fmt(ctr,2)}%</strong> — det er <strong>${ctrLabel}</strong>.`:'');
+      storyEl.classList.remove('hidden');
+    } else if (storyEl) {
+      storyEl.innerHTML = 'Klik på <strong>Hent data</strong> for at hente dine kampagner fra Meta.';
+      storyEl.classList.remove('hidden');
+    }
+
+    // ── Health bar ──────────────────────────────────
+    const hBar = el('rzpa-health-bar');
+    if (hBar) {
+      if (!spend) {
+        hBar.className = 'rzpa-health health-empty';
+        hBar.innerHTML = '<span class="h-icon">ℹ️</span><div class="h-text">Klik på "Hent data" for at hente dine kampagner</div>';
+      } else if (ctr>=1.5) {
+        hBar.className = 'rzpa-health health-good';
+        hBar.innerHTML = `<span class="h-icon">🟢</span><div class="h-text"><strong>Alt ser godt ud!</strong> Klikprocenten er ${fmt(ctr,2)}% — over målet på 1,5%.<div class="h-sub">Fortsæt som nu — annoncerne virker.</div></div>`;
+      } else if (ctr>=0.5) {
+        hBar.className = 'rzpa-health health-warn';
+        hBar.innerHTML = `<span class="h-icon">🟡</span><div class="h-text"><strong>Annoncerne virker, men kan forbedres.</strong> Klikprocenten er ${fmt(ctr,2)}% (mål: 1,5%+).<div class="h-sub">Test nyt billede eller overskrift for at hæve klikprocenten.</div></div>`;
+      } else if (ctr>0) {
+        hBar.className = 'rzpa-health health-bad';
+        hBar.innerHTML = `<span class="h-icon">🔴</span><div class="h-text"><strong>Lav klikprocent — annoncerne bør opdateres.</strong> ${fmt(ctr,2)}% klikker videre (mål: over 1,5%).<div class="h-sub">Prøv nyt billede, ny overskrift eller ny målgruppe.</div></div>`;
+      }
+      hBar.style.display = 'flex';
+    }
+
+    // ── Spend pill ──────────────────────────────────
+    const spPill = el('kpi_spend_pill');
+    if (spPill && perDay > 0) {
+      spPill.innerHTML = `<span class="rzpa-pill neutral">≈ ${fmt(perDay,0)} kr/dag</span>`;
+    }
+    // CTR sub text
+    const ctrSub = el('kpi_ctr_sub');
+    if (ctrSub) {
+      if (ctr >= 1.5) ctrSub.innerHTML = '<span class="rzpa-pill good">✓ Over gennemsnit</span>';
+      else if (ctr >= 0.5) ctrSub.innerHTML = '<span class="rzpa-pill warn">⚠ Kan forbedres</span>';
+      else if (ctr > 0) ctrSub.innerHTML = '<span class="rzpa-pill bad">✗ For lavt — handl nu</span>';
+    }
 
     const expEl = el('meta-explain'), expTxt = el('meta-explain-text');
     if (expEl && expTxt && spend > 0) {

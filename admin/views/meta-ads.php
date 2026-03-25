@@ -8,8 +8,8 @@
 
   <div class="rzpa-header">
     <div>
-      <h1>Meta Annoncer</h1>
-      <p class="page-sub">Facebook + Instagram · Hvad har du brugt, og hvor mange ser og klikker?</p>
+      <h1>Facebook &amp; Instagram Annoncer</h1>
+      <p class="page-sub">Her ser du hvad dine annoncer koster — og hvad du får ud af dem</p>
     </div>
     <div class="rzpa-header-right">
       <div id="rzpa-date-filter" class="rzpa-date-filter">
@@ -21,78 +21,86 @@
     </div>
   </div>
 
-  <!-- KPI kort -->
-  <div class="rzpa-kpi-grid">
-    <div class="rzpa-kpi">
-      <div class="rzpa-kpi-label">Samlet forbrug</div>
-      <div class="rzpa-kpi-value" id="kpi_spend">–</div>
-      <div class="rzpa-kpi-sub" id="kpi_spend_sub">kr brugt på annoncer i perioden</div>
-    </div>
-    <div class="rzpa-kpi color-purple">
-      <div class="rzpa-kpi-label">Visninger</div>
-      <div class="rzpa-kpi-value" id="kpi_impr">–</div>
-      <div class="rzpa-kpi-sub">Gange dine annoncer er blevet vist</div>
-    </div>
-    <div class="rzpa-kpi color-orange">
-      <div class="rzpa-kpi-label">Klik</div>
-      <div class="rzpa-kpi-value" id="kpi_clicks">–</div>
-      <div class="rzpa-kpi-sub" id="kpi_cpc_sub">Folk der klikkede på din annonce</div>
-    </div>
-    <div class="rzpa-kpi color-blue">
-      <div class="rzpa-kpi-label">Klikrate (CTR)</div>
-      <div class="rzpa-kpi-value" id="kpi_ctr">–</div>
-      <div class="rzpa-kpi-sub" id="kpi_ctr_sub">% af de der ser annoncen klikker</div>
-    </div>
-  </div>
+  <!-- Health bar (udfyldes af JS) -->
+  <div id="rzpa-health-bar" style="display:none"></div>
 
-  <!-- Forklaringsboks -->
-  <div class="rzpa-explain-bar" id="meta-explain" style="display:none">
-    <span class="explain-icon">💡</span>
-    <span id="meta-explain-text"></span>
+  <!-- Fortæller-kort (udfyldes af JS) -->
+  <div id="meta-story" class="rzpa-story hidden"></div>
+
+  <!-- KPI kort med simple spørgsmål -->
+  <div class="rzpa-kpi-grid v2">
+    <div class="rzpa-kpi-v2">
+      <div class="k2-q">💰 Hvad kostede annoncerne?</div>
+      <div class="k2-val" id="kpi_spend">–</div>
+      <div class="k2-ctx" id="kpi_spend_sub">kr brugt på Facebook og Instagram</div>
+      <div class="k2-status" id="kpi_spend_pill"></div>
+    </div>
+    <div class="rzpa-kpi-v2">
+      <div class="k2-q">👁 Hvor mange <span data-tip="En 'visning' tæller hver gang din annonce dukker op i en persons feed — uanset om de klikker eller ej.">så annoncen?</span></div>
+      <div class="k2-val" id="kpi_impr">–</div>
+      <div class="k2-ctx">gange dukkede annoncen op</div>
+    </div>
+    <div class="rzpa-kpi-v2">
+      <div class="k2-q">🖱 Hvem klikkede videre til sitet?</div>
+      <div class="k2-val" id="kpi_clicks">–</div>
+      <div class="k2-ctx" id="kpi_cpc_sub">personer klikkede videre</div>
+    </div>
+    <div class="rzpa-kpi-v2">
+      <div class="k2-q">🎯 Er folk <span data-tip="Klikprocenten (CTR) viser: ud af 100 der ser annoncen, hvor mange klikker? Over 1,5% er godt for B2B markedsføring. Under 0,5% bør du ændre annoncens billede eller tekst.">interesserede?</span></div>
+      <div class="k2-val" id="kpi_ctr">–</div>
+      <div class="k2-ctx">af de der ser annoncen, klikker videre</div>
+      <div class="k2-status" id="kpi_ctr_sub"></div>
+    </div>
   </div>
 
   <!-- Performance oversigt -->
   <div class="rzpa-perf-summary" id="meta-perf-summary" style="display:none">
-    <div class="perf-item perf-good"><span id="perf_good_count">0</span> kampagner kører <strong>godt</strong> 🟢</div>
-    <div class="perf-item perf-mid"><span id="perf_mid_count">0</span> kører <strong>middel</strong> 🟡</div>
-    <div class="perf-item perf-bad"><span id="perf_bad_count">0</span> kører <strong>svagt</strong> 🔴</div>
+    <div class="perf-item"><span id="perf_good_count">0</span> kampagner kører <strong>godt</strong> 🟢</div>
+    <div class="perf-item"><span id="perf_mid_count">0</span> kører <strong>middel</strong> 🟡</div>
+    <div class="perf-item"><span id="perf_bad_count">0</span> kører <strong>svagt — overvej at pause dem</strong> 🔴</div>
   </div>
 
   <!-- Månedlig oversigt -->
   <div class="rzpa-card rzpa-monthly-card" id="meta-monthly-card" style="display:none">
-    <div class="rzpa-chart-title">Månedligt forbrug</div>
-    <div class="rzpa-chart-sub">Total annonceforbrug per måned (DKK) · Seneste 6 måneder</div>
+    <div class="rzpa-chart-title">📅 Månedligt forbrug — seneste 6 måneder</div>
+    <div class="rzpa-chart-sub">Hvad har I brugt per måned? Nyttig til at spotte tendenser.</div>
     <div style="height:180px;margin-top:12px"><canvas id="chart_monthly"></canvas></div>
   </div>
 
   <!-- Grafer -->
   <div class="rzpa-chart-grid">
     <div class="rzpa-chart-wrap">
-      <div class="rzpa-chart-title">Forbrug per kampagne</div>
-      <div class="rzpa-chart-sub">Hvor mange kr er brugt (DKK)</div>
+      <div class="rzpa-chart-title">Forbrug per kampagne (kr)</div>
+      <div class="rzpa-chart-sub">Hvilke kampagner koster mest?</div>
       <div style="height:200px"><canvas id="chart_spend"></canvas></div>
     </div>
     <div class="rzpa-chart-wrap">
-      <div class="rzpa-chart-title">Klikrate per kampagne (CTR %)</div>
-      <div class="rzpa-chart-sub">Grøn ≥ 1,5% er godt · Under 0,5% er svagt</div>
+      <div class="rzpa-chart-title"><span data-tip="Klikprocenten viser, hvor mange af dem der ser annoncen der klikker. Grøn = over 1,5% (godt) · Gul = 0,5–1,5% (middel) · Rød = under 0,5% (svagt)">Interesse per kampagne</span></div>
+      <div class="rzpa-chart-sub">🟢 Over 1,5% er godt &nbsp;·&nbsp; 🔴 Under 0,5% bør du handle</div>
       <div style="height:200px"><canvas id="chart_ctr"></canvas></div>
     </div>
+  </div>
+
+  <!-- Forklaringsboks (udfyldes af JS — skjult i standard) -->
+  <div class="rzpa-explain-bar" id="meta-explain" style="display:none">
+    <span class="explain-icon">💡</span>
+    <span id="meta-explain-text"></span>
   </div>
 
   <!-- Filter + tabel -->
   <div class="rzpa-card">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
       <div>
-        <h2 style="margin:0">Alle kampagner</h2>
-        <div class="rzpa-card-sub">Sortér ved at klikke på en kolonneoverskrift</div>
+        <h2>Alle dine kampagner</h2>
+        <div class="rzpa-card-sub">Klik på en kolonne-overskrift for at sortere &nbsp;·&nbsp; Brug filtrene til højre</div>
       </div>
       <div class="rzpa-filter-bar" id="meta-filter-bar">
         <button class="filter-btn active" data-filter="all">Alle</button>
         <button class="filter-btn" data-filter="ACTIVE">Aktive</button>
-        <button class="filter-btn" data-filter="PAUSED">Pauseret</button>
-        <button class="filter-btn perf-good-btn" data-filter="good">🟢 Godt</button>
-        <button class="filter-btn perf-mid-btn" data-filter="mid">🟡 Middel</button>
-        <button class="filter-btn perf-bad-btn" data-filter="bad">🔴 Svagt</button>
+        <button class="filter-btn" data-filter="PAUSED">Pauserede</button>
+        <button class="filter-btn" data-filter="good">🟢 Godt</button>
+        <button class="filter-btn" data-filter="mid">🟡 Middel</button>
+        <button class="filter-btn" data-filter="bad">🔴 Svagt</button>
       </div>
     </div>
     <div class="rzpa-table-wrap">
@@ -100,14 +108,14 @@
         <thead><tr>
           <th>Kampagnenavn</th>
           <th>Status</th>
-          <th data-sort="spend" style="cursor:pointer">Forbrug ↕</th>
-          <th data-sort="impressions" style="cursor:pointer">Visninger ↕</th>
-          <th data-sort="reach" style="cursor:pointer">Rækkevidde ↕</th>
-          <th data-sort="clicks" style="cursor:pointer">Klik ↕</th>
-          <th>Pris/1000 vist</th>
-          <th data-sort="cpc" style="cursor:pointer">Pris/klik ↕</th>
-          <th data-sort="ctr" style="cursor:pointer">Klikrate ↕</th>
-          <th>Performance</th>
+          <th data-sort="spend" style="cursor:pointer" title="Klik for at sortere">Forbrug ↕</th>
+          <th data-sort="impressions" style="cursor:pointer" title="Klik for at sortere"><span data-tip="Antal gange annoncen er dukket op i folks feed">Vist ↕</span></th>
+          <th data-sort="reach" style="cursor:pointer" title="Klik for at sortere"><span data-tip="Antal unikke personer der har set annoncen">Unikke ↕</span></th>
+          <th data-sort="clicks" style="cursor:pointer" title="Klik for at sortere">Klik ↕</th>
+          <th><span data-tip="Hvad koster det at vise annoncen 1.000 gange? Lavere er bedre.">Pr. 1000 vist</span></th>
+          <th data-sort="cpc" style="cursor:pointer" title="Klik for at sortere"><span data-tip="Pris per klik: Hvad koster det at få én person til at klikke videre?">Pris/klik ↕</span></th>
+          <th data-sort="ctr" style="cursor:pointer" title="Klik for at sortere"><span data-tip="Klikprocent: Ud af 100 der ser annoncen, hvor mange klikker? Over 1,5% er godt.">Klikprocent ↕</span></th>
+          <th>Vurdering</th>
           <th></th>
         </tr></thead>
         <tbody id="meta_tbody"><tr><td colspan="11" class="rzpa-loading">Indlæser…</td></tr></tbody>

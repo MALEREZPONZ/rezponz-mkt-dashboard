@@ -438,3 +438,190 @@ body.wp-admin #wpbody-content { overflow-x: hidden; }
 @media (max-width: 700px) {
   .rzpa-platform-split { grid-template-columns: 1fr; }
 }
+
+/* ════════════════════════════════════════════════════
+   BEGYNDERVENLIGT DESIGN – v1.2.7
+   ════════════════════════════════════════════════════ */
+
+/* ── Story / Fortæller-kort ──────────────────────── */
+.rzpa-story {
+  background: var(--bg-200);
+  border: 1px solid rgba(204,255,0,.18);
+  border-left: 4px solid var(--neon);
+  border-radius: var(--radius);
+  padding: 18px 22px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.75;
+}
+.rzpa-story strong { color: #fff; font-weight: 700; }
+.rzpa-story.hidden { display: none; }
+
+/* ── Health bar ──────────────────────────────────── */
+.rzpa-health {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 18px;
+  border-radius: 8px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.rzpa-health.health-good  { background:rgba(204,255,0,.07); border:1px solid rgba(204,255,0,.2); color:var(--neon); }
+.rzpa-health.health-warn  { background:rgba(255,170,51,.07); border:1px solid rgba(255,170,51,.2); color:var(--warn); }
+.rzpa-health.health-bad   { background:rgba(255,85,85,.07); border:1px solid rgba(255,85,85,.2); color:var(--bad); }
+.rzpa-health.health-empty { background:var(--bg-200); border:1px solid var(--border); color:var(--text-muted); }
+.rzpa-health .h-icon { font-size:20px; flex-shrink:0; }
+.rzpa-health .h-text { flex:1; }
+.rzpa-health .h-sub  { font-size:12px; opacity:.7; font-weight:400; }
+
+/* ── Status pill (inline good/warn/bad) ──────────── */
+.rzpa-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+.rzpa-pill.good    { background:rgba(204,255,0,.12); color:#CCFF00; border:1px solid rgba(204,255,0,.25); }
+.rzpa-pill.warn    { background:rgba(255,170,51,.12); color:#ffaa33; border:1px solid rgba(255,170,51,.25); }
+.rzpa-pill.bad     { background:rgba(255,85,85,.12); color:#ff5555; border:1px solid rgba(255,85,85,.25); }
+.rzpa-pill.neutral { background:var(--bg-300); color:var(--text-muted); border:1px solid var(--border); }
+
+/* ── Tooltip via data-tip ────────────────────────── */
+[data-tip] {
+  position: relative;
+  cursor: help;
+  border-bottom: 1px dotted var(--text-dim);
+}
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #252529;
+  border: 1px solid #3a3a42;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+  padding: 10px 14px;
+  border-radius: 8px;
+  width: 240px;
+  white-space: normal;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s;
+  line-height: 1.5;
+  box-shadow: 0 6px 20px rgba(0,0,0,.5);
+  text-decoration: none;
+}
+[data-tip]:hover::after { opacity: 1; }
+
+/* ── KPI v2 – store tal med spørgsmål ───────────── */
+.rzpa-kpi-v2 {
+  background: var(--bg-200);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px 16px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rzpa-kpi-v2 .k2-q {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.rzpa-kpi-v2 .k2-val {
+  font-size: 30px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+.rzpa-kpi-v2 .k2-ctx {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  flex: 1;
+}
+.rzpa-kpi-v2 .k2-status { margin-top: auto; }
+
+/* ── Platform summary cards ──────────────────────── */
+.rzpa-plat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+@media (max-width: 900px) { .rzpa-plat-grid { grid-template-columns: 1fr; } }
+.rzpa-plat-card {
+  background: var(--bg-200);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  min-width: 0;
+}
+.rzpa-plat-card .pc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.rzpa-plat-card .pc-title {
+  font-size: 14px; font-weight: 700; color: #fff;
+  display: flex; align-items: center; gap: 8px;
+}
+.rzpa-plat-card .pc-big {
+  font-size: 26px; font-weight: 800; color: var(--neon);
+  margin-bottom: 2px;
+}
+.rzpa-plat-card .pc-desc {
+  font-size: 12px; color: var(--text-dim); margin-bottom: 12px;
+}
+.rzpa-plat-card .pc-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; color: var(--text-muted);
+  padding: 5px 0;
+  border-top: 1px solid rgba(255,255,255,.04);
+}
+.rzpa-plat-card .pc-row strong { color: var(--text); font-weight: 600; }
+
+/* ── Action card ─────────────────────────────────── */
+.rzpa-actions {
+  background: var(--bg-200);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.rzpa-actions .act-title {
+  font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 12px;
+}
+.rzpa-act-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.04);
+  font-size: 13px; color: var(--text-muted); line-height: 1.5;
+}
+.rzpa-act-item:last-child { border-bottom: none; padding-bottom: 0; }
+.rzpa-act-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── SEO position badge ──────────────────────────── */
+.pos-badge { display:inline-block; padding:2px 8px; border-radius:6px; font-size:12px; font-weight:700; }
+.pos-top3  { background:rgba(204,255,0,.15); color:var(--neon); }
+.pos-top10 { background:rgba(91,155,213,.15); color:#5b9bd5; }
+.pos-top20 { background:rgba(255,170,51,.12); color:var(--warn); }
+.pos-out   { background:var(--bg-300); color:#555; font-size:11px; }
+
+/* ── Responsive KPI grid override for v2 ────────── */
+.rzpa-kpi-grid.v2 {
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 1100px) { .rzpa-kpi-grid.v2 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px)  { .rzpa-kpi-grid.v2 { grid-template-columns: 1fr; } }
