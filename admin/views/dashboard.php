@@ -24,41 +24,7 @@
     </div>
   </div>
 
-  <!-- ROI Platform Spotlight -->
-  <div class="rzpa-roi-bar">
-    <div class="rzpa-roi-card">
-      <span class="platform-icon">📘</span>
-      <div class="platform-name">Meta Ads</div>
-      <div class="roas-value roas-high" id="roi_meta_roas">–</div>
-      <div class="roas-label">ROAS</div>
-      <div class="spend-row">
-        <span>Spend</span>
-        <strong id="roi_meta_spend">–</strong>
-      </div>
-    </div>
-    <div class="rzpa-roi-card">
-      <span class="platform-icon">👻</span>
-      <div class="platform-name">Snapchat Ads</div>
-      <div class="roas-value roas-mid" id="roi_snap_engagement">–</div>
-      <div class="roas-label">Engagement Rate</div>
-      <div class="spend-row">
-        <span>Spend</span>
-        <strong id="roi_snap_spend">–</strong>
-      </div>
-    </div>
-    <div class="rzpa-roi-card">
-      <span class="platform-icon">🎵</span>
-      <div class="platform-name">TikTok Ads</div>
-      <div class="roas-value roas-high" id="roi_tt_roas">–</div>
-      <div class="roas-label">ROAS</div>
-      <div class="spend-row">
-        <span>Spend</span>
-        <strong id="roi_tt_spend">–</strong>
-      </div>
-    </div>
-  </div>
-
-  <!-- KPI grid -->
+  <!-- KPI grid – 4 tal øverst -->
   <div class="rzpa-kpi-grid">
     <div class="rzpa-kpi">
       <div class="rzpa-kpi-label">Samlet Ad Spend</div>
@@ -81,21 +47,61 @@
     </div>
   </div>
 
-  <!-- Time-series: Spend + ROAS over time (full width) -->
-  <div class="rzpa-chart-wrap" style="margin-bottom:20px">
-    <div class="rzpa-chart-title">Spend & ROAS over tid</div>
-    <div class="rzpa-chart-sub">Dagligt ad spend per platform (stacked) + samlet ROAS-trend</div>
-    <div style="height:280px"><canvas id="chart_trends"></canvas></div>
+  <!-- ROI Platform cards – horisontale rækker -->
+  <div class="rzpa-roi-bar">
+    <div class="rzpa-roi-card">
+      <div class="roi-icon">📘</div>
+      <div class="roi-info">
+        <div class="platform-name">Meta Ads</div>
+        <div class="roas-value roas-high" id="roi_meta_roas">–</div>
+        <div class="roas-label">ROAS</div>
+        <div class="spend-row">
+          <span>Spend:</span>
+          <strong id="roi_meta_spend">–</strong>
+        </div>
+      </div>
+    </div>
+    <div class="rzpa-roi-card">
+      <div class="roi-icon">👻</div>
+      <div class="roi-info">
+        <div class="platform-name">Snapchat Ads</div>
+        <div class="roas-value roas-mid" id="roi_snap_engagement">–</div>
+        <div class="roas-label">Engagement Rate</div>
+        <div class="spend-row">
+          <span>Spend:</span>
+          <strong id="roi_snap_spend">–</strong>
+        </div>
+      </div>
+    </div>
+    <div class="rzpa-roi-card">
+      <div class="roi-icon">🎵</div>
+      <div class="roi-info">
+        <div class="platform-name">TikTok Ads</div>
+        <div class="roas-value roas-high" id="roi_tt_roas">–</div>
+        <div class="roas-label">ROAS</div>
+        <div class="spend-row">
+          <span>Spend:</span>
+          <strong id="roi_tt_spend">–</strong>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Bottom 2-col: SEO + Top campaigns -->
+  <!-- Spend & ROAS over tid -->
+  <div class="rzpa-chart-wrap">
+    <div class="rzpa-chart-title">Spend & ROAS over tid</div>
+    <div class="rzpa-chart-sub">Dagligt ad spend per platform (stacked) + samlet ROAS-trend</div>
+    <div style="height:260px;position:relative"><canvas id="chart_trends"></canvas></div>
+  </div>
+
+  <!-- Bottom grid: SEO søgeord + Top kampagner -->
   <div class="rzpa-chart-grid-wide">
-    <div class="rzpa-chart-wrap">
+    <div class="rzpa-chart-wrap" style="margin-bottom:0">
       <div class="rzpa-chart-title">Top SEO Søgeord</div>
       <div class="rzpa-chart-sub">Organiske klik i perioden</div>
-      <div style="height:220px"><canvas id="chart_seo"></canvas></div>
+      <div style="height:200px;position:relative"><canvas id="chart_seo"></canvas></div>
     </div>
-    <div class="rzpa-card">
+    <div class="rzpa-card" style="margin-bottom:0">
       <h2>Bedste kampagner</h2>
       <div class="rzpa-card-sub">Alle platforme · sorteret efter ROAS</div>
       <div class="rzpa-table-wrap">
