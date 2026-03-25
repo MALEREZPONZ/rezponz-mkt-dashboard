@@ -47,9 +47,9 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
   <div style="margin-bottom:20px;padding:12px 16px;background:var(--bg-200);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:space-between">
     <span style="font-size:13px;color:#666">✓ Plugin er opdateret &nbsp;·&nbsp; <span style="color:#444">Version <?php echo esc_html( RZPA_VERSION ); ?></span></span>
     <a href="<?php echo esc_url( wp_nonce_url( add_query_arg( 'rzpa_check_updates', '1' ), 'rzpa_check_updates' ) ); ?>"
-       style="font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:4px 12px;border-radius:6px"
+       style="font-size:12px;color:var(--text-muted);text-decoration:none;border:1px solid var(--border);padding:4px 12px;border-radius:6px"
        onmouseover="this.style.color='var(--neon)';this.style.borderColor='var(--neon)'"
-       onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">
+       onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">
       ⟳ Tjek for opdateringer
     </a>
   </div>

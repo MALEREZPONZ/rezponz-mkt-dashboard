@@ -749,7 +749,7 @@ const RZPA_App = (() => {
   // ── Auto-init ──────────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', () => {
-    const page = document.body.dataset.rzpaPage;
+    const page = document.getElementById('rzpa-app')?.dataset?.rzpaPage;
     const initMap = {
       dashboard: initDashboard,
       seo:       initSEO,
