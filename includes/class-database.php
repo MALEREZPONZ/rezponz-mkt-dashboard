@@ -137,6 +137,8 @@ class RZPA_Database {
     public static function insert_seo_rows( array $rows ) {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpa_seo_data';
+        // Ryd al gammel data (inkl. mock-data) — GSC giver altid det fulde billede
+        $wpdb->query( "TRUNCATE TABLE `{$t}`" ); // phpcs:ignore
         foreach ( $rows as $r ) {
             $wpdb->insert( $t, [
                 'date'        => sanitize_text_field( $r['date'] ),
@@ -199,6 +201,7 @@ class RZPA_Database {
     public static function insert_seo_page_rows( array $rows ) {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpa_seo_pages';
+        $wpdb->query( "TRUNCATE TABLE `{$t}`" ); // phpcs:ignore
         foreach ( $rows as $r ) {
             $wpdb->insert( $t, [
                 'date'        => sanitize_text_field( $r['date'] ),

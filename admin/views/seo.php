@@ -1,4 +1,8 @@
-<?php if ( ! defined( 'ABSPATH' ) ) exit; ?>
+<?php
+if ( ! defined( 'ABSPATH' ) ) exit;
+$seo_opts      = get_option( 'rzpa_settings', [] );
+$seo_configured = ! empty( $seo_opts['google_client_id'] ) && ! empty( $seo_opts['google_refresh_token'] );
+?>
 <div id="rzpa-app" data-rzpa-page="seo">
 
   <div class="rzpa-logo-bar">
@@ -20,6 +24,27 @@
       <button id="rzpa-seo-sync" class="btn-ghost">⟳ Hent data</button>
     </div>
   </div>
+
+  <?php if ( ! $seo_configured ) : ?>
+  <!-- ── Google ikke forbundet ─────────────────────── -->
+  <div style="background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.25);border-radius:12px;padding:28px 32px;margin-bottom:24px">
+    <div style="display:flex;gap:16px;align-items:flex-start">
+      <div style="font-size:32px;flex-shrink:0">🔌</div>
+      <div>
+        <h2 style="margin:0 0 8px;font-size:18px;color:#fff">Google Search Console er ikke forbundet endnu</h2>
+        <p style="font-size:13px;color:#888;margin:0 0 16px;line-height:1.7">
+          Denne side viser data fra Google om, hvilke søgeord der bringer folk til <strong style="color:#ccc">rezponz.dk</strong>,
+          og hvordan jeres sider rangerer på Google. For at se <em>rigtige</em> data skal Google Search Console forbindes.
+        </p>
+        <a href="<?php echo esc_url( admin_url( 'admin.php?page=rzpa-settings' ) ); ?>#google"
+           class="btn-primary" style="text-decoration:none;display:inline-block">
+          ⚙️ Forbind Google Search Console →
+        </a>
+        <span style="font-size:12px;color:#555;margin-left:12px">Det tager ca. 3 minutter</span>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
 
   <!-- Health bar (udfyldes af JS) -->
   <div id="rzpa-seo-health" style="display:none"></div>

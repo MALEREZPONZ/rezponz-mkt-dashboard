@@ -7,6 +7,46 @@ class RZPA_Admin {
         add_action( 'admin_menu',            [ __CLASS__, 'add_menu' ] );
         add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue' ] );
         add_action( 'admin_post_rzpa_save_settings', [ __CLASS__, 'save_settings' ] );
+        add_action( 'admin_init',            [ __CLASS__, 'handle_google_oauth' ] );
+    }
+
+    /**
+     * Håndterer Google OAuth callback.
+     * Når Google redirecter brugeren tilbage med en "code" parameter,
+     * udveksler vi den til et refresh token og gemmer det i indstillingerne.
+     */
+    public static function handle_google_oauth() {
+        if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) return;
+        if ( empty( $_GET['page'] ) || $_GET['page'] !== 'rzpa-settings' ) return;
+        if ( empty( $_GET['rzpa_google_oauth'] ) || empty( $_GET['code'] ) ) return;
+
+        $code = sanitize_text_field( wp_unslash( $_GET['code'] ) );
+        $opts = get_option( 'rzpa_settings', [] );
+        $redirect_uri = admin_url( 'admin.php?page=rzpa-settings&rzpa_google_oauth=1' );
+
+        $res = wp_remote_post( 'https://oauth2.googleapis.com/token', [
+            'timeout' => 15,
+            'body'    => [
+                'code'          => $code,
+                'client_id'     => $opts['google_client_id']     ?? '',
+                'client_secret' => $opts['google_client_secret'] ?? '',
+                'redirect_uri'  => $redirect_uri,
+                'grant_type'    => 'authorization_code',
+            ],
+        ] );
+
+        if ( ! is_wp_error( $res ) ) {
+            $data = json_decode( wp_remote_retrieve_body( $res ), true );
+            if ( ! empty( $data['refresh_token'] ) ) {
+                $opts['google_refresh_token'] = $data['refresh_token'];
+                update_option( 'rzpa_settings', $opts );
+                wp_redirect( admin_url( 'admin.php?page=rzpa-settings&google_connected=1' ) );
+                exit;
+            }
+        }
+
+        wp_redirect( admin_url( 'admin.php?page=rzpa-settings&google_error=1' ) );
+        exit;
     }
 
     public static function add_menu() {
@@ -109,10 +149,13 @@ class RZPA_Admin {
 
         // SEO
         if ( strpos( $hook, 'rzpa-seo' ) !== false ) {
+            $opts   = get_option( 'rzpa_settings', [] );
+            $configured = ! empty( $opts['google_client_id'] ) && ! empty( $opts['google_refresh_token'] );
             return [
-                'seo_summary'  => RZPA_Database::get_seo_summary( $days ),
-                'seo_keywords' => RZPA_Database::get_top_keywords( $days, 20 ),
-                'seo_pages'    => RZPA_Database::get_top_pages( $days, 20 ),
+                'seo_configured' => $configured,
+                'seo_summary'    => RZPA_Database::get_seo_summary( $days ),
+                'seo_keywords'   => RZPA_Database::get_top_keywords( $days, 20 ),
+                'seo_pages'      => RZPA_Database::get_top_pages( $days, 20 ),
             ];
         }
 

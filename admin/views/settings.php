@@ -118,35 +118,139 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
     </div>
 
     <!-- ══ GOOGLE SEARCH CONSOLE ══════════════════════════════════════════════ -->
+    <?php
+    $g_id      = $opts['google_client_id']     ?? '';
+    $g_secret  = $opts['google_client_secret'] ?? '';
+    $g_token   = $opts['google_refresh_token'] ?? '';
+    $g_url     = $opts['google_site_url']      ?? 'https://rezponz.dk';
+    $g_has_creds = $g_id && $g_secret;
+    $g_connected = $g_has_creds && $g_token;
+
+    // OAuth authorize URL (bruges når creds er gemt men token mangler)
+    $redirect_uri = admin_url( 'admin.php?page=rzpa-settings&rzpa_google_oauth=1' );
+    $auth_url = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query( [
+        'client_id'     => $g_id,
+        'redirect_uri'  => $redirect_uri,
+        'response_type' => 'code',
+        'scope'         => 'https://www.googleapis.com/auth/webmasters.readonly',
+        'access_type'   => 'offline',
+        'prompt'        => 'consent',
+    ] );
+
+    // Success / error beskeder
+    if ( isset( $_GET['google_connected'] ) ) :
+    ?>
+    <div class="rzpa-notice success" style="margin-bottom:20px">✅ Google Search Console er nu forbundet! Gå til SEO-siden og klik "Hent data".</div>
+    <?php elseif ( isset( $_GET['google_error'] ) ) : ?>
+    <div class="rzpa-notice error" style="margin-bottom:20px">❌ Noget gik galt. Sørg for at Client ID og Client Secret er gemt korrekt, og prøv igen.</div>
+    <?php endif; ?>
+
     <div class="rzpa-card rzpa-settings-section">
       <h2>🔍 Google Search Console</h2>
-      <div class="rzpa-settings-grid">
-        <div class="rzpa-field">
-          <label>Client ID</label>
-          <input type="text" name="google_client_id"
-                 value="<?php echo esc_attr( $opts['google_client_id'] ?? '' ); ?>"
-                 placeholder="xxx.apps.googleusercontent.com" />
+      <p style="font-size:13px;color:#888;margin-bottom:20px;line-height:1.7">
+        Google Search Console viser hvilke søgeord der bringer folk til <strong style="color:#ccc">rezponz.dk</strong>,
+        og hvilke sider der rangerer bedst på Google — helt gratis data direkte fra Google.
+      </p>
+
+      <?php if ( $g_connected ) : ?>
+      <!-- ✅ Forbundet -->
+      <div style="background:rgba(204,255,0,.06);border:1px solid rgba(204,255,0,.2);border-radius:10px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--neon);margin-bottom:4px">✅ Forbundet til Google Search Console</div>
+          <div style="font-size:12px;color:#666">Henter data for: <strong style="color:#aaa"><?php echo esc_html($g_url); ?></strong></div>
         </div>
-        <div class="rzpa-field">
-          <label>Client Secret</label>
-          <input type="password" name="google_client_secret"
-                 value="<?php echo esc_attr( $opts['google_client_secret'] ?? '' ); ?>" />
-        </div>
-        <div class="rzpa-field">
-          <label>Refresh Token</label>
-          <input type="password" name="google_refresh_token"
-                 value="<?php echo esc_attr( $opts['google_refresh_token'] ?? '' ); ?>" />
-        </div>
-        <div class="rzpa-field">
-          <label>Site URL</label>
-          <input type="text" name="google_site_url"
-                 value="<?php echo esc_attr( $opts['google_site_url'] ?? 'https://rezponz.dk' ); ?>" />
+        <div style="display:flex;gap:8px">
+          <a href="<?php echo esc_url($auth_url); ?>"
+             style="font-size:12px;color:var(--text-muted);text-decoration:none;border:1px solid var(--border);padding:6px 12px;border-radius:6px">
+            🔄 Genautoriser
+          </a>
         </div>
       </div>
-      <p style="font-size:12px;color:#444;margin-top:8px">
-        Opret OAuth 2.0 credentials i Google Cloud Console → Search Console API.
-        Brug <a href="https://developers.google.com/oauthplayground" target="_blank" style="color:var(--neon)">OAuth Playground</a> til at generere refresh token.
-      </p>
+      <?php elseif ( $g_has_creds ) : ?>
+      <!-- Creds gemt men ingen token endnu -->
+      <div style="background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.2);border-radius:10px;padding:16px 20px;margin-bottom:20px">
+        <div style="font-size:13px;font-weight:700;color:var(--warn);margin-bottom:8px">⚡ Client ID og Secret er gemt — klik nu for at forbinde</div>
+        <p style="font-size:12px;color:#888;margin-bottom:12px">Sørg for at <code style="color:#aaa"><?php echo esc_html($redirect_uri); ?></code> er tilføjet som godkendt redirect URI i dit Google Cloud projekt, gem derefter indstillingerne og klik:</p>
+        <a href="<?php echo esc_url($auth_url); ?>" class="btn-primary" style="text-decoration:none;display:inline-block">
+          🔑 Forbind til Google Search Console →
+        </a>
+      </div>
+      <?php else : ?>
+      <!-- Ikke konfigureret — vis trin-for-trin guide -->
+      <div style="background:var(--bg-100);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px">
+        <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:16px">Sådan forbinder du Google Search Console — 3 trin</div>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <div style="width:28px;height:28px;border-radius:50%;background:rgba(204,255,0,.12);border:1px solid rgba(204,255,0,.3);color:var(--neon);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:#ccc;margin-bottom:4px">Opret Google Cloud credentials</div>
+              <div style="font-size:12px;color:#666;line-height:1.7">
+                Gå til <a href="https://console.cloud.google.com/" target="_blank" style="color:var(--neon)">console.cloud.google.com</a> →
+                Opret projekt (eller vælg eksisterende) →
+                API &amp; Services → Library → søg efter <strong style="color:#aaa">Search Console API</strong> → Aktivér →
+                Credentials → Create Credentials → <strong style="color:#aaa">OAuth 2.0 Client ID</strong> →
+                Application type: <strong style="color:#aaa">Web application</strong> →
+                Tilføj Authorized redirect URI:<br>
+                <code style="background:var(--bg-300);color:#CCFF00;padding:4px 8px;border-radius:4px;font-size:11px;word-break:break-all;display:inline-block;margin-top:4px"><?php echo esc_html($redirect_uri); ?></code>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <div style="width:28px;height:28px;border-radius:50%;background:rgba(204,255,0,.12);border:1px solid rgba(204,255,0,.3);color:var(--neon);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:#ccc;margin-bottom:4px">Udfyld Client ID og Secret herunder + gem</div>
+              <div style="font-size:12px;color:#666">Du finder dem under Credentials → dit OAuth 2.0 Client ID.</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <div style="width:28px;height:28px;border-radius:50%;background:rgba(204,255,0,.12);border:1px solid rgba(204,255,0,.3);color:var(--neon);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:#ccc;margin-bottom:4px">Klik "Forbind til Google" — klar! ✅</div>
+              <div style="font-size:12px;color:#666">Du bliver sendt til Google, godkender adgang, og sendes automatisk tilbage.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <?php endif; ?>
+
+      <div class="rzpa-settings-grid">
+        <div class="rzpa-field">
+          <label>Google OAuth Client ID</label>
+          <input type="text" name="google_client_id"
+                 value="<?php echo esc_attr( $g_id ); ?>"
+                 placeholder="xxxxx.apps.googleusercontent.com" />
+        </div>
+        <div class="rzpa-field">
+          <label>Google OAuth Client Secret</label>
+          <input type="password" name="google_client_secret"
+                 value="<?php echo esc_attr( $g_secret ); ?>"
+                 placeholder="GOCSPX-xxxxxxxxx" />
+        </div>
+        <div class="rzpa-field">
+          <label>Site URL <span style="color:#555;font-weight:normal">(præcis URL fra Search Console)</span></label>
+          <input type="text" name="google_site_url"
+                 value="<?php echo esc_attr( $g_url ); ?>"
+                 placeholder="https://www.rezponz.dk" />
+          <small style="color:#555;font-size:11px;display:block;margin-top:4px">Kan være <code>https://rezponz.dk</code> eller <code>sc-domain:rezponz.dk</code> — tjek din Search Console</small>
+        </div>
+        <?php if ( $g_connected ) : ?>
+        <div class="rzpa-field">
+          <label>Refresh Token <span style="color:#555;font-weight:normal">(auto-gemt ved forbindelse)</span></label>
+          <input type="password" name="google_refresh_token" value="<?php echo esc_attr( $g_token ); ?>" />
+        </div>
+        <?php else : ?>
+        <input type="hidden" name="google_refresh_token" value="<?php echo esc_attr( $g_token ); ?>" />
+        <?php endif; ?>
+      </div>
+
+      <?php if ( $g_has_creds && ! $g_connected ) : ?>
+      <div style="margin-top:16px">
+        <a href="<?php echo esc_url($auth_url); ?>" class="btn-primary" style="text-decoration:none;display:inline-block">
+          🔑 Forbind til Google Search Console →
+        </a>
+        <span style="font-size:12px;color:#555;margin-left:12px">Husk at gemme indstillinger først!</span>
+      </div>
+      <?php endif; ?>
     </div>
 
     <!-- ══ SERPAPI ═══════════════════════════════════════════════════════════ -->
