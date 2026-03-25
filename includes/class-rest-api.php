@@ -84,6 +84,27 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        // Månedligt forbrug
+        register_rest_route( self::NS, '/meta/monthly', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'meta_monthly' ],
+            'permission_callback' => $cap,
+        ] );
+
+        // Har vi data for en given periode?
+        register_rest_route( self::NS, '/meta/has-data', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'meta_has_data' ],
+            'permission_callback' => $cap,
+        ] );
+
+        // Kombineret dashboard endpoint – ét kald i stedet for 10
+        register_rest_route( self::NS, '/dashboard/overview', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'dashboard_overview' ],
+            'permission_callback' => $cap,
+        ] );
+
         // PDF
         register_rest_route( self::NS, '/pdf/generate', [
             'methods'             => 'POST',
@@ -119,6 +140,13 @@ class RZPA_REST_API {
 
     public static function run_sync() {
         RZPA_Scheduler::run_full_sync();
+        // Ryd alle cache-transients
+        foreach ( [ 7, 30, 90 ] as $d ) {
+            delete_transient( 'rzpa_dash_overview_' . $d );
+        }
+        foreach ( [ 3, 6, 12 ] as $m ) {
+            delete_transient( 'rzpa_meta_monthly_' . $m );
+        }
         return self::ok( 'Full sync completed' );
     }
 
@@ -231,17 +259,33 @@ class RZPA_REST_API {
         return self::ok( $data );
     }
     public static function meta_sync( $r ) {
-        $rows = RZPA_Meta_Ads::fetch( self::days( $r ) );
+        $days = self::days( $r );
+        $rows = RZPA_Meta_Ads::fetch( $days );
         if ( isset( $rows['__error'] ) ) {
             RZPA_Database::log_sync( 'meta_ads', 'error', $rows['__error'] );
             return new WP_Error( 'meta_token_error', $rows['__error'], [ 'status' => 400 ] );
         }
-        // Ryd gammel data før indsæt – undgår duplikater på tværs af datoperioder
-        global $wpdb;
-        $wpdb->query( "TRUNCATE TABLE {$wpdb->prefix}rzpa_meta_campaigns" ); // phpcs:ignore
-        if ( $rows ) RZPA_Database::insert_meta_campaigns( $rows );
-        RZPA_Database::log_sync( 'meta_ads', 'success', count( $rows ) . ' campaigns' );
-        return self::ok( [ 'count' => count( $rows ), 'days' => self::days( $r ) ] );
+        // insert_meta_campaigns rydder kun den specifikke periode og indsætter ny data
+        RZPA_Database::insert_meta_campaigns( $rows, $days );
+        RZPA_Database::log_sync( 'meta_ads', 'success', count( $rows ) . ' campaigns for ' . $days . ' days' );
+        // Ryd dashboard cache for denne periode
+        delete_transient( 'rzpa_dash_overview_' . $days );
+        return self::ok( [ 'count' => count( $rows ), 'days' => $days ] );
+    }
+
+    public static function meta_monthly( $r ) {
+        $months = (int) ( $r->get_param( 'months' ) ?: 6 );
+        $key    = 'rzpa_meta_monthly_' . $months;
+        $cached = get_transient( $key );
+        if ( $cached !== false ) return self::ok( $cached );
+        $data = RZPA_Meta_Ads::fetch_monthly( $months );
+        if ( $data ) set_transient( $key, $data, 6 * HOUR_IN_SECONDS );
+        return self::ok( $data );
+    }
+
+    public static function meta_has_data( $r ) {
+        $days = self::days( $r );
+        return self::ok( [ 'has_data' => RZPA_Database::has_meta_data( $days ), 'days' => $days ] );
     }
 
     // Snap
@@ -291,6 +335,45 @@ class RZPA_REST_API {
     // Trends
     public static function ads_trends( $r ) {
         return self::ok( RZPA_Database::get_ads_daily_trends( self::days( $r ) ) );
+    }
+
+    // Kombineret dashboard overview – erstatter 10 separate kald med ét
+    public static function dashboard_overview( $r ) {
+        $days = self::days( $r );
+        $key  = 'rzpa_dash_overview_' . $days;
+
+        $cached = get_transient( $key );
+        if ( $cached !== false ) {
+            return self::ok( $cached );
+        }
+
+        $opts          = get_option( 'rzpa_settings', [] );
+        $meta_ok       = ! empty( $opts['meta_access_token'] ) && ! empty( $opts['meta_ad_account_id'] );
+        $snap_ok       = ! empty( $opts['snap_access_token'] );
+        $tt_ok         = ! empty( $opts['tiktok_access_token'] );
+
+        $meta_sum  = $meta_ok ? RZPA_Database::get_meta_summary( $days )   : [ 'configured' => false ];
+        $snap_sum  = $snap_ok ? RZPA_Database::get_snap_summary( $days )   : [ 'configured' => false ];
+        $tt_sum    = $tt_ok   ? RZPA_Database::get_tiktok_summary( $days ) : [ 'configured' => false ];
+        if ( $meta_ok ) $meta_sum['configured'] = true;
+        if ( $snap_ok ) $snap_sum['configured'] = true;
+        if ( $tt_ok )   $tt_sum['configured']   = true;
+
+        $data = [
+            'seo'            => RZPA_Database::get_seo_summary( $days ),
+            'meta'           => $meta_sum,
+            'snap'           => $snap_sum,
+            'tiktok'         => $tt_sum,
+            'ai'             => RZPA_Database::get_ai_summary( $days ),
+            'keywords'       => RZPA_Database::get_top_keywords( $days, 8 ),
+            'meta_campaigns' => $meta_ok ? RZPA_Database::get_meta_campaigns( $days ) : [],
+            'snap_campaigns' => $snap_ok ? RZPA_Database::get_snap_campaigns( $days ) : [],
+            'tt_campaigns'   => $tt_ok   ? RZPA_Database::get_tiktok_campaigns( $days ) : [],
+            'trends'         => RZPA_Database::get_ads_daily_trends( $days ),
+        ];
+
+        set_transient( $key, $data, 5 * MINUTE_IN_SECONDS ); // 5 min cache
+        return self::ok( $data );
     }
 
     // Ryd data

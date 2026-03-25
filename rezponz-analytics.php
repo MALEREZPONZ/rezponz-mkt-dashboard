@@ -14,11 +14,11 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '1.2.5' );
+define( 'RZPA_VERSION',     '1.2.6' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
-define( 'RZPA_DB_VER',      '2' );
+define( 'RZPA_DB_VER',      '3' );
 
 require_once RZPA_DIR . 'includes/class-database.php';
 require_once RZPA_DIR . 'includes/class-scheduler.php';

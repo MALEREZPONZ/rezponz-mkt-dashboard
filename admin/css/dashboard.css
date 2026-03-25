@@ -4,6 +4,19 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Meta Ads Manager link */
+.rzpa-meta-link {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:26px; height:26px; border-radius:6px;
+  background:rgba(24,119,242,.15); color:#4e90f7;
+  font-size:14px; font-weight:700; text-decoration:none;
+  border:1px solid rgba(24,119,242,.25); transition:all .2s;
+}
+.rzpa-meta-link:hover { background:rgba(24,119,242,.3); color:#fff; border-color:#1877F2; }
+
+/* Monthly card */
+.rzpa-monthly-card { margin-bottom:20px; }
+
 /* Performance badges */
 .perf-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
 .perf-badge.perf-good { background:rgba(204,255,0,.15); color:#CCFF00; border:1px solid rgba(204,255,0,.3); }

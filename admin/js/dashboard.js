@@ -259,23 +259,28 @@ const RZPA_App = (() => {
   }
 
   async function loadDashboard(days) {
-    // Individuelle kald – fejl returnerer {} så resten af UI stadig renderes
-    const safe = path => api(path).catch(() => ({}));
-    const [seo, meta, snap, tt, ai, kw, mc, sc, tc, trends] = await Promise.all([
-      safe(`/seo/summary?days=${days}`),
-      safe(`/meta/summary?days=${days}`),
-      safe(`/snap/summary?days=${days}`),
-      safe(`/tiktok/summary?days=${days}`),
-      safe(`/ai/summary?days=${days}`),
-      safe(`/seo/keywords?days=${days}`),
-      safe(`/meta/campaigns?days=${days}`),
-      safe(`/snap/campaigns?days=${days}`),
-      safe(`/tiktok/campaigns?days=${days}`),
-      safe(`/ads/trends?days=${days}`),
-    ]);
+    // Ét kombineret kald i stedet for 10 – meget hurtigere
+    let overview;
+    try { overview = await api(`/dashboard/overview?days=${days}`); }
+    catch(e) { overview = {}; }
+    const d = overview.data || {};
 
-    const s = seo.data || {}, m = meta.data || {}, sn = snap.data || {},
-          t = tt.data || {}, a = ai.data || {};
+    const seoD  = d.seo            || {};
+    const metaD = d.meta           || {};
+    const snapD = d.snap           || {};
+    const ttD   = d.tiktok         || {};
+    const aiD   = d.ai             || {};
+    const kwD   = d.keywords       || [];
+    const mcD   = d.meta_campaigns || [];
+    const scD   = d.snap_campaigns || [];
+    const tcD   = d.tt_campaigns   || [];
+    const trD   = d.trends         || [];
+
+    // Alias så resten af koden stadig virker
+    const s = seoD, m = metaD, sn = snapD, t = ttD, a = aiD;
+    const kw = { data: kwD }, mc = { data: mcD }, sc = { data: scD },
+          tc = { data: tcD }, trends = { data: trD };
+    const seo = {data:s}, meta = {data:m}, snap = {data:sn}, tt = {data:t}, ai = {data:a};
 
     const metaOk = m.configured !== false;
     const snapOk = sn.configured !== false;
@@ -628,8 +633,11 @@ const RZPA_App = (() => {
     }
     if (noRes) noRes.style.display = 'none';
     tbody.innerHTML = filtered.map(c => {
-      const ctr = parseFloat(c.ctr) || 0;
+      const ctr  = parseFloat(c.ctr) || 0;
       const name = c.campaign_name.replace(/Rezponz\s*[–-]\s*/i,'');
+      const mgr  = c.campaign_id
+        ? `<a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?selected_campaign_ids=${c.campaign_id}" target="_blank" rel="noopener" class="rzpa-meta-link" title="Åbn i Meta Ads Manager">↗</a>`
+        : '';
       return `<tr>
         <td style="color:#ddd;font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${c.campaign_name}">${name}</td>
         <td>${badgeHtml(c.status)}</td>
@@ -641,6 +649,7 @@ const RZPA_App = (() => {
         <td>${fmt(c.cpc,2)} kr</td>
         <td style="font-weight:600">${fmt(ctr,2)}%</td>
         <td><span class="perf-badge ${perfClass(ctr)}">${perfLabel(ctr)}</span></td>
+        <td>${mgr}</td>
       </tr>`;
     }).join('');
   }
@@ -662,18 +671,58 @@ const RZPA_App = (() => {
     }
   }
 
+  async function loadMonthlyChart() {
+    try {
+      const r = await api('/meta/monthly?months=6');
+      const data = r.data || [];
+      if (!data.length) return;
+      const card = el('meta-monthly-card');
+      if (card) card.style.display = 'block';
+      const labels = data.map(d => {
+        const [y, m] = d.month.split('-');
+        const names = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+        return names[parseInt(m,10)-1] + ' ' + y.slice(2);
+      });
+      barChart('chart_monthly', labels,
+        [{ data: data.map(d => Math.round(d.spend||0)),
+           backgroundColor: 'rgba(24,119,242,0.8)',
+           borderRadius: 6 }],
+        { yTick: v => (v>=1000?(v/1000).toFixed(0)+'k':v)+' kr' }
+      );
+    } catch(e) {}
+  }
+
   async function initMeta() {
     let days = 30;
-    // Auto-sync når datofilter ændres
+
+    // Smart auto-sync: hent data hvis perioden ikke har data endnu
+    async function maybeSync(d) {
+      const check = await api(`/meta/has-data?days=${d}`);
+      if (!check.data?.has_data) {
+        return await syncMeta(d);
+      }
+      return true;
+    }
+
+    // Date filter: load first, sync only if needed
     initDateFilter('rzpa-date-filter', async d => {
       days = d;
-      await syncMeta(d);
+      const tbody = el('meta_tbody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="11" class="rzpa-loading">Henter data…</td></tr>';
+      await maybeSync(d);
       loadMeta(d);
     });
+
+    // Initial load
+    await maybeSync(days);
     loadMeta(days);
+    loadMonthlyChart();
 
     el('rzpa-sync-meta')?.addEventListener('click', async () => {
-      if (await syncMeta(days)) loadMeta(days);
+      if (await syncMeta(days)) {
+        loadMeta(days);
+        loadMonthlyChart();
+      }
     });
 
     // Filter-knapper

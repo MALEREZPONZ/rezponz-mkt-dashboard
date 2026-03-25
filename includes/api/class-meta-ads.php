@@ -63,6 +63,48 @@ class RZPA_Meta_Ads {
         return $rows; // Tom array er OK – ingen mock data
     }
 
+    /**
+     * Henter månedlig forbrug for de sidste X måneder.
+     * Bruger Meta Insights API med time_increment=monthly.
+     */
+    public static function fetch_monthly( int $months = 6 ) : array {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['meta_access_token'] ) || empty( $opts['meta_ad_account_id'] ) ) {
+            return [];
+        }
+
+        $token      = $opts['meta_access_token'];
+        $account_id = $opts['meta_ad_account_id'];
+        $end        = gmdate( 'Y-m-d' );
+        $start      = gmdate( 'Y-m-d', strtotime( "-{$months} months" ) );
+
+        $url = self::API_BASE . '/act_' . $account_id . '/insights?' . http_build_query( [
+            'access_token'   => $token,
+            'fields'         => 'spend,impressions,clicks',
+            'time_increment' => 'monthly',
+            'time_range'     => wp_json_encode( [ 'since' => $start, 'until' => $end ] ),
+            'level'          => 'account',
+            'limit'          => 50,
+        ] );
+
+        $res = wp_remote_get( $url, [ 'timeout' => 20 ] );
+        if ( is_wp_error( $res ) ) return [];
+
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
+        if ( ! empty( $body['error'] ) ) return [];
+
+        $rows = [];
+        foreach ( $body['data'] ?? [] as $item ) {
+            $rows[] = [
+                'month'       => substr( $item['date_start'] ?? '', 0, 7 ), // YYYY-MM
+                'spend'       => (float) ( $item['spend']       ?? 0 ),
+                'impressions' => (int)   ( $item['impressions'] ?? 0 ),
+                'clicks'      => (int)   ( $item['clicks']      ?? 0 ),
+            ];
+        }
+        return $rows;
+    }
+
     private static function mock_data( int $days ) : array {
         $start = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
         $end   = gmdate( 'Y-m-d' );

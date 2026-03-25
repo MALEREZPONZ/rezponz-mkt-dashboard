@@ -77,9 +77,10 @@ class RZPA_Database {
             roas          FLOAT DEFAULT 0,
             date_start    DATE,
             date_stop     DATE,
+            period_days   TINYINT UNSIGNED DEFAULT 30,
             fetched_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY idx_date_start (date_start)
+            KEY idx_period (period_days)
         ) $c;" );
 
         dbDelta( "CREATE TABLE {$wpdb->prefix}rzpa_snap_campaigns (
@@ -299,9 +300,11 @@ class RZPA_Database {
 
     // ── Meta ────────────────────────────────────────────────────────────────
 
-    public static function insert_meta_campaigns( array $rows ) {
+    public static function insert_meta_campaigns( array $rows, int $days = 30 ) {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpa_meta_campaigns';
+        // Ryd kun den specifikke periode – bevarer data for andre perioder
+        $wpdb->delete( $t, [ 'period_days' => $days ], [ '%d' ] );
         foreach ( $rows as $r ) {
             $wpdb->insert( $t, [
                 'campaign_id'   => sanitize_text_field( $r['campaign_id'] ),
@@ -316,6 +319,7 @@ class RZPA_Database {
                 'roas'          => (float) $r['roas'],
                 'date_start'    => sanitize_text_field( $r['date_start'] ),
                 'date_stop'     => sanitize_text_field( $r['date_stop'] ),
+                'period_days'   => $days,
             ] );
         }
     }
@@ -323,18 +327,17 @@ class RZPA_Database {
     public static function get_meta_campaigns( int $days = 30 ) : array {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpa_meta_campaigns';
-        // Returnér alle kampagner fra seneste sync (truncate sker ved sync)
-        return $wpdb->get_results(
+        return $wpdb->get_results( $wpdb->prepare(
             "SELECT *, CASE WHEN impressions > 0 THEN ROUND(clicks/impressions*100,2) ELSE 0 END AS ctr
-             FROM $t ORDER BY spend DESC",
-            ARRAY_A
-        );
+             FROM $t WHERE period_days = %d ORDER BY spend DESC",
+            $days
+        ), ARRAY_A );
     }
 
     public static function get_meta_summary( int $days = 30 ) : array {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpa_meta_campaigns';
-        $row = $wpdb->get_row(
+        $row = $wpdb->get_row( $wpdb->prepare(
             "SELECT SUM(spend) AS total_spend, SUM(impressions) AS total_impressions,
                     SUM(reach) AS total_reach, SUM(clicks) AS total_clicks,
                     AVG(cpm) AS avg_cpm, AVG(cpc) AS avg_cpc,
@@ -342,10 +345,18 @@ class RZPA_Database {
                          THEN ROUND(SUM(clicks)/SUM(impressions)*100, 2)
                          ELSE 0 END AS avg_ctr,
                     COUNT(*) AS campaign_count
-             FROM $t",
-            ARRAY_A
-        );
+             FROM $t WHERE period_days = %d",
+            $days
+        ), ARRAY_A );
         return $row ?: [];
+    }
+
+    public static function has_meta_data( int $days = 30 ) : bool {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_meta_campaigns';
+        return (bool) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM $t WHERE period_days = %d", $days
+        ) );
     }
 
     // ── Snapchat ─────────────────────────────────────────────────────────────

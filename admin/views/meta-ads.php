@@ -58,6 +58,13 @@
     <div class="perf-item perf-bad"><span id="perf_bad_count">0</span> kører <strong>svagt</strong> 🔴</div>
   </div>
 
+  <!-- Månedlig oversigt -->
+  <div class="rzpa-card rzpa-monthly-card" id="meta-monthly-card" style="display:none">
+    <div class="rzpa-chart-title">Månedligt forbrug</div>
+    <div class="rzpa-chart-sub">Total annonceforbrug per måned (DKK) · Seneste 6 måneder</div>
+    <div style="height:180px;margin-top:12px"><canvas id="chart_monthly"></canvas></div>
+  </div>
+
   <!-- Grafer -->
   <div class="rzpa-chart-grid">
     <div class="rzpa-chart-wrap">
@@ -101,8 +108,9 @@
           <th data-sort="cpc" style="cursor:pointer">Pris/klik ↕</th>
           <th data-sort="ctr" style="cursor:pointer">Klikrate ↕</th>
           <th>Performance</th>
+          <th></th>
         </tr></thead>
-        <tbody id="meta_tbody"><tr><td colspan="10" class="rzpa-loading">Klik "Hent data" for at hente dine rigtige kampagner…</td></tr></tbody>
+        <tbody id="meta_tbody"><tr><td colspan="11" class="rzpa-loading">Indlæser…</td></tr></tbody>
       </table>
     </div>
     <div id="meta-no-results" style="display:none;text-align:center;padding:24px;color:var(--text-muted)">
