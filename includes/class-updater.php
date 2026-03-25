@@ -60,6 +60,20 @@ class RZPA_Updater {
         // Vis GitHub-konfigurationsstatus på plugins-siden
         add_filter( 'plugin_row_meta',
                     [ $this, 'plugin_row_meta' ], 10, 2 );
+
+        // Tilføj auth-header til GitHub-downloads så private repos virker
+        if ( $this->github_token ) {
+            add_filter( 'http_request_args', [ $this, 'add_auth_to_github_requests' ], 10, 2 );
+        }
+    }
+
+    /** Inject Authorization-header på alle GitHub API + download-kald. */
+    public function add_auth_to_github_requests( array $args, string $url ) : array {
+        if ( strpos( $url, 'api.github.com' ) !== false ||
+             strpos( $url, 'codeload.github.com' ) !== false ) {
+            $args['headers']['Authorization'] = 'Bearer ' . $this->github_token;
+        }
+        return $args;
     }
 
     // ── Hent seneste GitHub-release ──────────────────────────────────────────
