@@ -38,12 +38,15 @@ class RZPA_Admin {
     public static function enqueue( string $hook ) {
         if ( strpos( $hook, 'rzpa' ) === false ) return;
 
-        // Chart.js from CDN
-        wp_enqueue_script( 'chartjs', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js', [], null, true );
+        // Chart.js – lokalt bundlet (ingen CDN-anmodning)
+        wp_enqueue_script( 'chartjs', RZPA_URL . 'admin/js/chart.umd.min.js', [], '4.4.2', true );
 
         // Plugin CSS & JS
         wp_enqueue_style(  'rzpa-admin', RZPA_URL . 'admin/css/dashboard.css', [], RZPA_VERSION );
         wp_enqueue_script( 'rzpa-admin', RZPA_URL . 'admin/js/dashboard.js',   [ 'chartjs' ], RZPA_VERSION, true );
+
+        // Gør plugin-scriptet defer så WP-admin-UI renderes med det samme
+        wp_script_add_data( 'rzpa-admin', 'defer', true );
 
         wp_localize_script( 'rzpa-admin', 'RZPA', [
             'apiBase' => rest_url( 'rzpa/v1' ),

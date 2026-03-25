@@ -4,3 +4,5 @@ docker-compose.yml
 node_modules/
 .DS_Store
 Thumbs.db
+*.zip
+*.tar.gz

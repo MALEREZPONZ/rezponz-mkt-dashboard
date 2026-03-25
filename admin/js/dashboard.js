@@ -8,10 +8,41 @@ const RZPA_App = (() => {
 
   const API = RZPA.apiBase;
   const HDR = { 'Content-Type': 'application/json', 'X-WP-Nonce': RZPA.nonce };
+  const CACHE_TTL = 5 * 60 * 1000; // 5 min – matcher server-side transient
 
+  // Browser-cache: GET-kald gemmes i sessionStorage i 5 min
+  // Når du klikker rundt i menuen bruges de gemte data med det samme
   async function api(path, opts = {}) {
-    const res = await fetch(API + path, { headers: HDR, ...opts });
-    return res.json();
+    const isGet = !opts.method || opts.method === 'GET';
+    const cacheKey = 'rzpa||' + path;
+
+    if (isGet) {
+      try {
+        const raw = sessionStorage.getItem(cacheKey);
+        if (raw) {
+          const { data, ts } = JSON.parse(raw);
+          if (Date.now() - ts < CACHE_TTL) return data;
+        }
+      } catch(e) {}
+    }
+
+    const res  = await fetch(API + path, { headers: HDR, ...opts });
+    const data = await res.json();
+
+    if (isGet) {
+      try { sessionStorage.setItem(cacheKey, JSON.stringify({ data, ts: Date.now() })); }
+      catch(e) {}
+    }
+    return data;
+  }
+
+  // Ryd browser-cache for et bestemt path-prefix (bruges efter sync)
+  function clearCache(prefix) {
+    try {
+      Object.keys(sessionStorage)
+        .filter(k => k.startsWith('rzpa||' + prefix))
+        .forEach(k => sessionStorage.removeItem(k));
+    } catch(e) {}
   }
 
   function fmt(n, d = 0) {
@@ -223,6 +254,7 @@ const RZPA_App = (() => {
       btn.textContent = 'Synkroniserer…';
       try {
         await api('/sync', { method: 'POST' });
+        clearCache('/'); // Ryd hele browser-cachen
         window.location.reload();
       } catch(e) {
         btn.disabled = false;
@@ -480,6 +512,15 @@ const RZPA_App = (() => {
     let days = 30, allKw = [];
     initDateFilter('rzpa-date-filter', d => { days = d; loadSEO(d); });
     loadSEO(days);
+    el('rzpa-seo-sync')?.addEventListener('click', async () => {
+      const btn = el('rzpa-seo-sync');
+      if (btn) { btn.disabled = true; btn.textContent = 'Henter…'; }
+      await api('/seo/sync', { method: 'POST' });
+      clearCache('/seo/');
+      clearCache('/dashboard/overview');
+      if (btn) { btn.disabled = false; btn.textContent = '⟳ Hent data'; }
+      loadSEO(days);
+    });
 
     async function loadSEO(d) {
       const [sum, kw, pages] = await Promise.all([
@@ -771,6 +812,9 @@ const RZPA_App = (() => {
     if (btn) { btn.disabled = true; btn.textContent = 'Henter…'; }
     try {
       const r = await api('/meta/sync', { method: 'POST', body: JSON.stringify({days}) });
+      // Ryd browser-cache så næste load henter friske data
+      clearCache('/meta/');
+      clearCache('/dashboard/overview');
       if (btn) {
         btn.textContent = `✓ ${r.data?.count||0} kampagner hentet`;
         setTimeout(() => { btn.disabled = false; btn.textContent = '⟳ Hent data'; }, 3000);
