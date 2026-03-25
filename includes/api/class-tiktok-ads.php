@@ -9,7 +9,7 @@ class RZPA_TikTok_Ads {
         $opts = get_option( 'rzpa_settings', [] );
 
         if ( empty( $opts['tiktok_access_token'] ) || empty( $opts['tiktok_advertiser_id'] ) ) {
-            return self::mock_data( $days );
+            return []; // Ikke konfigureret
         }
 
         $token         = $opts['tiktok_access_token'];

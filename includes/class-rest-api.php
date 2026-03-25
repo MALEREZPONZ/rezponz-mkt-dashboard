@@ -90,6 +90,13 @@ class RZPA_REST_API {
             'callback'            => [ __CLASS__, 'pdf_generate' ],
             'permission_callback' => $cap,
         ] );
+
+        // Ryd al data (bruges til at fjerne mock-data fra DB)
+        register_rest_route( self::NS, '/clear-data', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'clear_data' ],
+            'permission_callback' => $cap,
+        ] );
     }
 
     private static function days( WP_REST_Request $r ) : int {
@@ -225,7 +232,11 @@ class RZPA_REST_API {
     }
     public static function meta_sync( $r ) {
         $rows = RZPA_Meta_Ads::fetch( self::days( $r ) );
-        RZPA_Database::insert_meta_campaigns( $rows );
+        if ( isset( $rows['__error'] ) ) {
+            RZPA_Database::log_sync( 'meta_ads', 'error', $rows['__error'] );
+            return new WP_Error( 'meta_token_error', $rows['__error'], [ 'status' => 400 ] );
+        }
+        if ( $rows ) RZPA_Database::insert_meta_campaigns( $rows );
         RZPA_Database::log_sync( 'meta_ads', 'success', count( $rows ) . ' campaigns' );
         return self::ok( [ 'count' => count( $rows ) ] );
     }
@@ -277,6 +288,32 @@ class RZPA_REST_API {
     // Trends
     public static function ads_trends( $r ) {
         return self::ok( RZPA_Database::get_ads_daily_trends( self::days( $r ) ) );
+    }
+
+    // Ryd data
+    public static function clear_data( WP_REST_Request $r ) {
+        global $wpdb;
+        $prefix = $wpdb->prefix . 'rzpa_';
+        $tables = [ 'seo_keywords', 'seo_pages', 'meta_campaigns', 'snap_campaigns', 'tiktok_campaigns', 'ai_overview', 'ai_manual_logs', 'ads_daily', 'sync_log' ];
+        $body   = $r->get_json_params();
+        $only   = $body['only'] ?? 'all'; // 'all', 'meta', 'seo', 'snap', 'tiktok'
+
+        if ( $only === 'all' ) {
+            foreach ( $tables as $t ) {
+                $wpdb->query( "TRUNCATE TABLE `{$prefix}{$t}`" ); // phpcs:ignore
+            }
+        } else {
+            $map = [
+                'meta'   => [ 'meta_campaigns' ],
+                'seo'    => [ 'seo_keywords', 'seo_pages' ],
+                'snap'   => [ 'snap_campaigns' ],
+                'tiktok' => [ 'tiktok_campaigns' ],
+            ];
+            foreach ( ( $map[ $only ] ?? [] ) as $t ) {
+                $wpdb->query( "TRUNCATE TABLE `{$prefix}{$t}`" ); // phpcs:ignore
+            }
+        }
+        return self::ok( 'Data ryddet: ' . $only );
     }
 
     // PDF

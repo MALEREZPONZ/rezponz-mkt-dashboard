@@ -9,7 +9,7 @@ class RZPA_Meta_Ads {
         $opts = get_option( 'rzpa_settings', [] );
 
         if ( empty( $opts['meta_access_token'] ) || empty( $opts['meta_ad_account_id'] ) ) {
-            return self::mock_data( $days );
+            return []; // Ikke konfigureret – vis ingen data
         }
 
         $token      = $opts['meta_access_token'];
@@ -27,17 +27,22 @@ class RZPA_Meta_Ads {
         $res = wp_remote_get( $url, [ 'timeout' => 30 ] );
 
         if ( is_wp_error( $res ) ) {
-            return self::mock_data( $days );
+            return []; // API fejl – vis ingen data
         }
 
         $body      = json_decode( wp_remote_retrieve_body( $res ), true );
+
+        // Token udløbet eller API-fejl
+        if ( ! empty( $body['error'] ) ) {
+            return [ '__error' => $body['error']['message'] ?? 'Token fejl' ];
+        }
+
         $campaigns = $body['data'] ?? [];
         $rows      = [];
 
         foreach ( $campaigns as $c ) {
             $ins    = $c['insights']['data'][0] ?? [];
             $spend  = (float) ( $ins['spend'] ?? 0 );
-            $roas   = $spend > 0 ? round( ( wp_rand( 150, 400 ) / 100 ), 2 ) : 0;
 
             $rows[] = [
                 'campaign_id'   => $c['id'],
@@ -49,13 +54,13 @@ class RZPA_Meta_Ads {
                 'clicks'        => (int) ( $ins['clicks'] ?? 0 ),
                 'cpm'           => (float) ( $ins['cpm'] ?? 0 ),
                 'cpc'           => (float) ( $ins['cpc'] ?? 0 ),
-                'roas'          => $roas,
+                'roas'          => 0.0, // ROAS kræver konverteringssporing (Meta Pixel)
                 'date_start'    => $start,
                 'date_stop'     => $end,
             ];
         }
 
-        return $rows ?: self::mock_data( $days );
+        return $rows; // Tom array er OK – ingen mock data
     }
 
     private static function mock_data( int $days ) : array {

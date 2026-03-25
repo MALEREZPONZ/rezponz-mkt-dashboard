@@ -701,6 +701,15 @@ const RZPA_App = (() => {
     ]);
     const s = sum.data || {}, data = camps.data || [];
 
+    if (s.configured === false) {
+      const app = el('rzpa-app');
+      if (app) app.innerHTML = `<div class="rzpa-not-configured">
+        <h2>⚙️ Snapchat Ads er ikke opsat</h2>
+        <p>Gå til <a href="?page=rzpa-settings">Indstillinger</a> og tilføj din Snapchat access token og ad account ID.</p>
+      </div>`;
+      return;
+    }
+
     renderKPI('kpi_spend',      fmt(s.total_spend,0) + ' kr');
     renderKPI('kpi_swipes',     fmt(s.total_swipe_ups));
     renderKPI('kpi_impr',       fmt(s.total_impressions));
@@ -748,6 +757,15 @@ const RZPA_App = (() => {
       api(`/tiktok/campaigns?days=${days}`),
     ]);
     const s = sum.data || {}, data = camps.data || [];
+
+    if (s.configured === false) {
+      const app = el('rzpa-app');
+      if (app) app.innerHTML = `<div class="rzpa-not-configured">
+        <h2>⚙️ TikTok Ads er ikke opsat</h2>
+        <p>Gå til <a href="?page=rzpa-settings">Indstillinger</a> og tilføj din TikTok access token og advertiser ID.</p>
+      </div>`;
+      return;
+    }
 
     renderKPI('kpi_spend',  fmt(s.total_spend,0) + ' kr');
     renderKPI('kpi_views',  fmt(s.total_video_views));

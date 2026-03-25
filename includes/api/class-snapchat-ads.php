@@ -9,7 +9,7 @@ class RZPA_Snapchat_Ads {
         $opts = get_option( 'rzpa_settings', [] );
 
         if ( empty( $opts['snap_access_token'] ) || empty( $opts['snap_ad_account_id'] ) ) {
-            return self::mock_data( $days );
+            return []; // Ikke konfigureret
         }
 
         $token      = $opts['snap_access_token'];

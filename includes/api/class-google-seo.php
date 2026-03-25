@@ -7,7 +7,7 @@ class RZPA_Google_SEO {
         $opts = get_option( 'rzpa_settings', [] );
 
         if ( empty( $opts['google_client_id'] ) || empty( $opts['google_refresh_token'] ) ) {
-            return self::mock_data( $days );
+            return []; // Ikke konfigureret
         }
 
         // Get access token via refresh token
@@ -21,14 +21,14 @@ class RZPA_Google_SEO {
         ] );
 
         if ( is_wp_error( $token_res ) ) {
-            return self::mock_data( $days );
+            return [];
         }
 
         $token_data   = json_decode( wp_remote_retrieve_body( $token_res ), true );
         $access_token = $token_data['access_token'] ?? '';
 
         if ( ! $access_token ) {
-            return self::mock_data( $days );
+            return [];
         }
 
         $site_url  = $opts['google_site_url'] ?? 'https://rezponz.dk';
@@ -52,7 +52,7 @@ class RZPA_Google_SEO {
         );
 
         if ( is_wp_error( $api_res ) ) {
-            return self::mock_data( $days );
+            return [];
         }
 
         $body = json_decode( wp_remote_retrieve_body( $api_res ), true );
@@ -69,14 +69,14 @@ class RZPA_Google_SEO {
             ];
         }
 
-        return $rows ?: self::mock_data( $days );
+        return $rows; // Tom = ingen data fra GSC (tjek site URL i indstillinger)
     }
 
     public static function fetch_pages( int $days = 30 ) : array {
         $opts = get_option( 'rzpa_settings', [] );
 
         if ( empty( $opts['google_client_id'] ) || empty( $opts['google_refresh_token'] ) ) {
-            return self::mock_pages( $days );
+            return []; // Ikke konfigureret
         }
 
         $token_res = wp_remote_post( 'https://oauth2.googleapis.com/token', [
@@ -87,11 +87,11 @@ class RZPA_Google_SEO {
                 'grant_type'    => 'refresh_token',
             ],
         ] );
-        if ( is_wp_error( $token_res ) ) return self::mock_pages( $days );
+        if ( is_wp_error( $token_res ) ) return [];
 
         $token_data   = json_decode( wp_remote_retrieve_body( $token_res ), true );
         $access_token = $token_data['access_token'] ?? '';
-        if ( ! $access_token ) return self::mock_pages( $days );
+        if ( ! $access_token ) return [];
 
         $site_url   = $opts['google_site_url'] ?? 'https://rezponz.dk';
         $end_date   = gmdate( 'Y-m-d' );
@@ -112,7 +112,7 @@ class RZPA_Google_SEO {
                 ] ),
             ]
         );
-        if ( is_wp_error( $api_res ) ) return self::mock_pages( $days );
+        if ( is_wp_error( $api_res ) ) return [];
 
         $body = json_decode( wp_remote_retrieve_body( $api_res ), true );
         $rows = [];
@@ -126,7 +126,7 @@ class RZPA_Google_SEO {
                 'ctr'         => round( $row['ctr'] * 100, 2 ),
             ];
         }
-        return $rows ?: self::mock_pages( $days );
+        return $rows;
     }
 
     private static function mock_pages( int $days ) : array {
