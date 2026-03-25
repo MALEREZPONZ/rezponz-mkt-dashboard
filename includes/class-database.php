@@ -323,23 +323,28 @@ class RZPA_Database {
     public static function get_meta_campaigns( int $days = 30 ) : array {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpa_meta_campaigns';
-        return $wpdb->get_results( $wpdb->prepare(
-            "SELECT * FROM $t WHERE date_start >= DATE_SUB(CURDATE(), INTERVAL %d DAY) ORDER BY fetched_at DESC",
-            $days
-        ), ARRAY_A );
+        // Returnér alle kampagner fra seneste sync (truncate sker ved sync)
+        return $wpdb->get_results(
+            "SELECT *, CASE WHEN impressions > 0 THEN ROUND(clicks/impressions*100,2) ELSE 0 END AS ctr
+             FROM $t ORDER BY spend DESC",
+            ARRAY_A
+        );
     }
 
     public static function get_meta_summary( int $days = 30 ) : array {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpa_meta_campaigns';
-        $row = $wpdb->get_row( $wpdb->prepare(
+        $row = $wpdb->get_row(
             "SELECT SUM(spend) AS total_spend, SUM(impressions) AS total_impressions,
                     SUM(reach) AS total_reach, SUM(clicks) AS total_clicks,
                     AVG(cpm) AS avg_cpm, AVG(cpc) AS avg_cpc,
-                    AVG(roas) AS avg_roas, COUNT(*) AS campaign_count
-             FROM $t WHERE date_start >= DATE_SUB(CURDATE(), INTERVAL %d DAY)",
-            $days
-        ), ARRAY_A );
+                    CASE WHEN SUM(impressions) > 0
+                         THEN ROUND(SUM(clicks)/SUM(impressions)*100, 2)
+                         ELSE 0 END AS avg_ctr,
+                    COUNT(*) AS campaign_count
+             FROM $t",
+            ARRAY_A
+        );
         return $row ?: [];
     }
 

@@ -236,9 +236,12 @@ class RZPA_REST_API {
             RZPA_Database::log_sync( 'meta_ads', 'error', $rows['__error'] );
             return new WP_Error( 'meta_token_error', $rows['__error'], [ 'status' => 400 ] );
         }
+        // Ryd gammel data før indsæt – undgår duplikater på tværs af datoperioder
+        global $wpdb;
+        $wpdb->query( "TRUNCATE TABLE {$wpdb->prefix}rzpa_meta_campaigns" ); // phpcs:ignore
         if ( $rows ) RZPA_Database::insert_meta_campaigns( $rows );
         RZPA_Database::log_sync( 'meta_ads', 'success', count( $rows ) . ' campaigns' );
-        return self::ok( [ 'count' => count( $rows ) ] );
+        return self::ok( [ 'count' => count( $rows ), 'days' => self::days( $r ) ] );
     }
 
     // Snap

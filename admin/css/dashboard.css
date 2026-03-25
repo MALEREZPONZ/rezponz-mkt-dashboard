@@ -4,6 +4,30 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Performance badges */
+.perf-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.perf-badge.perf-good { background:rgba(204,255,0,.15); color:#CCFF00; border:1px solid rgba(204,255,0,.3); }
+.perf-badge.perf-mid  { background:rgba(245,166,35,.15); color:#f5a623; border:1px solid rgba(245,166,35,.3); }
+.perf-badge.perf-bad  { background:rgba(204,68,0,.15); color:#ff6633; border:1px solid rgba(204,68,0,.3); }
+
+/* Filter bar */
+.rzpa-filter-bar { display:flex; gap:6px; flex-wrap:wrap; }
+.filter-btn { padding:5px 12px; border-radius:20px; border:1px solid var(--border); background:var(--bg-200);
+  color:var(--text-muted); font-size:12px; cursor:pointer; transition:all .2s; }
+.filter-btn:hover { border-color:var(--neon); color:var(--neon); }
+.filter-btn.active { background:rgba(204,255,0,.12); border-color:var(--neon); color:var(--neon); font-weight:600; }
+
+/* Performance summary bar */
+.rzpa-perf-summary { display:flex; gap:16px; flex-wrap:wrap; margin:0 0 16px;
+  padding:14px 20px; background:var(--bg-200); border-radius:var(--radius); border:1px solid var(--border); }
+.perf-item { font-size:14px; color:var(--text-muted); }
+.perf-item strong { color:var(--text); }
+
+/* Not configured state */
+.rzpa-not-configured { text-align:center; padding:60px 24px; color:var(--text-muted); }
+.rzpa-not-configured h2 { color:var(--text); margin-bottom:12px; }
+.rzpa-not-configured a { color:var(--neon); }
+
 :root {
   --neon:       #CCFF00;
   --neon-dim:   #a8d400;

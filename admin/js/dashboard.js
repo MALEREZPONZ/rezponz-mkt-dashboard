@@ -596,25 +596,104 @@ const RZPA_App = (() => {
   // PAGE: META ADS
   // ════════════════════════════════════════════════════
 
+  // ── Meta helpers ──────────────────────────────────
+  function perfClass(ctr) {
+    return ctr >= 1.5 ? 'perf-good' : ctr >= 0.5 ? 'perf-mid' : 'perf-bad';
+  }
+  function perfLabel(ctr) {
+    return ctr >= 1.5 ? '🟢 Godt' : ctr >= 0.5 ? '🟡 Middel' : '🔴 Svagt';
+  }
+
+  let metaAllData = [], metaSortKey = 'spend', metaSortDir = 'desc', metaFilter = 'all';
+
+  function renderMetaTable(data) {
+    const tbody = el('meta_tbody');
+    const noRes = el('meta-no-results');
+    if (!tbody) return;
+    let filtered = data.filter(c => {
+      if (metaFilter === 'all') return true;
+      if (metaFilter === 'ACTIVE') return c.status === 'ACTIVE';
+      if (metaFilter === 'PAUSED') return c.status === 'PAUSED';
+      const ctr = parseFloat(c.ctr) || 0;
+      if (metaFilter === 'good') return ctr >= 1.5;
+      if (metaFilter === 'mid')  return ctr >= 0.5 && ctr < 1.5;
+      if (metaFilter === 'bad')  return ctr < 0.5;
+      return true;
+    });
+    filtered = sortTable(filtered, metaSortKey, metaSortDir);
+    if (!filtered.length) {
+      tbody.innerHTML = '';
+      if (noRes) noRes.style.display = 'block';
+      return;
+    }
+    if (noRes) noRes.style.display = 'none';
+    tbody.innerHTML = filtered.map(c => {
+      const ctr = parseFloat(c.ctr) || 0;
+      const name = c.campaign_name.replace(/Rezponz\s*[–-]\s*/i,'');
+      return `<tr>
+        <td style="color:#ddd;font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${c.campaign_name}">${name}</td>
+        <td>${badgeHtml(c.status)}</td>
+        <td>${fmt(c.spend,0)} kr</td>
+        <td>${fmt(c.impressions)}</td>
+        <td>${fmt(c.reach)}</td>
+        <td>${fmt(c.clicks)}</td>
+        <td>${fmt(c.cpm,2)} kr</td>
+        <td>${fmt(c.cpc,2)} kr</td>
+        <td style="font-weight:600">${fmt(ctr,2)}%</td>
+        <td><span class="perf-badge ${perfClass(ctr)}">${perfLabel(ctr)}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function syncMeta(days) {
+    const btn = el('rzpa-sync-meta');
+    if (btn) { btn.disabled = true; btn.textContent = 'Henter…'; }
+    try {
+      const r = await api('/meta/sync', { method: 'POST', body: JSON.stringify({days}) });
+      if (btn) {
+        btn.textContent = `✓ ${r.data?.count||0} kampagner hentet`;
+        setTimeout(() => { btn.disabled = false; btn.textContent = '⟳ Hent data'; }, 3000);
+      }
+      return true;
+    } catch(e) {
+      if (btn) { btn.disabled = false; btn.textContent = '⟳ Hent data'; }
+      alert('Fejl: Tjek at Meta Access Token er gyldigt i Indstillinger.');
+      return false;
+    }
+  }
+
   async function initMeta() {
     let days = 30;
-    initDateFilter('rzpa-date-filter', d => { days = d; loadMeta(d); });
+    // Auto-sync når datofilter ændres
+    initDateFilter('rzpa-date-filter', async d => {
+      days = d;
+      await syncMeta(d);
+      loadMeta(d);
+    });
     loadMeta(days);
+
     el('rzpa-sync-meta')?.addEventListener('click', async () => {
-      const btn = el('rzpa-sync-meta');
-      btn.disabled = true;
-      btn.textContent = 'Henter…';
-      try {
-        const r = await api('/meta/sync', { method: 'POST', body: JSON.stringify({days}) });
-        const count = r.data?.count || 0;
-        btn.textContent = '✓ ' + count + ' kampagner hentet';
-        setTimeout(() => { btn.disabled = false; btn.textContent = '⟳ Hent data'; }, 3000);
-        loadMeta(days);
-      } catch(e) {
-        btn.disabled = false;
-        btn.textContent = '⟳ Hent data';
-        alert('Fejl ved hentning af Meta-data. Tjek at Access Token er gyldigt i Indstillinger.');
-      }
+      if (await syncMeta(days)) loadMeta(days);
+    });
+
+    // Filter-knapper
+    el('meta-filter-bar')?.addEventListener('click', e => {
+      const btn = e.target.closest('[data-filter]');
+      if (!btn) return;
+      metaFilter = btn.dataset.filter;
+      el('meta-filter-bar').querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderMetaTable(metaAllData);
+    });
+
+    // Sortér kolonner
+    el('meta-table')?.querySelector('thead')?.addEventListener('click', e => {
+      const th = e.target.closest('[data-sort]');
+      if (!th) return;
+      const key = th.dataset.sort;
+      metaSortDir = (metaSortKey === key && metaSortDir === 'desc') ? 'asc' : 'desc';
+      metaSortKey = key;
+      renderMetaTable(metaAllData);
     });
   }
 
@@ -623,61 +702,66 @@ const RZPA_App = (() => {
       api(`/meta/summary?days=${days}`),
       api(`/meta/campaigns?days=${days}`),
     ]);
-    const s = sum.data || {}, data = camps.data || [];
+    const s = sum.data || {};
+    metaAllData = camps.data || [];
 
-    const roas = parseFloat(s.avg_roas) || 0;
-    const spend = parseFloat(s.total_spend) || 0;
-    const perDay = days > 0 ? Math.round(spend / days) : 0;
-    const avgCpc = parseFloat(s.avg_cpc) || 0;
-
-    renderKPI('kpi_spend',   fmt(spend,0) + ' kr',
-      perDay > 0 ? '≈ ' + fmt(perDay,0) + ' kr/dag' : '');
-    renderKPI('kpi_roas',    roas > 0 ? fmt(roas,2) + 'x' : '–',
-      roas >= 2.5 ? '✅ Rigtig godt afkast' : roas >= 1 ? '⚠️ Under målet (mål: 2,5x+)' : roas > 0 ? '❌ Taber penge' : 'Ingen data endnu');
-    renderKPI('kpi_impr',    fmt(s.total_impressions));
-    renderKPI('kpi_clicks',  fmt(s.total_clicks),
-      avgCpc > 0 ? fmt(avgCpc,2) + ' kr per klik' : '');
-
-    // Forklaringsboks
-    const explainEl = el('meta-roas-explain');
-    const textEl    = el('meta-roas-text');
-    if (explainEl && textEl && roas > 0 && spend > 0) {
-      const earned = spend * roas;
-      explainEl.style.display = 'flex';
-      textEl.textContent = `Du brugte ${fmt(spend,0)} kr og fik ca. ${fmt(earned,0)} kr i omsætning tilbage. `
-        + (roas >= 2.5 ? `Det er rigtig godt – fortsæt og skalér op! 🚀`
-          : roas >= 1.5 ? `Det er okay men der er plads til forbedring. Mål er 2,5x+.`
-          : `Det er under hvad det bør være. Overvej at justere målgruppe eller kreativt indhold.`);
-    } else if (explainEl) {
-      explainEl.style.display = 'none';
+    if (s.configured === false) {
+      const app = el('rzpa-app');
+      if (app) app.innerHTML = `<div class="rzpa-not-configured">
+        <h2>⚙️ Meta Ads er ikke opsat</h2>
+        <p>Gå til <a href="?page=rzpa-settings">Indstillinger</a> og tilføj Access Token og Ad Account ID.</p>
+      </div>`;
+      return;
     }
 
-    const top6 = data.slice(0,6);
-    const labels = top6.map(c => c.campaign_name.replace('Rezponz – ','').replace('Rezponz - ','').slice(0,22));
+    const spend  = parseFloat(s.total_spend) || 0;
+    const clicks = parseInt(s.total_clicks) || 0;
+    const impr   = parseInt(s.total_impressions) || 0;
+    const ctr    = parseFloat(s.avg_ctr) || (impr > 0 ? Math.round(clicks/impr*10000)/100 : 0);
+    const cpc    = parseFloat(s.avg_cpc) || (clicks > 0 ? Math.round(spend/clicks*100)/100 : 0);
+    const perDay = days > 0 ? Math.round(spend / days) : 0;
 
+    renderKPI('kpi_spend',  spend > 0 ? fmt(spend,0) + ' kr' : '–',
+      perDay > 0 ? '≈ ' + fmt(perDay,0) + ' kr/dag' : 'Klik "Hent data" for at hente kampagner');
+    renderKPI('kpi_impr',   fmt(impr));
+    renderKPI('kpi_clicks', fmt(clicks), cpc > 0 ? fmt(cpc,2) + ' kr per klik' : '');
+    renderKPI('kpi_ctr',    ctr > 0 ? fmt(ctr,2) + '%' : '–',
+      ctr >= 1.5 ? '✅ Over gennemsnit' : ctr >= 0.5 ? '⚠️ Under målet (mål: 1,5%+)' : ctr > 0 ? '❌ Lav – overvej nyt kreativt indhold' : '');
+
+    const expEl = el('meta-explain'), expTxt = el('meta-explain-text');
+    if (expEl && expTxt && spend > 0) {
+      expEl.style.display = 'flex';
+      expTxt.textContent = `Du brugte ${fmt(spend,0)} kr og nåede ${fmt(impr)} folk – ${fmt(clicks)} klikkede videre. `
+        + `Det svarer til ${fmt(cpc,2)} kr per klik og ${fmt(perDay,0)} kr per dag. `
+        + (ctr >= 1.5 ? 'Annoncerne fanger godt opmærksomhed! 🚀'
+          : ctr >= 0.5 ? 'Klikraten er okay – test nyt indhold for at forbedre den.'
+          : ctr > 0 ? 'Klikraten er lav – prøv at ændre billede, overskrift eller målgruppe.'
+          : '');
+    } else if (expEl) expEl.style.display = 'none';
+
+    // Performance oversigt
+    const perfSum = el('meta-perf-summary');
+    if (perfSum && metaAllData.length) {
+      const good = metaAllData.filter(c=>(parseFloat(c.ctr)||0)>=1.5).length;
+      const mid  = metaAllData.filter(c=>{const v=parseFloat(c.ctr)||0;return v>=0.5&&v<1.5;}).length;
+      const bad  = metaAllData.filter(c=>(parseFloat(c.ctr)||0)<0.5).length;
+      setText('perf_good_count',good); setText('perf_mid_count',mid); setText('perf_bad_count',bad);
+      perfSum.style.display = 'flex';
+    }
+
+    const top6   = [...metaAllData].sort((a,b)=>b.spend-a.spend).slice(0,6);
+    const labels = top6.map(c => c.campaign_name.replace(/Rezponz\s*[–-]\s*/i,'').slice(0,20));
     barChart('chart_spend', labels,
-      [{ data: top6.map(c=>Math.round(c.spend)), backgroundColor: '#1877F2', borderRadius: 5 }],
-      { yTick: v => (v/1000).toFixed(0)+'k' }
+      [{data:top6.map(c=>Math.round(c.spend||0)),backgroundColor:'#1877F2',borderRadius:5}],
+      {yTick: v => Math.round(v/1000)+'k kr'}
     );
-    barChart('chart_roas', labels,
-      [{ data: top6.map(c=>c.roas),
-         backgroundColor: top6.map(c => c.roas>=2.5?'#CCFF00':c.roas>=1.5?'#88cc00':'#cc4400'),
-         borderRadius: 5 }]
+    barChart('chart_ctr', labels,
+      [{data:top6.map(c=>parseFloat(c.ctr||0)),
+        backgroundColor:top6.map(c=>(parseFloat(c.ctr)||0)>=1.5?'#CCFF00':(parseFloat(c.ctr)||0)>=0.5?'#f5a623':'#cc4400'),
+        borderRadius:5}],
+      {yTick: v => v+'%'}
     );
-
-    const tbody = el('meta_tbody');
-    if (tbody) tbody.innerHTML = data.map(c => `
-      <tr>
-        <td style="color:#ddd;font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis">${c.campaign_name}</td>
-        <td>${badgeHtml(c.status)}</td>
-        <td>${fmt(c.spend,0)} kr</td>
-        <td>${fmt(c.impressions)}</td>
-        <td>${fmt(c.reach)}</td>
-        <td>${fmt(c.clicks)}</td>
-        <td>${fmt(c.cpm,2)} kr</td>
-        <td>${fmt(c.cpc,2)} kr</td>
-        <td class="${roasClass(c.roas)}">${fmt(c.roas,2)}x</td>
-      </tr>`).join('');
+    renderMetaTable(metaAllData);
   }
 
   // ════════════════════════════════════════════════════
