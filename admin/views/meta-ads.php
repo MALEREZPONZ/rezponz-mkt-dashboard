@@ -127,3 +127,19 @@
   </div>
 
 </div>
+
+<!-- ── Ad Creative Modal ─────────────────────────────────────────────── -->
+<div id="rzpa-ad-modal" class="rzpa-modal-overlay" style="display:none" role="dialog" aria-modal="true">
+  <div class="rzpa-modal">
+    <div class="rzpa-modal-head">
+      <div>
+        <div class="rzpa-modal-eyebrow">Annoncer i kampagne</div>
+        <h2 id="rzpa-modal-title" class="rzpa-modal-title">–</h2>
+      </div>
+      <button id="rzpa-modal-close" class="rzpa-modal-close" aria-label="Luk">✕</button>
+    </div>
+    <div class="rzpa-modal-body">
+      <div id="rzpa-ad-cards" class="rzpa-ad-cards"></div>
+    </div>
+  </div>
+</div>

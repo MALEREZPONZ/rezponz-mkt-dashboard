@@ -98,6 +98,20 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        // Ad creative viewer – alle ads i én kampagne
+        register_rest_route( self::NS, '/meta/campaign-ads', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'meta_campaign_ads' ],
+            'permission_callback' => $cap,
+        ] );
+
+        // Ad preview – iframe HTML for én enkelt annonce
+        register_rest_route( self::NS, '/meta/ad-preview', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'meta_ad_preview' ],
+            'permission_callback' => $cap,
+        ] );
+
         // Kombineret dashboard endpoint – ét kald i stedet for 10
         register_rest_route( self::NS, '/dashboard/overview', [
             'methods'             => 'GET',
@@ -286,6 +300,32 @@ class RZPA_REST_API {
     public static function meta_has_data( $r ) {
         $days = self::days( $r );
         return self::ok( [ 'has_data' => RZPA_Database::has_meta_data( $days ), 'days' => $days ] );
+    }
+
+    public static function meta_campaign_ads( WP_REST_Request $r ) {
+        $campaign_id = sanitize_text_field( $r->get_param( 'campaign_id' ) ?? '' );
+        if ( ! $campaign_id ) {
+            return new WP_Error( 'missing_param', 'campaign_id required', [ 'status' => 400 ] );
+        }
+        $key    = 'rzpa_camp_ads_' . md5( $campaign_id );
+        $cached = get_transient( $key );
+        if ( $cached !== false ) return self::ok( $cached );
+        $ads = RZPA_Meta_Ads::fetch_campaign_ads( $campaign_id );
+        if ( $ads ) set_transient( $key, $ads, HOUR_IN_SECONDS );
+        return self::ok( $ads );
+    }
+
+    public static function meta_ad_preview( WP_REST_Request $r ) {
+        $ad_id = sanitize_text_field( $r->get_param( 'ad_id' ) ?? '' );
+        if ( ! $ad_id ) {
+            return new WP_Error( 'missing_param', 'ad_id required', [ 'status' => 400 ] );
+        }
+        $key    = 'rzpa_adprev_' . md5( $ad_id );
+        $cached = get_transient( $key );
+        if ( $cached !== false ) return self::ok( [ 'iframe_html' => $cached ] );
+        $html = RZPA_Meta_Ads::fetch_ad_preview( $ad_id );
+        if ( $html ) set_transient( $key, $html, 30 * MINUTE_IN_SECONDS );
+        return self::ok( [ 'iframe_html' => $html ] );
     }
 
     // Snap

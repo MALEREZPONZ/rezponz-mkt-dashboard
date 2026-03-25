@@ -105,6 +105,72 @@ class RZPA_Meta_Ads {
         return $rows;
     }
 
+    /**
+     * Henter alle annoncer (ads) i én kampagne med kreativ information.
+     * Bruges til annonce-preview-modal i dashboard.
+     */
+    public static function fetch_campaign_ads( string $campaign_id ) : array {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['meta_access_token'] ) ) return [];
+
+        $token = $opts['meta_access_token'];
+
+        $url = self::API_BASE . '/' . $campaign_id . '/ads?' . http_build_query( [
+            'access_token' => $token,
+            'fields'       => 'id,name,creative{id,name,thumbnail_url,image_url,video_id,body,title,call_to_action_type}',
+            'limit'        => 20,
+        ] );
+
+        $res = wp_remote_get( $url, [ 'timeout' => 20 ] );
+        if ( is_wp_error( $res ) ) return [];
+
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
+        if ( ! empty( $body['error'] ) ) return [];
+
+        $ads = [];
+        foreach ( $body['data'] ?? [] as $ad ) {
+            $creative = $ad['creative'] ?? [];
+            $ads[] = [
+                'ad_id'         => $ad['id'],
+                'ad_name'       => $ad['name'] ?? '',
+                'creative_id'   => $creative['id'] ?? '',
+                'title'         => $creative['title'] ?? '',
+                'body'          => $creative['body'] ?? '',
+                'thumbnail_url' => $creative['thumbnail_url'] ?? '',
+                'image_url'     => $creative['image_url'] ?? '',
+                'video_id'      => $creative['video_id'] ?? '',
+                'has_video'     => ! empty( $creative['video_id'] ),
+                'cta'           => $creative['call_to_action_type'] ?? '',
+            ];
+        }
+        return $ads;
+    }
+
+    /**
+     * Henter HTML-preview (iframe) for én enkelt annonce via Meta Ad Preview API.
+     * Returnerer rå iframe HTML-streng klar til at vise i modal.
+     */
+    public static function fetch_ad_preview( string $ad_id ) : string {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['meta_access_token'] ) ) return '';
+
+        $token = $opts['meta_access_token'];
+
+        $url = self::API_BASE . '/' . $ad_id . '/previews?' . http_build_query( [
+            'access_token' => $token,
+            'ad_format'    => 'MOBILE_FEED_STANDARD',
+        ] );
+
+        $res = wp_remote_get( $url, [ 'timeout' => 20 ] );
+        if ( is_wp_error( $res ) ) return '';
+
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
+        if ( ! empty( $body['error'] ) ) return '';
+
+        // Meta returnerer HTML-entiteter — decode dem til rå HTML
+        return html_entity_decode( $body['data'][0]['body'] ?? '', ENT_QUOTES, 'UTF-8' );
+    }
+
     private static function mock_data( int $days ) : array {
         $start = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
         $end   = gmdate( 'Y-m-d' );

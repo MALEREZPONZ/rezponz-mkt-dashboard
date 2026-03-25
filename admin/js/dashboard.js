@@ -8,14 +8,40 @@ const RZPA_App = (() => {
 
   const API = RZPA.apiBase;
   const HDR = { 'Content-Type': 'application/json', 'X-WP-Nonce': RZPA.nonce };
-  const CACHE_TTL = 5 * 60 * 1000; // 5 min – matcher server-side transient
+  const CACHE_TTL = 5 * 60 * 1000; // 5 min
 
-  // Browser-cache: GET-kald gemmes i sessionStorage i 5 min
-  // Når du klikker rundt i menuen bruges de gemte data med det samme
+  // Server-preload: PHP-data indlejret direkte i HTML — nul HTTP-kald
+  const _preload = RZPA.preload || {};
+
+  // Matcher en API-sti til indlejret PHP-data (ignorerer ?days=X på første load)
+  function _matchPreload(path) {
+    if (path.includes('/dashboard/overview'))        return _preload.dashboard_overview;
+    if (path.includes('/meta/summary'))              return _preload.meta_summary;
+    if (path.includes('/meta/campaigns'))            return _preload.meta_campaigns;
+    if (path.includes('/meta/has-data'))             return { has_data: !!_preload.meta_has_data, days: 30 };
+    if (path.includes('/seo/summary'))               return _preload.seo_summary;
+    if (path.includes('/seo/keywords'))              return _preload.seo_keywords;
+    if (path.includes('/seo/pages'))                 return _preload.seo_pages;
+    return undefined;
+  }
+
+  // Bruges-én-gang flag pr. nøgle
+  const _preloadUsed = {};
+
   async function api(path, opts = {}) {
     const isGet = !opts.method || opts.method === 'GET';
-    const cacheKey = 'rzpa||' + path;
 
+    // ① PHP server-preload – ingen netværksanmodning overhovedet
+    if (isGet && !_preloadUsed[path]) {
+      const hit = _matchPreload(path);
+      if (hit !== undefined) {
+        _preloadUsed[path] = true;
+        return { success: true, data: hit };
+      }
+    }
+
+    // ② Browser sessionStorage – data genbruges i 5 min ved sidesnak
+    const cacheKey = 'rzpa||' + path;
     if (isGet) {
       try {
         const raw = sessionStorage.getItem(cacheKey);
@@ -26,6 +52,7 @@ const RZPA_App = (() => {
       } catch(e) {}
     }
 
+    // ③ Rigtig REST-kald (kun når data mangler eller er forældet)
     const res  = await fetch(API + path, { headers: HDR, ...opts });
     const data = await res.json();
 
@@ -764,6 +791,93 @@ const RZPA_App = (() => {
 
   let metaAllData = [], metaSortKey = 'spend', metaSortDir = 'desc', metaFilter = 'all';
 
+  // ── Ad Creative Modal ──────────────────────────────────────────────────────
+
+  const _ctaLabels = {
+    LEARN_MORE:'Læs mere', SHOP_NOW:'Køb nu', SIGN_UP:'Tilmeld dig',
+    GET_QUOTE:'Få et tilbud', CONTACT_US:'Kontakt os', DOWNLOAD:'Download',
+    WATCH_MORE:'Se mere', BOOK_TRAVEL:'Book rejse', APPLY_NOW:'Ansøg nu',
+    GET_OFFER:'Få tilbud',
+  };
+  function fmtCTA(v) { return _ctaLabels[v] || v || ''; }
+
+  function openAdModal(campaignId, campaignName) {
+    const modal = el('rzpa-ad-modal');
+    if (!modal) return;
+    const titleEl = el('rzpa-modal-title');
+    const cards   = el('rzpa-ad-cards');
+    if (titleEl) titleEl.textContent = campaignName;
+    if (cards)   cards.innerHTML = '<div class="rzpa-loading-modal">⏳ Henter annoncer fra Meta…</div>';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    api(`/meta/campaign-ads?campaign_id=${encodeURIComponent(campaignId)}`).then(r => {
+      const ads = r.data || [];
+      if (!cards) return;
+      if (!ads.length) {
+        cards.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:48px 24px">Ingen annoncer fundet for denne kampagne.<br><small>Det kan skyldes at kampagnen er ny, eller at din token mangler ads-tilladelse.</small></p>';
+        return;
+      }
+      cards.innerHTML = ads.map(ad => {
+        const thumb = ad.thumbnail_url || ad.image_url;
+        const mediaHtml = thumb
+          ? `<img src="${thumb}" class="rzpa-ad-thumb" alt="Annonce preview">`
+          : `<div class="rzpa-ad-no-thumb">📷 Ingen preview tilgængeligt</div>`;
+        const playBtn = ad.has_video
+          ? `<button class="rzpa-play-btn" data-adid="${ad.ad_id}" title="Afspil annonce">▶</button>`
+          : '';
+        const cta = fmtCTA(ad.cta);
+        return `<div class="rzpa-ad-card">
+          <div class="rzpa-ad-preview-wrap" id="adprev-${ad.ad_id}">
+            ${mediaHtml}${playBtn}
+          </div>
+          <div class="rzpa-ad-info">
+            <div class="rzpa-ad-name">${ad.ad_name||'Unavngivet'}</div>
+            ${ad.title ? `<div class="rzpa-ad-title">${ad.title}</div>` : ''}
+            ${ad.body  ? `<div class="rzpa-ad-body">${ad.body.substring(0,120)}${ad.body.length>120?'…':''}</div>` : ''}
+            ${cta      ? `<div class="rzpa-ad-cta">${cta}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+
+      // Play-knapper: hent og vis Meta iframe-preview
+      cards.querySelectorAll('.rzpa-play-btn').forEach(btn => {
+        btn.addEventListener('click', () => loadAdPreview(btn.dataset.adid, document.getElementById('adprev-' + btn.dataset.adid)));
+      });
+    }).catch(() => {
+      if (cards) cards.innerHTML = '<p style="color:#ff6633;padding:40px;text-align:center">Fejl: Kunne ikke hente annoncer. Tjek din Meta Access Token i Indstillinger.</p>';
+    });
+  }
+
+  function closeAdModal() {
+    const modal = el('rzpa-ad-modal');
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  function loadAdPreview(adId, container) {
+    if (!container) return;
+    container.innerHTML = '<div class="rzpa-loading-modal" style="min-height:80px">Indlæser annonce…</div>';
+    api(`/meta/ad-preview?ad_id=${encodeURIComponent(adId)}`).then(r => {
+      const html = r.data?.iframe_html;
+      if (!html) {
+        container.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:20px;font-size:12px">Preview ikke tilgængeligt for denne annonce.</p>';
+        return;
+      }
+      container.innerHTML = `<div class="rzpa-ad-iframe-wrap">${html}</div>`;
+    });
+  }
+
+  // Modal luk-handlers (oprettes én gang ved modul-init)
+  document.addEventListener('click', e => {
+    if (e.target.id === 'rzpa-modal-close' || e.target.id === 'rzpa-ad-modal') closeAdModal();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeAdModal();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   function renderMetaTable(data) {
     const tbody = el('meta_tbody');
     const noRes = el('meta-no-results');
@@ -789,7 +903,7 @@ const RZPA_App = (() => {
       const ctr  = parseFloat(c.ctr) || 0;
       const name = c.campaign_name.replace(/Rezponz\s*[–-]\s*/i,'');
       const mgr  = c.campaign_id
-        ? `<a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?selected_campaign_ids=${c.campaign_id}" target="_blank" rel="noopener" class="rzpa-meta-link" title="Åbn i Meta Ads Manager">↗</a>`
+        ? `<button class="rzpa-see-ads-btn" data-cid="${c.campaign_id}" data-cname="${name}">🎨 Se annoncer</button>`
         : '';
       return `<tr>
         <td style="color:#ddd;font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${c.campaign_name}">${name}</td>
@@ -899,6 +1013,13 @@ const RZPA_App = (() => {
       metaSortDir = (metaSortKey === key && metaSortDir === 'desc') ? 'asc' : 'desc';
       metaSortKey = key;
       renderMetaTable(metaAllData);
+    });
+
+    // Se annoncer-knapper (event delegation på tbody)
+    el('meta_tbody')?.addEventListener('click', e => {
+      const btn = e.target.closest('.rzpa-see-ads-btn');
+      if (!btn) return;
+      openAdModal(btn.dataset.cid, btn.dataset.cname);
     });
   }
 

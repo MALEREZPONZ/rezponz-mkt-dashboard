@@ -51,7 +51,72 @@ class RZPA_Admin {
         wp_localize_script( 'rzpa-admin', 'RZPA', [
             'apiBase' => rest_url( 'rzpa/v1' ),
             'nonce'   => wp_create_nonce( 'wp_rest' ),
+            'preload' => self::get_page_preload( $hook ), // Data indlejret i siden – ingen REST-kald
         ] );
+    }
+
+    /**
+     * Indlejrer relevante DB-data direkte i siden ved PHP-rendering.
+     * Resultatet sendes med i wp_localize_script som RZPA.preload,
+     * så JS ikke behøver et separat REST-kald på første pageload.
+     */
+    private static function get_page_preload( string $hook ) : array {
+        $days = 30; // Default – JS opdaterer ved datofilter-ændring
+
+        // Dashboard (toplevel)
+        if ( $hook === 'toplevel_page_rzpa-dashboard' ) {
+            $cached = get_transient( 'rzpa_dash_overview_' . $days );
+            if ( $cached ) return [ 'dashboard_overview' => $cached ];
+
+            // Byg det live og gem i transient til næste besøg
+            $opts    = get_option( 'rzpa_settings', [] );
+            $meta_ok = ! empty( $opts['meta_access_token'] ) && ! empty( $opts['meta_ad_account_id'] );
+            $snap_ok = ! empty( $opts['snap_access_token'] );
+            $tt_ok   = ! empty( $opts['tiktok_access_token'] );
+
+            $meta_sum = $meta_ok ? array_merge( RZPA_Database::get_meta_summary( $days ), [ 'configured' => true ] ) : [ 'configured' => false ];
+            $snap_sum = $snap_ok ? array_merge( RZPA_Database::get_snap_summary( $days ), [ 'configured' => true ] ) : [ 'configured' => false ];
+            $tt_sum   = $tt_ok   ? array_merge( RZPA_Database::get_tiktok_summary( $days ), [ 'configured' => true ] ) : [ 'configured' => false ];
+
+            $data = [
+                'seo'            => RZPA_Database::get_seo_summary( $days ),
+                'meta'           => $meta_sum,
+                'snap'           => $snap_sum,
+                'tiktok'         => $tt_sum,
+                'ai'             => RZPA_Database::get_ai_summary( $days ),
+                'keywords'       => RZPA_Database::get_top_keywords( $days, 8 ),
+                'meta_campaigns' => $meta_ok ? RZPA_Database::get_meta_campaigns( $days ) : [],
+                'snap_campaigns' => $snap_ok ? RZPA_Database::get_snap_campaigns( $days ) : [],
+                'tt_campaigns'   => $tt_ok   ? RZPA_Database::get_tiktok_campaigns( $days ) : [],
+                'trends'         => RZPA_Database::get_ads_daily_trends( $days ),
+            ];
+            set_transient( 'rzpa_dash_overview_' . $days, $data, 5 * MINUTE_IN_SECONDS );
+            return [ 'dashboard_overview' => $data ];
+        }
+
+        // Meta Ads
+        if ( strpos( $hook, 'rzpa-meta' ) !== false ) {
+            $opts    = get_option( 'rzpa_settings', [] );
+            $meta_ok = ! empty( $opts['meta_access_token'] ) && ! empty( $opts['meta_ad_account_id'] );
+            return [
+                'meta_summary'   => $meta_ok
+                    ? array_merge( RZPA_Database::get_meta_summary( $days ), [ 'configured' => true ] )
+                    : [ 'configured' => false ],
+                'meta_campaigns' => $meta_ok ? RZPA_Database::get_meta_campaigns( $days ) : [],
+                'meta_has_data'  => RZPA_Database::has_meta_data( $days ),
+            ];
+        }
+
+        // SEO
+        if ( strpos( $hook, 'rzpa-seo' ) !== false ) {
+            return [
+                'seo_summary'  => RZPA_Database::get_seo_summary( $days ),
+                'seo_keywords' => RZPA_Database::get_top_keywords( $days, 20 ),
+                'seo_pages'    => RZPA_Database::get_top_pages( $days, 20 ),
+            ];
+        }
+
+        return [];
     }
 
     public static function save_settings() {
