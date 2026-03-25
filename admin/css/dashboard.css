@@ -22,6 +22,9 @@
 }
 
 /* ── Reset WP chrome ──────────────────────────── */
+body.wp-admin #wpbody,
+body.wp-admin #wpbody-content { overflow-x: hidden; }
+
 #rzpa-app {
   font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
   background: var(--bg);
@@ -32,6 +35,7 @@
   font-size: 14px;
   line-height: 1.5;
   overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 /* ── Logo bar ─────────────────────────────────── */

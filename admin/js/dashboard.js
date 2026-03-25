@@ -259,17 +259,19 @@ const RZPA_App = (() => {
   }
 
   async function loadDashboard(days) {
+    // Individuelle kald – fejl returnerer {} så resten af UI stadig renderes
+    const safe = path => api(path).catch(() => ({}));
     const [seo, meta, snap, tt, ai, kw, mc, sc, tc, trends] = await Promise.all([
-      api(`/seo/summary?days=${days}`),
-      api(`/meta/summary?days=${days}`),
-      api(`/snap/summary?days=${days}`),
-      api(`/tiktok/summary?days=${days}`),
-      api(`/ai/summary?days=${days}`),
-      api(`/seo/keywords?days=${days}`),
-      api(`/meta/campaigns?days=${days}`),
-      api(`/snap/campaigns?days=${days}`),
-      api(`/tiktok/campaigns?days=${days}`),
-      api(`/ads/trends?days=${days}`),
+      safe(`/seo/summary?days=${days}`),
+      safe(`/meta/summary?days=${days}`),
+      safe(`/snap/summary?days=${days}`),
+      safe(`/tiktok/summary?days=${days}`),
+      safe(`/ai/summary?days=${days}`),
+      safe(`/seo/keywords?days=${days}`),
+      safe(`/meta/campaigns?days=${days}`),
+      safe(`/snap/campaigns?days=${days}`),
+      safe(`/tiktok/campaigns?days=${days}`),
+      safe(`/ads/trends?days=${days}`),
     ]);
 
     const s = seo.data || {}, m = meta.data || {}, sn = snap.data || {},
