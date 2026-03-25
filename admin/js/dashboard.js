@@ -277,44 +277,72 @@ const RZPA_App = (() => {
     const s = seo.data || {}, m = meta.data || {}, sn = snap.data || {},
           t = tt.data || {}, a = ai.data || {};
 
-    const totalSpend = (parseFloat(m.total_spend)||0) + (parseFloat(sn.total_spend)||0) + (parseFloat(t.total_spend)||0);
-    const metaRoas   = parseFloat(m.avg_roas) || 0;
-    const snapEng    = parseFloat(sn.avg_engagement_rate) || 0;
-    const ttRoas     = parseFloat(t.avg_roas) || 0;
+    const metaOk = m.configured !== false;
+    const snapOk = sn.configured !== false;
+    const ttOk   = t.configured  !== false;
 
-    // ROI Spotlight – med afkast-forklaring i label
+    const totalSpend = (metaOk ? parseFloat(m.total_spend)||0 : 0)
+                     + (snapOk ? parseFloat(sn.total_spend)||0 : 0)
+                     + (ttOk   ? parseFloat(t.total_spend)||0  : 0);
+    const metaRoas = metaOk ? (parseFloat(m.avg_roas) || 0) : 0;
+    const snapEng  = snapOk ? (parseFloat(sn.avg_engagement_rate) || 0) : 0;
+    const ttRoas   = ttOk   ? (parseFloat(t.avg_roas) || 0)  : 0;
+
+    // ROI Spotlight – vis "Ikke opsat" for ukonfigurerede platforme
     const setRoas = (id, val, clsName) => {
       const e = el(id);
       if (e) { e.textContent = val; e.className = 'roas-value ' + clsName; }
     };
-    setRoas('roi_meta_roas',       fmt(metaRoas,2)+'x', roasClass(metaRoas));
-    setRoas('roi_snap_engagement', fmt(snapEng,2)+'%',  snapEng>=3?'roas-high':snapEng>=1.5?'roas-mid':'roas-low');
-    setRoas('roi_tt_roas',         fmt(ttRoas,2)+'x',   roasClass(ttRoas));
-    setText('roi_meta_spend', fmt(m.total_spend,0)+' kr');
-    setText('roi_snap_spend', fmt(sn.total_spend,0)+' kr');
-    setText('roi_tt_spend',   fmt(t.total_spend,0)+' kr');
+    if (metaOk) {
+      setRoas('roi_meta_roas', fmt(metaRoas,2)+'x', roasClass(metaRoas));
+      setText('roi_meta_spend', fmt(m.total_spend,0)+' kr');
+    } else {
+      setRoas('roi_meta_roas', 'Ikke opsat', 'roas-low');
+      setText('roi_meta_spend', '–');
+    }
+    if (snapOk) {
+      setRoas('roi_snap_engagement', fmt(snapEng,2)+'%', snapEng>=3?'roas-high':snapEng>=1.5?'roas-mid':'roas-low');
+      setText('roi_snap_spend', fmt(sn.total_spend,0)+' kr');
+    } else {
+      setRoas('roi_snap_engagement', 'Ikke opsat', 'roas-low');
+      setText('roi_snap_spend', '–');
+    }
+    if (ttOk) {
+      setRoas('roi_tt_roas', fmt(ttRoas,2)+'x', roasClass(ttRoas));
+      setText('roi_tt_spend', fmt(t.total_spend,0)+' kr');
+    } else {
+      setRoas('roi_tt_roas', 'Ikke opsat', 'roas-low');
+      setText('roi_tt_spend', '–');
+    }
 
-    // Dynamisk afkast-forklaring under kortene
+    // Dynamisk afkast-forklaring under kortene (kun Meta hvis konfigureret)
     const explainBar  = el('rzpa-roas-explain');
     const explainText = el('rzpa-roas-explain-text');
-    if (explainBar && explainText && metaRoas > 0) {
+    if (explainBar && explainText && metaOk && metaRoas > 0) {
       const earned = (parseFloat(m.total_spend)||0) * metaRoas;
       explainText.textContent = `💰 Meta: Du brugte ${fmt(m.total_spend,0)} kr og fik ca. ${fmt(earned,0)} kr i omsætning tilbage (ROAS ${fmt(metaRoas,2)}x). Under 1x = taber penge · 2,5x+ = rigtig god.`;
       explainBar.style.display = 'flex';
+    } else if (explainBar) {
+      explainBar.style.display = 'none';
     }
 
-    // KPIs – menneskelige undertekster
-    const avgRoas = totalSpend > 0
-      ? (((m.total_spend||0)*metaRoas + (t.total_spend||0)*ttRoas) / ((m.total_spend||0)+(t.total_spend||0)||1)).toFixed(2)
+    // KPIs – kun konfigurerede platforme tælles med
+    const configuredCount = (metaOk?1:0)+(snapOk?1:0)+(ttOk?1:0);
+    const avgRoas = totalSpend > 0 && (metaOk||ttOk)
+      ? ((metaOk?(m.total_spend||0)*metaRoas:0) + (ttOk?(t.total_spend||0)*ttRoas:0))
+        / ((metaOk?(m.total_spend||0):0) + (ttOk?(t.total_spend||0):0) || 1)
       : 0;
     const perDay = days > 0 ? Math.round(totalSpend / days) : 0;
-    renderKPI('kpi_spend',      fmt(totalSpend,0)+' kr',
-      perDay > 0 ? '≈ '+fmt(perDay,0)+' kr/dag · Afkast: '+avgRoas+'x' : 'Meta + Snapchat + TikTok');
-    renderKPI('kpi_seo_clicks', fmt(s.total_clicks),
+    renderKPI('kpi_spend',
+      totalSpend > 0 ? fmt(totalSpend,0)+' kr' : '–',
+      perDay > 0 ? '≈ '+fmt(perDay,0)+' kr/dag · Afkast: '+avgRoas.toFixed(2)+'x'
+                 : configuredCount === 0 ? 'Ingen platforme sat op endnu' : 'Meta + Snapchat + TikTok');
+    renderKPI('kpi_seo_clicks', fmt(s.total_clicks)||'–',
       s.keywords_top10 > 0 ? (s.keywords_top10)+' søgeord på Googles 1. side' : 'Gratis besøg fra Google');
-    renderKPI('kpi_ai',         fmt(a.ai_overview_count)||'–',
+    renderKPI('kpi_ai', fmt(a.ai_overview_count)||'–',
       (a.featured_snippet_count||0)+' gange vist som fremhævet svar');
-    renderKPI('kpi_campaigns',  ((m.campaign_count||0)+(sn.campaign_count||0)+(t.campaign_count||0)));
+    renderKPI('kpi_campaigns',
+      ((metaOk?(m.campaign_count||0):0)+(snapOk?(sn.campaign_count||0):0)+(ttOk?(t.campaign_count||0):0)) || '–');
 
     // Time-series combo chart – always render, fallback til mock hvis ingen data
     let td = trends.data || [];
@@ -771,13 +799,23 @@ const RZPA_App = (() => {
         });
 
         if (r.success && r.html) {
-          const win = window.open('', '_blank');
-          win.document.write(r.html);
-          win.document.close();
-          setTimeout(() => win.print(), 800);
-
-          notice.className = 'rzpa-notice success';
-          notice.textContent = 'Rapport åbnet i nyt vindue – brug Ctrl+P / Cmd+P til at gemme som PDF.';
+          // Brug Blob URL for at undgå popup-blocker
+          const blob = new Blob([r.html], { type: 'text/html;charset=utf-8' });
+          const url  = URL.createObjectURL(blob);
+          const win  = window.open(url, '_blank');
+          if (win) {
+            win.addEventListener('load', () => {
+              setTimeout(() => { win.print(); URL.revokeObjectURL(url); }, 800);
+            });
+            notice.className = 'rzpa-notice success';
+            notice.textContent = 'Rapport åbnet i nyt vindue – brug Ctrl+P / Cmd+P til at gemme som PDF.';
+          } else {
+            // Popup blev blokeret – tilbyd download i stedet
+            const a = document.createElement('a');
+            a.href = url; a.download = 'rezponz-rapport.html'; a.click();
+            notice.className = 'rzpa-notice success';
+            notice.textContent = 'Rapport downloadet som HTML – åbn filen og tryk Ctrl+P for at gemme som PDF.';
+          }
           notice.style.display = 'block';
         }
       } catch(e) {

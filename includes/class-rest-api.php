@@ -208,10 +208,20 @@ class RZPA_REST_API {
 
     // Meta
     public static function meta_campaigns( $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['meta_access_token'] ) || empty( $opts['meta_ad_account_id'] ) ) {
+            return self::ok( [] );
+        }
         return self::ok( RZPA_Database::get_meta_campaigns( self::days( $r ) ) );
     }
     public static function meta_summary( $r ) {
-        return self::ok( RZPA_Database::get_meta_summary( self::days( $r ) ) );
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['meta_access_token'] ) || empty( $opts['meta_ad_account_id'] ) ) {
+            return self::ok( [ 'configured' => false ] );
+        }
+        $data = RZPA_Database::get_meta_summary( self::days( $r ) );
+        $data['configured'] = true;
+        return self::ok( $data );
     }
     public static function meta_sync( $r ) {
         $rows = RZPA_Meta_Ads::fetch( self::days( $r ) );
@@ -222,10 +232,18 @@ class RZPA_REST_API {
 
     // Snap
     public static function snap_campaigns( $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['snap_access_token'] ) ) return self::ok( [] );
         return self::ok( RZPA_Database::get_snap_campaigns( self::days( $r ) ) );
     }
     public static function snap_summary( $r ) {
-        return self::ok( RZPA_Database::get_snap_summary( self::days( $r ) ) );
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['snap_access_token'] ) ) {
+            return self::ok( [ 'configured' => false ] );
+        }
+        $data = RZPA_Database::get_snap_summary( self::days( $r ) );
+        $data['configured'] = true;
+        return self::ok( $data );
     }
     public static function snap_sync( $r ) {
         $rows = RZPA_Snapchat_Ads::fetch( self::days( $r ) );
@@ -236,10 +254,18 @@ class RZPA_REST_API {
 
     // TikTok
     public static function tiktok_campaigns( $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['tiktok_access_token'] ) ) return self::ok( [] );
         return self::ok( RZPA_Database::get_tiktok_campaigns( self::days( $r ) ) );
     }
     public static function tiktok_summary( $r ) {
-        return self::ok( RZPA_Database::get_tiktok_summary( self::days( $r ) ) );
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['tiktok_access_token'] ) ) {
+            return self::ok( [ 'configured' => false ] );
+        }
+        $data = RZPA_Database::get_tiktok_summary( self::days( $r ) );
+        $data['configured'] = true;
+        return self::ok( $data );
     }
     public static function tiktok_sync( $r ) {
         $rows = RZPA_TikTok_Ads::fetch( self::days( $r ) );
