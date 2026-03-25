@@ -720,3 +720,25 @@ body.wp-admin #wpbody-content { overflow-x: hidden; }
   align-self: flex-start;
 }
 .rzpa-loading-modal { text-align: center; padding: 48px; color: var(--text-dim); font-size: 14px; }
+
+/* ── PJAX loading state ──────────────────────────── */
+#rzpa-app.rzpa-pjax-loading {
+  opacity: 0.45;
+  pointer-events: none;
+  transition: opacity .15s;
+}
+#rzpa-app.rzpa-pjax-loading::after {
+  content: '';
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(204,255,0,.2);
+  border-top-color: var(--neon);
+  border-radius: 50%;
+  animation: rzpa-spin .7s linear infinite;
+  z-index: 9000;
+}
+@keyframes rzpa-spin { to { transform: translate(-50%,-50%) rotate(360deg); } }

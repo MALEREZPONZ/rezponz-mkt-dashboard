@@ -1307,20 +1307,140 @@ const RZPA_App = (() => {
     initDateFilter('rzpa-date-filter', () => {});
   }
 
+  // ── Section init map (IIFE-scoped so PJAX can reach it) ─────────────────
+
+  const initMap = {
+    dashboard: initDashboard,
+    seo:       initSEO,
+    ai:        initAI,
+    meta:      initMeta,
+    snap:      initSnap,
+    tiktok:    initTikTok,
+    rapport:   initRapport,
+    // settings: pure PHP form — ingen JS init nødvendig
+  };
+
+  // ── PJAX: instant navigation – ingen full page reload ───────────────────
+  //
+  // Når brugeren klikker et RZPA-menupunkt:
+  //   1. Fetch siden som tekst  (WP genrenderer kun <body>-indhold)
+  //   2. Udskift #rzpa-app med det nye indhold
+  //   3. pushState → URL opdateres uden reload
+  //   4. Kør init-funktionen for den nye sektion
+  //
+  // Fallback: ved netværksfejl falder vi tilbage til normal navigation.
+
+  let _pjaxBusy = false;
+
+  async function pjaxGo(targetUrl) {
+    if (_pjaxBusy) return;
+    _pjaxBusy = true;
+
+    const app = document.getElementById('rzpa-app');
+    if (!app) { window.location.href = targetUrl; return; }
+
+    // Optimistisk UI: dim nuværende indhold
+    app.classList.add('rzpa-pjax-loading');
+
+    try {
+      const res  = await fetch(targetUrl, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const html = await res.text();
+
+      const doc    = new DOMParser().parseFromString(html, 'text/html');
+      const newApp = doc.getElementById('rzpa-app');
+      if (!newApp) { window.location.href = targetUrl; return; }
+
+      // Opfrisk PHP preload-data fra den nye side (sendes med i <script>)
+      doc.querySelectorAll('script').forEach(s => {
+        const m = s.textContent.match(/"preload"\s*:\s*(\{[\s\S]*?\})\s*(?:[,}])/);
+        if (m) {
+          try {
+            const fresh = JSON.parse(m[1]);
+            Object.keys(fresh).forEach(k => {
+              _preload[k] = fresh[k];
+              // Nulstil "brugt" flag så den friske data rent faktisk bruges
+              Object.keys(_preloadUsed).forEach(u => {
+                if (_matchPreload(u) !== undefined) delete _preloadUsed[u];
+              });
+            });
+          } catch(e) {}
+        }
+      });
+
+      // Erstat app-indhold
+      const newPage  = newApp.dataset.rzpaPage || '';
+      app.dataset.rzpaPage = newPage;
+      app.innerHTML  = newApp.innerHTML;
+
+      // Modaler lever udenfor #rzpa-app — synkroniser dem
+      ['rzpa-ad-modal'].forEach(id => {
+        const oldEl = document.getElementById(id);
+        const newEl = doc.getElementById(id);
+        if (newEl && oldEl) oldEl.replaceWith(newEl.cloneNode(true));
+        else if (newEl)     document.body.appendChild(newEl.cloneNode(true));
+        else if (oldEl)     oldEl.remove();
+      });
+
+      // Opdater URL-linje
+      history.pushState({ rzpaPjax: newPage }, '', targetUrl);
+
+      // Opdater WP sidebars markering af aktivt menupunkt
+      pjaxUpdateMenu(targetUrl);
+
+      // Start sektionens JS
+      if (initMap[newPage]) initMap[newPage]();
+
+    } catch(e) {
+      window.location.href = targetUrl; // graceful fallback
+    } finally {
+      document.getElementById('rzpa-app')?.classList.remove('rzpa-pjax-loading');
+      _pjaxBusy = false;
+    }
+  }
+
+  function pjaxUpdateMenu(url) {
+    const m    = url.match(/[?&]page=(rzpa-[^&]*)/);
+    const slug = m?.[1] ?? '';
+    if (!slug) return;
+
+    document.querySelectorAll('#adminmenu a').forEach(a => {
+      const aHref = a.getAttribute('href') || '';
+      if (!aHref.includes('page=rzpa')) return;
+      const li = a.closest('li');
+      if (!li) return;
+
+      const isTarget = aHref.includes(slug);
+      li.classList.toggle('current', isTarget);
+      a.classList.toggle('current', isTarget);
+
+      // Toplevel menu-item (Rezponz Analytics)
+      if (aHref.includes('rzpa-dashboard')) {
+        const topLi = li.closest('.wp-has-submenu') ?? li.parentElement?.closest('li');
+        if (topLi) topLi.classList.add('wp-has-current-submenu', 'wp-menu-open');
+      }
+    });
+  }
+
   // ── Auto-init ──────────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', () => {
     const page = document.getElementById('rzpa-app')?.dataset?.rzpaPage;
-    const initMap = {
-      dashboard: initDashboard,
-      seo:       initSEO,
-      ai:        initAI,
-      meta:      initMeta,
-      snap:      initSnap,
-      tiktok:    initTikTok,
-      rapport:   initRapport,
-    };
     if (initMap[page]) initMap[page]();
+
+    // Sæt PJAX-navigation op på RZPA-menupunkter
+    document.querySelectorAll('#adminmenu a').forEach(a => {
+      if (!(a.getAttribute('href') || '').includes('page=rzpa')) return;
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        pjaxGo(a.href); // .href er altid absolut URL
+      });
+    });
+
+    // Browser tilbage/frem-knapper
+    window.addEventListener('popstate', e => {
+      if (e.state?.rzpaPjax !== undefined) pjaxGo(location.href);
+    });
   });
 
   // Public API (used inline)
