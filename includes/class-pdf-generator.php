@@ -99,18 +99,6 @@ class RZPA_PDF_Generator {
 
     private static function render_html( array $d ) : string {
         $css = self::get_css();
-        $seo_rows = '';
-        foreach ( $d['seo_kw'] as $k ) {
-            $pos_color = (float)$k['avg_position'] <= 3 ? '#CCFF00' : ( (float)$k['avg_position'] <= 10 ? '#88aaff' : '#888' );
-            $seo_rows .= "<tr>
-                <td>{$k['keyword']}</td>
-                <td style='color:{$pos_color};font-weight:700'>#{$this->n($k['avg_position'],1)}</td>
-                <td>{$this->n($k['total_clicks'])}</td>
-                <td>{$this->n($k['total_impressions'])}</td>
-                <td>{$this->n($k['avg_ctr'],2)}%</td>
-            </tr>";
-        }
-
         ob_start();
         ?>
 <!DOCTYPE html>

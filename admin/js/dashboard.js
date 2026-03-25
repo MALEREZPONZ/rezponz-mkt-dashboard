@@ -282,25 +282,38 @@ const RZPA_App = (() => {
     const snapEng    = parseFloat(sn.avg_engagement_rate) || 0;
     const ttRoas     = parseFloat(t.avg_roas) || 0;
 
-    // ROI Spotlight
+    // ROI Spotlight – med afkast-forklaring i label
     const setRoas = (id, val, clsName) => {
       const e = el(id);
       if (e) { e.textContent = val; e.className = 'roas-value ' + clsName; }
     };
-    setRoas('roi_meta_roas',     fmt(metaRoas,2)+'x', roasClass(metaRoas));
-    setRoas('roi_snap_engagement', fmt(snapEng,2)+'%', snapEng>=3?'roas-high':snapEng>=1.5?'roas-mid':'roas-low');
-    setRoas('roi_tt_roas',       fmt(ttRoas,2)+'x',  roasClass(ttRoas));
+    setRoas('roi_meta_roas',       fmt(metaRoas,2)+'x', roasClass(metaRoas));
+    setRoas('roi_snap_engagement', fmt(snapEng,2)+'%',  snapEng>=3?'roas-high':snapEng>=1.5?'roas-mid':'roas-low');
+    setRoas('roi_tt_roas',         fmt(ttRoas,2)+'x',   roasClass(ttRoas));
     setText('roi_meta_spend', fmt(m.total_spend,0)+' kr');
     setText('roi_snap_spend', fmt(sn.total_spend,0)+' kr');
     setText('roi_tt_spend',   fmt(t.total_spend,0)+' kr');
 
-    // KPIs
+    // Dynamisk afkast-forklaring under kortene
+    const explainBar  = el('rzpa-roas-explain');
+    const explainText = el('rzpa-roas-explain-text');
+    if (explainBar && explainText && metaRoas > 0) {
+      const earned = (parseFloat(m.total_spend)||0) * metaRoas;
+      explainText.textContent = `💰 Meta: Du brugte ${fmt(m.total_spend,0)} kr og fik ca. ${fmt(earned,0)} kr i omsætning tilbage (ROAS ${fmt(metaRoas,2)}x). Under 1x = taber penge · 2,5x+ = rigtig god.`;
+      explainBar.style.display = 'flex';
+    }
+
+    // KPIs – menneskelige undertekster
     const avgRoas = totalSpend > 0
       ? (((m.total_spend||0)*metaRoas + (t.total_spend||0)*ttRoas) / ((m.total_spend||0)+(t.total_spend||0)||1)).toFixed(2)
       : 0;
-    renderKPI('kpi_spend',      fmt(totalSpend,0)+' kr', 'Samlet ROAS: '+avgRoas+'x');
-    renderKPI('kpi_seo_clicks', fmt(s.total_clicks), (s.keywords_top10||0)+' søgeord i top 10');
-    renderKPI('kpi_ai',         fmt(a.ai_overview_count), fmt(a.featured_snippet_count)+' featured snippets');
+    const perDay = days > 0 ? Math.round(totalSpend / days) : 0;
+    renderKPI('kpi_spend',      fmt(totalSpend,0)+' kr',
+      perDay > 0 ? '≈ '+fmt(perDay,0)+' kr/dag · Afkast: '+avgRoas+'x' : 'Meta + Snapchat + TikTok');
+    renderKPI('kpi_seo_clicks', fmt(s.total_clicks),
+      s.keywords_top10 > 0 ? (s.keywords_top10)+' søgeord på Googles 1. side' : 'Gratis besøg fra Google');
+    renderKPI('kpi_ai',         fmt(a.ai_overview_count)||'–',
+      (a.featured_snippet_count||0)+' gange vist som fremhævet svar');
     renderKPI('kpi_campaigns',  ((m.campaign_count||0)+(sn.campaign_count||0)+(t.campaign_count||0)));
 
     // Time-series combo chart – always render, fallback til mock hvis ingen data
@@ -560,8 +573,20 @@ const RZPA_App = (() => {
     initDateFilter('rzpa-date-filter', d => { days = d; loadMeta(d); });
     loadMeta(days);
     el('rzpa-sync-meta')?.addEventListener('click', async () => {
-      await api('/meta/sync', { method: 'POST', body: JSON.stringify({days}) });
-      loadMeta(days);
+      const btn = el('rzpa-sync-meta');
+      btn.disabled = true;
+      btn.textContent = 'Henter…';
+      try {
+        const r = await api('/meta/sync', { method: 'POST', body: JSON.stringify({days}) });
+        const count = r.data?.count || 0;
+        btn.textContent = '✓ ' + count + ' kampagner hentet';
+        setTimeout(() => { btn.disabled = false; btn.textContent = '⟳ Hent data'; }, 3000);
+        loadMeta(days);
+      } catch(e) {
+        btn.disabled = false;
+        btn.textContent = '⟳ Hent data';
+        alert('Fejl ved hentning af Meta-data. Tjek at Access Token er gyldigt i Indstillinger.');
+      }
     });
   }
 
@@ -572,10 +597,32 @@ const RZPA_App = (() => {
     ]);
     const s = sum.data || {}, data = camps.data || [];
 
-    renderKPI('kpi_spend',   fmt(s.total_spend,0) + ' kr');
-    renderKPI('kpi_roas',    fmt(s.avg_roas,2) + 'x');
+    const roas = parseFloat(s.avg_roas) || 0;
+    const spend = parseFloat(s.total_spend) || 0;
+    const perDay = days > 0 ? Math.round(spend / days) : 0;
+    const avgCpc = parseFloat(s.avg_cpc) || 0;
+
+    renderKPI('kpi_spend',   fmt(spend,0) + ' kr',
+      perDay > 0 ? '≈ ' + fmt(perDay,0) + ' kr/dag' : '');
+    renderKPI('kpi_roas',    roas > 0 ? fmt(roas,2) + 'x' : '–',
+      roas >= 2.5 ? '✅ Rigtig godt afkast' : roas >= 1 ? '⚠️ Under målet (mål: 2,5x+)' : roas > 0 ? '❌ Taber penge' : 'Ingen data endnu');
     renderKPI('kpi_impr',    fmt(s.total_impressions));
-    renderKPI('kpi_clicks',  fmt(s.total_clicks));
+    renderKPI('kpi_clicks',  fmt(s.total_clicks),
+      avgCpc > 0 ? fmt(avgCpc,2) + ' kr per klik' : '');
+
+    // Forklaringsboks
+    const explainEl = el('meta-roas-explain');
+    const textEl    = el('meta-roas-text');
+    if (explainEl && textEl && roas > 0 && spend > 0) {
+      const earned = spend * roas;
+      explainEl.style.display = 'flex';
+      textEl.textContent = `Du brugte ${fmt(spend,0)} kr og fik ca. ${fmt(earned,0)} kr i omsætning tilbage. `
+        + (roas >= 2.5 ? `Det er rigtig godt – fortsæt og skalér op! 🚀`
+          : roas >= 1.5 ? `Det er okay men der er plads til forbedring. Mål er 2,5x+.`
+          : `Det er under hvad det bør være. Overvej at justere målgruppe eller kreativt indhold.`);
+    } else if (explainEl) {
+      explainEl.style.display = 'none';
+    }
 
     const top6 = data.slice(0,6);
     const labels = top6.map(c => c.campaign_name.replace('Rezponz – ','').replace('Rezponz - ','').slice(0,22));
