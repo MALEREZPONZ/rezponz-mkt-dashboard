@@ -35,6 +35,10 @@ class RZPA_REST_API {
             [ 'seo/pages',        'GET',  'seo_pages' ],
             [ 'seo/sync',         'POST', 'seo_sync' ],
             [ 'seo/test',         'GET',  'seo_test' ],
+            [ 'seo/content-map',  'GET',  'seo_content_map' ],
+            [ 'seo/monthly',      'GET',  'seo_monthly' ],
+            [ 'seo/comparison',   'GET',  'seo_comparison' ],
+            [ 'seo/ai-analysis',  'POST', 'seo_ai_analysis' ],
         ] as [ $path, $method, $cb ] ) {
             register_rest_route( self::NS, '/' . $path, [
                 'methods'             => $method,
@@ -197,6 +201,48 @@ class RZPA_REST_API {
 
     public static function seo_test() {
         return self::ok( RZPA_Google_SEO::test_connection() );
+    }
+    public static function seo_content_map() {
+        return self::ok( RZPA_Database::get_wp_content_map() );
+    }
+    public static function seo_monthly() {
+        return self::ok( RZPA_Database::get_seo_monthly( 6 ) );
+    }
+    public static function seo_comparison( $r ) {
+        return self::ok( RZPA_Database::get_seo_comparison( self::days( $r ) ) );
+    }
+    public static function seo_ai_analysis( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        $key  = $opts['openai_api_key'] ?? '';
+        if ( ! $key ) return self::ok( [ 'error' => 'Ingen OpenAI nøgle — tilføj den i Indstillinger' ] );
+
+        $body = $r->get_json_params();
+        $kw   = array_slice( $body['keywords'] ?? [], 0, 20 );
+        $pages = array_slice( $body['pages'] ?? [], 0, 15 );
+
+        $kwText    = implode( "\n", array_map( fn($k) => "- {$k['keyword']}: pos {$k['avg_position']}, {$k['total_clicks']} klik, {$k['avg_ctr']}% CTR", $kw ) );
+        $pagesText = implode( "\n", array_map( fn($p) => "- {$p['page_url']}: pos {$p['avg_position']}, {$p['total_clicks']} klik, {$p['avg_ctr']}% CTR", $pages ) );
+
+        $prompt = "Du er SEO-ekspert. Analyser disse Google Search Console data for rezponz.dk og giv 4 konkrete, handlingsrettede anbefalinger på dansk. Vær specifik – nævn konkrete søgeord og sider.\n\nTop søgeord:\n{$kwText}\n\nTop sider:\n{$pagesText}\n\nGiv 4 anbefalinger i dette format:\n1. [Hvad man skal gøre]: [Hvorfor og hvordan – konkret]\n2. ...\n\nSvar KUN med de 4 anbefalinger, ingen intro eller outro.";
+
+        $ai_res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
+            'timeout' => 30,
+            'headers' => [ 'Authorization' => 'Bearer ' . $key, 'Content-Type' => 'application/json' ],
+            'body'    => wp_json_encode( [
+                'model'    => 'gpt-4o-mini',
+                'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ],
+                'max_tokens' => 600,
+            ] ),
+        ] );
+
+        if ( is_wp_error( $ai_res ) ) return self::ok( [ 'error' => $ai_res->get_error_message() ] );
+        $ai_body = json_decode( wp_remote_retrieve_body( $ai_res ), true );
+        $text = $ai_body['choices'][0]['message']['content'] ?? '';
+        if ( ! $text ) return self::ok( [ 'error' => $ai_body['error']['message'] ?? 'Ingen svar fra OpenAI' ] );
+
+        // Cache i 24 timer
+        set_transient( 'rzpa_seo_ai_analysis', $text, DAY_IN_SECONDS );
+        return self::ok( [ 'analysis' => $text ] );
     }
 
     // AI

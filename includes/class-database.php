@@ -232,6 +232,60 @@ class RZPA_Database {
         ), ARRAY_A ) ?: [];
     }
 
+    /** Månedlig SEO-statistik – bruges til trend-graf */
+    public static function get_seo_monthly( int $months = 6 ) : array {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_seo_data';
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT DATE_FORMAT(date, '%%Y-%%m') AS month,
+                    SUM(clicks)      AS total_clicks,
+                    SUM(impressions) AS total_impressions,
+                    AVG(ctr)         AS avg_ctr,
+                    COUNT(DISTINCT keyword) AS keyword_count
+             FROM $t
+             WHERE date >= DATE_SUB(CURDATE(), INTERVAL %d MONTH)
+             GROUP BY month
+             ORDER BY month ASC",
+            $months
+        ), ARRAY_A ) ?: [];
+    }
+
+    /** WordPress indholdstype-kort: { '/path/' => 'page'|'post' } */
+    public static function get_wp_content_map() : array {
+        global $wpdb;
+        $results = $wpdb->get_results(
+            "SELECT ID, post_type FROM {$wpdb->posts}
+             WHERE post_status = 'publish' AND post_type IN ('page','post')
+             ORDER BY post_type ASC",
+            ARRAY_A
+        );
+        $map = [];
+        foreach ( $results as $row ) {
+            $link = get_permalink( (int) $row['ID'] );
+            if ( ! $link ) continue;
+            $path = rtrim( parse_url( $link, PHP_URL_PATH ), '/' ) . '/';
+            $map[ $path ] = $row['post_type'];
+        }
+        return $map;
+    }
+
+    /** SEO-sammenligning: forrige periode vs nuværende */
+    public static function get_seo_comparison( int $days = 30 ) : array {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_seo_data';
+        $cur  = $wpdb->get_row( $wpdb->prepare(
+            "SELECT SUM(clicks) AS clicks, SUM(impressions) AS impressions, AVG(ctr) AS ctr
+             FROM $t WHERE date >= DATE_SUB(CURDATE(), INTERVAL %d DAY)", $days
+        ), ARRAY_A );
+        $prev = $wpdb->get_row( $wpdb->prepare(
+            "SELECT SUM(clicks) AS clicks, SUM(impressions) AS impressions, AVG(ctr) AS ctr
+             FROM $t WHERE date >= DATE_SUB(CURDATE(), INTERVAL %d DAY)
+                       AND date <  DATE_SUB(CURDATE(), INTERVAL %d DAY)",
+            $days * 2, $days
+        ), ARRAY_A );
+        return [ 'current' => $cur ?: [], 'previous' => $prev ?: [] ];
+    }
+
     // ── AI Overview ─────────────────────────────────────────────────────────
 
     public static function insert_ai_overview_rows( array $rows ) {

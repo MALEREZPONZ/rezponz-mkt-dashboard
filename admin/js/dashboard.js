@@ -536,87 +536,176 @@ const RZPA_App = (() => {
   // ════════════════════════════════════════════════════
 
   async function initSEO() {
-    let days = 30, allKw = [];
+    let days = 30, allKw = [], allPages = [], contentMap = {};
+
+    // Hent content map (side/blog typer) én gang
+    api('/seo/content-map').then(r => { contentMap = r.data || {}; });
+
     initDateFilter('rzpa-date-filter', d => { days = d; loadSEO(d); });
     loadSEO(days);
+    loadSEOMonthly();
+
     el('rzpa-seo-sync')?.addEventListener('click', async () => {
       const btn = el('rzpa-seo-sync');
       if (btn) { btn.disabled = true; btn.textContent = 'Henter…'; }
       const res = await api('/seo/sync', { method: 'POST' });
       if (btn) { btn.disabled = false; btn.textContent = '⟳ Hent data'; }
-
-      // Vis fejlbesked hvis Google API fejlede
       if (res && res.success && res.data && res.data.success === false && res.data.error) {
         const story = el('seo-story');
         if (story) story.innerHTML =
           `<p style="color:#ff6b6b;font-weight:600">❌ Google API fejl</p>` +
           `<p style="color:#ccc;margin:6px 0">${res.data.error}</p>` +
           `<p style="font-size:12px;color:#888;margin-top:8px">` +
-          `Tjek at <strong>Site URL</strong> i Indstillinger matcher <em>præcis</em> hvad der står i Google Search Console.<br>` +
-          `Prøv: <code>https://www.rezponz.dk</code>, <code>https://rezponz.dk</code> eller <code>sc-domain:rezponz.dk</code>` +
-          `</p>`;
+          `Tjek at <strong>Site URL</strong> i Indstillinger matcher præcis din Google Search Console.<br>` +
+          `Prøv: <code>https://www.rezponz.dk</code>, <code>https://rezponz.dk</code> eller <code>sc-domain:rezponz.dk</code></p>`;
         return;
       }
-
       clearCache('/seo/');
       clearCache('/dashboard/overview');
       loadSEO(days);
+      loadSEOMonthly();
+    });
+
+    // AI-analyse knap
+    el('seo-ai-refresh')?.addEventListener('click', async () => {
+      const btn = el('seo-ai-refresh');
+      const content = el('seo-ai-content');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Analyserer…'; }
+      if (content) content.innerHTML = '<span style="color:#666">Sender data til AI — tager 10-20 sekunder…</span>';
+      const res = await api('/seo/ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keywords: allKw.slice(0,20), pages: allPages.slice(0,15) }),
+      });
+      if (btn) { btn.disabled = false; btn.textContent = '✨ Analysér nu'; }
+      if (!content) return;
+      const d = res.data || {};
+      if (d.error) {
+        content.innerHTML = `<span style="color:#ff6b6b">⚠️ ${d.error}</span>`;
+      } else if (d.analysis) {
+        // Formatér nummererede punkter
+        const lines = d.analysis.split('\n').filter(l => l.trim());
+        content.innerHTML = lines.map(l =>
+          l.match(/^\d+\./) ?
+            `<div style="display:flex;gap:10px;margin-bottom:12px;padding:12px;background:var(--bg-200);border-radius:8px;border-left:3px solid var(--neon)">
+              <div style="color:var(--neon);font-weight:700;flex-shrink:0">${l.match(/^\d+/)[0]}.</div>
+              <div style="color:#ccc">${l.replace(/^\d+\.\s*/, '')}</div>
+            </div>` : `<p style="color:#888;margin:4px 0">${l}</p>`
+        ).join('');
+      }
     });
 
     async function loadSEO(d) {
-      const [sum, kw, pages] = await Promise.all([
+      const [sum, kw, pages, cmp] = await Promise.all([
         api(`/seo/summary?days=${d}`),
-        api(`/seo/keywords?days=${d}`),
-        api(`/seo/pages?days=${d}`),
+        api(`/seo/keywords?days=${d}&limit=50`),
+        api(`/seo/pages?days=${d}&limit=30`),
+        api(`/seo/comparison?days=${d}`),
       ]);
-      const s = sum.data || {};
-      allKw = kw.data || [];
+      const s   = sum.data || {};
+      allKw     = kw.data  || [];
+      allPages  = pages.data || [];
+      const cur  = cmp.data?.current  || {};
+      const prev = cmp.data?.previous || {};
 
-      renderKPI('kpi_clicks', fmt(s.total_clicks), 'klik fra Google');
-      renderKPI('kpi_impr',   fmt(s.total_impressions));
-      renderKPI('kpi_ctr',    fmt(s.avg_ctr,2) + '%');
+      // KPI med trend-pile
+      const trendArrow = (cur, prev) => {
+        if (!prev || prev == 0) return '';
+        const pct = Math.round(((cur - prev) / prev) * 100);
+        if (pct > 0)  return ` <span style="color:#4ade80;font-size:12px">↑ ${pct}%</span>`;
+        if (pct < 0)  return ` <span style="color:#ff6b6b;font-size:12px">↓ ${Math.abs(pct)}%</span>`;
+        return '';
+      };
+
+      renderKPI('kpi_clicks', fmt(s.total_clicks) + trendArrow(s.total_clicks, prev.clicks));
+      renderKPI('kpi_impr',   fmt(s.total_impressions) + trendArrow(s.total_impressions, prev.impressions));
+      renderKPI('kpi_ctr',    fmt(s.avg_ctr, 2) + '%');
       renderKPI('kpi_top10',  fmt(s.keywords_top10));
-      setText('kpi_top10_sub', (s.keywords_top3||0)+' søgeord i top 3 · '+fmt(s.keywords_top10||0)+' på side 1');
+      setText('kpi_top10_sub', (s.keywords_top3||0) + ' søgeord i top 3 · ' + fmt(s.keywords_top10||0) + ' på side 1');
 
-      // ── SEO Story ──────────────────────────────────
+      // Story
       const seoStory = el('seo-story');
-      if (seoStory) {
-        const clicks = parseInt(s.total_clicks)||0;
-        const top10n = parseInt(s.keywords_top10)||0;
-        const top3n  = parseInt(s.keywords_top3)||0;
-        if (clicks > 0) {
-          seoStory.innerHTML = `<strong>${fmt(clicks)}</strong> personer fandt jer på Google i perioden — helt gratis! `
-            + `I er på Googles 1. side for <strong>${top10n} søgeord</strong>, og <strong>${top3n} af dem er i top 3</strong> (der går størstedelen af klikene). `
-            + (top10n<5?'💡 Tip: Jo flere søgeord I optimerer til side 1, jo mere gratis trafik får I.':'✅ God organisk synlighed — fortsæt med at opdatere indholdet på sitet.');
-          seoStory.classList.remove('hidden');
-        }
+      if (seoStory && parseInt(s.total_clicks) > 0) {
+        const clicks = parseInt(s.total_clicks), top10n = parseInt(s.keywords_top10)||0, top3n = parseInt(s.keywords_top3)||0;
+        const trendNote = prev.clicks > 0 ? (clicks > prev.clicks ?
+          ` Det er <strong style="color:#4ade80">${Math.round(((clicks-prev.clicks)/prev.clicks)*100)}% mere</strong> end forrige periode. 📈` :
+          ` Det er <strong style="color:#ff6b6b">${Math.round(((prev.clicks-clicks)/prev.clicks)*100)}% færre</strong> end forrige periode.`) : '';
+        seoStory.innerHTML = `<strong>${fmt(clicks)}</strong> personer fandt jer på Google i perioden — helt gratis!${trendNote} `
+          + `I er på Googles 1. side for <strong>${top10n} søgeord</strong>, og <strong>${top3n} af dem er i top 3</strong>. `
+          + (top10n >= 10 ? '✅ God organisk synlighed — fortsæt med at opdatere indholdet.' : '💡 Se Action Center nedenfor for konkrete tips til at få flere søgeord på side 1.');
+        seoStory.classList.remove('hidden');
       }
 
-      // ── SEO Health bar ──────────────────────────────
+      // Health bar
       const seoHealth = el('rzpa-seo-health');
       if (seoHealth) {
-        const clicks = parseInt(s.total_clicks)||0;
-        const top10n = parseInt(s.keywords_top10)||0;
+        const top10n = parseInt(s.keywords_top10)||0, clicks = parseInt(s.total_clicks)||0;
         if (!clicks) {
           seoHealth.className = 'rzpa-health health-empty';
           seoHealth.innerHTML = '<span class="h-icon">ℹ️</span><div class="h-text">Ingen SEO-data endnu — klik "Hent data"</div>';
-        } else if (top10n >= 10) {
+        } else if (top10n >= 15) {
           seoHealth.className = 'rzpa-health health-good';
-          seoHealth.innerHTML = `<span class="h-icon">🟢</span><div class="h-text"><strong>God SEO-synlighed!</strong> ${top10n} søgeord på Googles 1. side.<div class="h-sub">Bliv ved med at udgive relevant indhold og sørg for at siderne loader hurtigt.</div></div>`;
+          seoHealth.innerHTML = `<span class="h-icon">🟢</span><div class="h-text"><strong>Stærk SEO-synlighed!</strong> ${top10n} søgeord på side 1.<div class="h-sub">Fokusér på at fastholde top 3-placeringer og optimér CTR på sider med mange visninger.</div></div>`;
+        } else if (top10n >= 5) {
+          seoHealth.className = 'rzpa-health health-good';
+          seoHealth.innerHTML = `<span class="h-icon">🟢</span><div class="h-text"><strong>God SEO-synlighed!</strong> ${top10n} søgeord på Googles 1. side.<div class="h-sub">Se Action Center for hurtige gevinster.</div></div>`;
         } else if (top10n > 0) {
           seoHealth.className = 'rzpa-health health-warn';
-          seoHealth.innerHTML = `<span class="h-icon">🟡</span><div class="h-text"><strong>Begynder at få synlighed.</strong> ${top10n} søgeord på side 1.<div class="h-sub">Se "Muligheder" nedenfor — der er søgeord tæt på side 1 som kan forbedres.</div></div>`;
+          seoHealth.innerHTML = `<span class="h-icon">🟡</span><div class="h-text"><strong>Begynder at få synlighed.</strong> ${top10n} søgeord på side 1.<div class="h-sub">Se "Muligheder" nedenfor — der er søgeord tæt på side 1.</div></div>`;
         } else {
           seoHealth.className = 'rzpa-health health-bad';
-          seoHealth.innerHTML = `<span class="h-icon">🔴</span><div class="h-text"><strong>Lav SEO-synlighed.</strong> Ingen søgeord på Googles 1. side.<div class="h-sub">Overvej at oprette SEO-optimerede undersider og blogindlæg.</div></div>`;
+          seoHealth.innerHTML = `<span class="h-icon">🔴</span><div class="h-text"><strong>Lav SEO-synlighed.</strong> Ingen søgeord på side 1.<div class="h-sub">Opret SEO-optimerede undersider og blogindlæg om jeres kerneydelser.</div></div>`;
         }
         seoHealth.style.display = 'flex';
       }
 
       hBarChart('chart_kw_clicks', allKw.slice(0,8).map(k=>k.keyword), allKw.slice(0,8).map(k=>k.total_clicks));
       renderSeoTable(allKw, d);
-      renderPagesTable(pages.data || []);
+      renderPagesTable(allPages);
       renderOpportunities(allKw);
+      renderCTRTable(allPages);
+      renderActionCenter(allKw, allPages);
+    }
+
+    async function loadSEOMonthly() {
+      const r = await api('/seo/monthly');
+      const months = r.data || [];
+      if (!months.length) return;
+      const canvas = el('chart_seo_monthly');
+      if (!canvas) return;
+      if (canvas._chart) { canvas._chart.destroy(); delete canvas._chart; }
+      const labels = months.map(m => {
+        const [y, mo] = m.month.split('-');
+        return ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'][parseInt(mo)-1] + ' ' + y.slice(2);
+      });
+      canvas._chart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Klik', data: months.map(m => m.total_clicks), backgroundColor: 'rgba(204,255,0,0.7)', borderRadius: 6, order: 1 },
+            { label: 'Visninger', data: months.map(m => m.total_impressions), type: 'line', borderColor: '#888', backgroundColor: 'transparent', pointRadius: 3, tension: 0.3, yAxisID: 'y2', order: 0 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#888', font: { size: 11 } } } },
+          scales: {
+            x: { ticks: { color: '#666' }, grid: { color: 'rgba(255,255,255,.04)' } },
+            y: { ticks: { color: '#666' }, grid: { color: 'rgba(255,255,255,.06)' } },
+            y2: { position: 'right', ticks: { color: '#666' }, grid: { display: false } },
+          },
+        },
+      });
+    }
+
+    function contentTypeBadge(url) {
+      const path = url.replace(/^https?:\/\/[^/]+/, '') || '/';
+      const normalized = path.endsWith('/') ? path : path + '/';
+      const type = contentMap[normalized] || contentMap[path] || null;
+      if (type === 'post') return '<span class="rzpa-type-badge type-blog">✍️ Blog</span>';
+      if (type === 'page') return '<span class="rzpa-type-badge type-page">📄 Side</span>';
+      return '<span class="rzpa-type-badge type-other">🔗 Andet</span>';
     }
 
     function posBadge(p) {
@@ -625,13 +714,6 @@ const RZPA_App = (() => {
       const cls = n<=3?'pos-top3':n<=10?'pos-top10':n<=20?'pos-top20':'pos-out';
       const lbl = n<=3?'Top 3 🏆':n<=10?'Side 1':n<=20?'Side 2':'Side '+Math.ceil(n/10);
       return `<span class="pos-badge ${cls}">#${Math.round(n)} ${lbl}</span>`;
-    }
-
-    function posStyle(p) {
-      if (p <= 3)  return 'color:var(--neon);font-weight:700';
-      if (p <= 10) return 'color:#88aaff;font-weight:600';
-      if (p <= 20) return 'color:var(--warn);font-weight:600';
-      return 'color:#555';
     }
 
     function renderSeoTable(data, d) {
@@ -650,18 +732,39 @@ const RZPA_App = (() => {
     function renderPagesTable(data) {
       const tbody = el('seo_pages_tbody');
       if (!tbody) return;
-      if (!data.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="rzpa-empty">Ingen sidedata – synkronisér SEO data</td></tr>';
-        return;
-      }
-      tbody.innerHTML = data.slice(0,15).map(p => {
-        const url = p.page_url.replace(/^https?:\/\/[^/]+/, '');
+      if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="rzpa-empty">Ingen sidedata – synkronisér SEO data</td></tr>'; return; }
+      tbody.innerHTML = data.slice(0,20).map(p => {
+        const url = p.page_url.replace(/^https?:\/\/[^/]+/, '') || '/';
         return `<tr>
-          <td style="color:#ddd;font-weight:500;max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${p.page_url}">${url || '/'}</td>
+          <td style="color:#ddd;font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${p.page_url}">${url}</td>
+          <td>${contentTypeBadge(p.page_url)}</td>
           <td>${posBadge(p.avg_position)}</td>
           <td>${fmt(p.total_clicks)}</td>
           <td>${fmt(p.total_impressions)}</td>
           <td>${fmt(p.avg_ctr,2)}%</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderCTRTable(data) {
+      const tbody = el('seo_ctr_tbody');
+      if (!tbody) return;
+      // Sider med >50 visninger men CTR under 5%
+      const low = data.filter(p => p.total_impressions > 50 && p.avg_ctr < 5 && p.avg_position <= 20)
+                      .sort((a,b) => b.total_impressions - a.total_impressions);
+      if (!low.length) { tbody.innerHTML = '<tr><td colspan="6" class="rzpa-empty">Ingen sider med lav CTR — godt klaret! 🎉</td></tr>'; return; }
+      tbody.innerHTML = low.slice(0,8).map(p => {
+        const url = p.page_url.replace(/^https?:\/\/[^/]+/, '') || '/';
+        const tip = p.avg_ctr < 2
+          ? 'Titlen er sandsynligvis for generisk — prøv en mere fængende overskrift'
+          : 'Meta-beskrivelsen mangler måske et call-to-action';
+        return `<tr>
+          <td style="color:#ddd;font-weight:500;max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${p.page_url}">${url}</td>
+          <td>${contentTypeBadge(p.page_url)}</td>
+          <td>${posBadge(p.avg_position)}</td>
+          <td>${fmt(p.total_impressions)}</td>
+          <td style="color:#f59e0b;font-weight:600">${fmt(p.avg_ctr,2)}%</td>
+          <td style="font-size:11px;color:#888">${tip}</td>
         </tr>`;
       }).join('');
     }
@@ -671,17 +774,88 @@ const RZPA_App = (() => {
       if (!tbody) return;
       const opps = data.filter(k => k.avg_position > 10 && k.avg_position <= 20)
                        .sort((a,b) => a.avg_position - b.avg_position);
-      if (!opps.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="rzpa-empty">Ingen søgeord i position 11–20</td></tr>';
-        return;
-      }
-      tbody.innerHTML = opps.slice(0,10).map(k => `
-        <tr>
+      if (!opps.length) { tbody.innerHTML = '<tr><td colspan="5" class="rzpa-empty">Ingen søgeord i position 11–20</td></tr>'; return; }
+      tbody.innerHTML = opps.slice(0,10).map(k => {
+        const tip = k.total_impressions > 100
+          ? 'Skriv et dedikeret blogindlæg eller side om dette emne'
+          : 'Tilføj søgeordet naturligt på eksisterende sider';
+        return `<tr>
           <td style="color:#ddd;font-weight:500">${k.keyword}</td>
           <td>${posBadge(k.avg_position)}</td>
           <td>${fmt(k.total_impressions)}</td>
           <td>${fmt(k.avg_ctr,2)}%</td>
-        </tr>`).join('');
+          <td style="font-size:11px;color:#888">${tip}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderActionCenter(kws, pages) {
+      const card = el('seo-action-center');
+      const list = el('seo-action-list');
+      if (!card || !list) return;
+
+      const actions = [];
+
+      // 1. Quick wins: søgeord position 4-10
+      const quickWins = kws.filter(k => k.avg_position > 3 && k.avg_position <= 10)
+                           .sort((a,b) => b.total_clicks - a.total_clicks).slice(0,3);
+      quickWins.forEach(k => {
+        const pos = Math.round(k.avg_position);
+        const extraClicks = Math.round(k.total_clicks * (pos > 5 ? 1.5 : 0.8));
+        actions.push({
+          prio: 'high',
+          icon: '🚀',
+          title: `Ryk "${k.keyword}" fra #${pos} til top 3`,
+          desc: `Dette søgeord er tæt på top 3. Med lidt forbedring af siden kan I potentielt få ~${fmt(extraClicks)} flere klik om måneden.`,
+          action: `Opdatér siden med søgeordet i overskriften (H1), meta-titlen og de første 100 ord. Tilføj interne links til siden fra andre sider på rezponz.dk.`,
+        });
+      });
+
+      // 2. CTR-problemer: mange visninger, få klik
+      const ctrIssues = pages.filter(p => p.total_impressions > 100 && p.avg_ctr < 3 && p.avg_position <= 10)
+                             .sort((a,b) => b.total_impressions - a.total_impressions).slice(0,2);
+      ctrIssues.forEach(p => {
+        const url = p.page_url.replace(/^https?:\/\/[^/]+/, '') || '/';
+        actions.push({
+          prio: 'medium',
+          icon: '✏️',
+          title: `Forbedre sidetitlen på ${url}`,
+          desc: `Siden vises ${fmt(p.total_impressions)} gange på Google men kun ${fmt(p.avg_ctr,1)}% klikker ind. En bedre titel kan fordoble trafikken uden at ændre indholdet.`,
+          action: `Gå til WordPress → Rediger siden → Skift SEO-titlen (Yoast/RankMath) til noget mere fængende med et klart benefit. F.eks. "${url.replace(/\//g,'').replace(/-/g,' ')}" → "Hvad er [emne]? Alt du skal vide [${new Date().getFullYear()}]"`,
+        });
+      });
+
+      // 3. Side 1-kandidater
+      const candidates = kws.filter(k => k.avg_position > 10 && k.avg_position <= 15 && k.total_impressions > 50)
+                            .sort((a,b) => b.total_impressions - a.total_impressions).slice(0,2);
+      candidates.forEach(k => {
+        actions.push({
+          prio: 'medium',
+          icon: '💡',
+          title: `Skub "${k.keyword}" op på side 1`,
+          desc: `Position #${Math.round(k.avg_position)} — kun ét step fra side 1. Søgeordet vises allerede ${fmt(k.total_impressions)} gange.`,
+          action: `Skriv et nyt blogindlæg der fokuserer specifikt på "${k.keyword}". Brug søgeordet i URL'en, overskriften og de første afsnit. Tilføj FAQ-sektion med relaterede spørgsmål.`,
+        });
+      });
+
+      if (!actions.length) {
+        card.style.display = 'none';
+        return;
+      }
+
+      list.innerHTML = actions.map((a, i) => `
+        <div class="rzpa-action-item rzpa-action-${a.prio}">
+          <div class="action-num">${i+1}</div>
+          <div class="action-body">
+            <div class="action-title">${a.icon} ${a.title}</div>
+            <div class="action-desc">${a.desc}</div>
+            <div class="action-how"><strong>Sådan gør du:</strong> ${a.action}</div>
+          </div>
+          <div class="action-prio action-prio-${a.prio}">${a.prio === 'high' ? '🔥 Høj' : '⚡ Middel'}</div>
+        </div>
+      `).join('');
+
+      card.style.display = 'block';
     }
   }
 

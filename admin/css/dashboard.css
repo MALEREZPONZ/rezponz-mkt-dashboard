@@ -4,6 +4,40 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* ── Content type badges (Side / Blog) ──────────────────────── */
+.rzpa-type-badge {
+  display:inline-block; font-size:10px; font-weight:700; padding:2px 8px;
+  border-radius:20px; white-space:nowrap; letter-spacing:.03em;
+}
+.type-blog  { background:rgba(139,92,246,.2);  color:#a78bfa; border:1px solid rgba(139,92,246,.3); }
+.type-page  { background:rgba(59,130,246,.2);  color:#93c5fd; border:1px solid rgba(59,130,246,.3); }
+.type-other { background:rgba(255,255,255,.06); color:#666;    border:1px solid rgba(255,255,255,.1); }
+
+/* ── Action Center ──────────────────────────────────────────── */
+.rzpa-action-center { border-color:rgba(204,255,0,.2) !important; }
+.rzpa-action-list { display:flex; flex-direction:column; gap:12px; margin-top:4px; }
+.rzpa-action-item {
+  display:flex; gap:16px; align-items:flex-start;
+  padding:16px; border-radius:10px; border:1px solid var(--border);
+  background:var(--bg-200); transition:border-color .2s;
+}
+.rzpa-action-item:hover { border-color:rgba(204,255,0,.2); }
+.rzpa-action-high  { border-left:3px solid var(--neon) !important; }
+.rzpa-action-medium { border-left:3px solid #f59e0b !important; }
+.action-num {
+  width:28px; height:28px; border-radius:50%; background:rgba(204,255,0,.1);
+  border:1px solid rgba(204,255,0,.25); color:var(--neon); font-size:12px;
+  font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.action-body { flex:1; min-width:0; }
+.action-title { font-size:14px; font-weight:700; color:#fff; margin-bottom:6px; }
+.action-desc  { font-size:12px; color:#888; line-height:1.6; margin-bottom:8px; }
+.action-how   { font-size:12px; color:#666; line-height:1.6; background:var(--bg-100); padding:8px 12px; border-radius:6px; }
+.action-how strong { color:#aaa; }
+.action-prio  { font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; white-space:nowrap; flex-shrink:0; }
+.action-prio-high   { background:rgba(204,255,0,.12); color:var(--neon); border:1px solid rgba(204,255,0,.2); }
+.action-prio-medium { background:rgba(245,158,11,.12); color:#f59e0b;    border:1px solid rgba(245,158,11,.2); }
+
 /* Meta Ads Manager link */
 .rzpa-meta-link {
   display:inline-flex; align-items:center; justify-content:center;
