@@ -542,10 +542,24 @@ const RZPA_App = (() => {
     el('rzpa-seo-sync')?.addEventListener('click', async () => {
       const btn = el('rzpa-seo-sync');
       if (btn) { btn.disabled = true; btn.textContent = 'Henter…'; }
-      await api('/seo/sync', { method: 'POST' });
+      const res = await api('/seo/sync', { method: 'POST' });
+      if (btn) { btn.disabled = false; btn.textContent = '⟳ Hent data'; }
+
+      // Vis fejlbesked hvis Google API fejlede
+      if (res && res.success && res.data && res.data.success === false && res.data.error) {
+        const story = el('seo-story');
+        if (story) story.innerHTML =
+          `<p style="color:#ff6b6b;font-weight:600">❌ Google API fejl</p>` +
+          `<p style="color:#ccc;margin:6px 0">${res.data.error}</p>` +
+          `<p style="font-size:12px;color:#888;margin-top:8px">` +
+          `Tjek at <strong>Site URL</strong> i Indstillinger matcher <em>præcis</em> hvad der står i Google Search Console.<br>` +
+          `Prøv: <code>https://www.rezponz.dk</code>, <code>https://rezponz.dk</code> eller <code>sc-domain:rezponz.dk</code>` +
+          `</p>`;
+        return;
+      }
+
       clearCache('/seo/');
       clearCache('/dashboard/overview');
-      if (btn) { btn.disabled = false; btn.textContent = '⟳ Hent data'; }
       loadSEO(days);
     });
 

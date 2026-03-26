@@ -3,36 +3,93 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class RZPA_Google_SEO {
 
-    public static function fetch( int $days = 30 ) : array {
-        $opts = get_option( 'rzpa_settings', [] );
+    /** Seneste fejlbesked fra fetch() – bruges af seo_sync til at vise fejl i UI */
+    public static $last_error = null;
 
-        if ( empty( $opts['google_client_id'] ) || empty( $opts['google_refresh_token'] ) ) {
-            return []; // Ikke konfigureret
-        }
-
-        // Get access token via refresh token
+    /** Henter access token – returnerer token-streng eller sætter $last_error */
+    private static function get_access_token( array $opts ) : string {
         $token_res = wp_remote_post( 'https://oauth2.googleapis.com/token', [
             'body' => [
                 'client_id'     => $opts['google_client_id'],
-                'client_secret' => $opts['google_client_secret'],
+                'client_secret' => $opts['google_client_secret'] ?? '',
                 'refresh_token' => $opts['google_refresh_token'],
                 'grant_type'    => 'refresh_token',
             ],
         ] );
-
         if ( is_wp_error( $token_res ) ) {
+            self::$last_error = 'Netværksfejl: ' . $token_res->get_error_message();
+            return '';
+        }
+        $body = json_decode( wp_remote_retrieve_body( $token_res ), true );
+        if ( empty( $body['access_token'] ) ) {
+            self::$last_error = $body['error_description'] ?? ( $body['error'] ?? 'Kunne ikke hente access token' );
+            return '';
+        }
+        return $body['access_token'];
+    }
+
+    /** Debug: test forbindelsen og returnér rå API-respons */
+    public static function test_connection() : array {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['google_client_id'] ) || empty( $opts['google_refresh_token'] ) ) {
+            return [ 'step' => 'config', 'error' => 'Mangler client_id eller refresh_token i indstillinger' ];
+        }
+        $token_res = wp_remote_post( 'https://oauth2.googleapis.com/token', [
+            'body' => [
+                'client_id'     => $opts['google_client_id'],
+                'client_secret' => $opts['google_client_secret'] ?? '',
+                'refresh_token' => $opts['google_refresh_token'],
+                'grant_type'    => 'refresh_token',
+            ],
+        ] );
+        if ( is_wp_error( $token_res ) ) {
+            return [ 'step' => 'token', 'error' => $token_res->get_error_message() ];
+        }
+        $token_body = json_decode( wp_remote_retrieve_body( $token_res ), true );
+        if ( empty( $token_body['access_token'] ) ) {
+            return [ 'step' => 'token', 'error' => $token_body['error_description'] ?? 'Ingen access_token', 'raw' => $token_body ];
+        }
+        $site_url = $opts['google_site_url'] ?? 'https://rezponz.dk';
+        $api_res = wp_remote_post(
+            'https://searchconsole.googleapis.com/webmasters/v3/sites/' . rawurlencode( $site_url ) . '/searchAnalytics/query',
+            [
+                'headers' => [ 'Authorization' => 'Bearer ' . $token_body['access_token'], 'Content-Type' => 'application/json' ],
+                'body'    => wp_json_encode( [
+                    'startDate'  => gmdate( 'Y-m-d', strtotime( '-30 days' ) ),
+                    'endDate'    => gmdate( 'Y-m-d' ),
+                    'dimensions' => [ 'query' ],
+                    'rowLimit'   => 5,
+                ] ),
+            ]
+        );
+        $api_body  = json_decode( wp_remote_retrieve_body( $api_res ), true );
+        $http_code = wp_remote_retrieve_response_code( $api_res );
+        return [
+            'step'      => 'api',
+            'http_code' => $http_code,
+            'site_url'  => $site_url,
+            'rows'      => count( $api_body['rows'] ?? [] ),
+            'error'     => $api_body['error']['message'] ?? null,
+            'raw'       => $api_body,
+        ];
+    }
+
+    public static function fetch( int $days = 30 ) : array {
+        self::$last_error = null;
+        $opts = get_option( 'rzpa_settings', [] );
+
+        if ( empty( $opts['google_client_id'] ) || empty( $opts['google_refresh_token'] ) ) {
+            self::$last_error = 'Google Search Console er ikke forbundet — gå til Indstillinger og klik "Forbind".';
             return [];
         }
 
-        $token_data   = json_decode( wp_remote_retrieve_body( $token_res ), true );
-        $access_token = $token_data['access_token'] ?? '';
-
+        $access_token = self::get_access_token( $opts );
         if ( ! $access_token ) {
-            return [];
+            return []; // $last_error sat af get_access_token()
         }
 
-        $site_url  = $opts['google_site_url'] ?? 'https://rezponz.dk';
-        $end_date  = gmdate( 'Y-m-d' );
+        $site_url   = $opts['google_site_url'] ?? 'https://rezponz.dk';
+        $end_date   = gmdate( 'Y-m-d' );
         $start_date = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
 
         $api_res = wp_remote_post(
@@ -52,12 +109,20 @@ class RZPA_Google_SEO {
         );
 
         if ( is_wp_error( $api_res ) ) {
+            self::$last_error = 'Netværksfejl mod Google API: ' . $api_res->get_error_message();
             return [];
         }
 
-        $body = json_decode( wp_remote_retrieve_body( $api_res ), true );
-        $rows = [];
+        $body      = json_decode( wp_remote_retrieve_body( $api_res ), true );
+        $http_code = wp_remote_retrieve_response_code( $api_res );
 
+        if ( ! empty( $body['error'] ) ) {
+            $msg = $body['error']['message'] ?? 'Ukendt API-fejl';
+            self::$last_error = "Google API fejl ({$http_code}): {$msg} — Site URL: {$site_url}";
+            return [];
+        }
+
+        $rows = [];
         foreach ( ( $body['rows'] ?? [] ) as $row ) {
             $rows[] = [
                 'date'        => $row['keys'][1],
@@ -69,28 +134,17 @@ class RZPA_Google_SEO {
             ];
         }
 
-        return $rows; // Tom = ingen data fra GSC (tjek site URL i indstillinger)
+        return $rows;
     }
 
     public static function fetch_pages( int $days = 30 ) : array {
         $opts = get_option( 'rzpa_settings', [] );
 
         if ( empty( $opts['google_client_id'] ) || empty( $opts['google_refresh_token'] ) ) {
-            return []; // Ikke konfigureret
+            return [];
         }
 
-        $token_res = wp_remote_post( 'https://oauth2.googleapis.com/token', [
-            'body' => [
-                'client_id'     => $opts['google_client_id'],
-                'client_secret' => $opts['google_client_secret'],
-                'refresh_token' => $opts['google_refresh_token'],
-                'grant_type'    => 'refresh_token',
-            ],
-        ] );
-        if ( is_wp_error( $token_res ) ) return [];
-
-        $token_data   = json_decode( wp_remote_retrieve_body( $token_res ), true );
-        $access_token = $token_data['access_token'] ?? '';
+        $access_token = self::get_access_token( $opts );
         if ( ! $access_token ) return [];
 
         $site_url   = $opts['google_site_url'] ?? 'https://rezponz.dk';

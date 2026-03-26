@@ -34,6 +34,7 @@ class RZPA_REST_API {
             [ 'seo/keyword-trend','GET',  'seo_keyword_trend' ],
             [ 'seo/pages',        'GET',  'seo_pages' ],
             [ 'seo/sync',         'POST', 'seo_sync' ],
+            [ 'seo/test',         'GET',  'seo_test' ],
         ] as [ $path, $method, $cb ] ) {
             register_rest_route( self::NS, '/' . $path, [
                 'methods'             => $method,
@@ -179,12 +180,23 @@ class RZPA_REST_API {
         return self::ok( RZPA_Database::get_top_pages( self::days( $r ), 30 ) );
     }
     public static function seo_sync( $r ) {
-        $rows = RZPA_Google_SEO::fetch( 90 );
+        $rows  = RZPA_Google_SEO::fetch( 90 );
+        $error = RZPA_Google_SEO::$last_error;
+
+        if ( $error && empty( $rows ) ) {
+            RZPA_Database::log_sync( 'google_search_console', 'error', $error );
+            return self::ok( [ 'success' => false, 'error' => $error, 'keywords' => 0, 'pages' => 0 ] );
+        }
+
         RZPA_Database::insert_seo_rows( $rows );
         $page_rows = RZPA_Google_SEO::fetch_pages( 90 );
         RZPA_Database::insert_seo_page_rows( $page_rows );
         RZPA_Database::log_sync( 'google_search_console', 'success', count( $rows ) . ' keywords, ' . count( $page_rows ) . ' pages' );
-        return self::ok( [ 'keywords' => count( $rows ), 'pages' => count( $page_rows ) ] );
+        return self::ok( [ 'success' => true, 'keywords' => count( $rows ), 'pages' => count( $page_rows ) ] );
+    }
+
+    public static function seo_test() {
+        return self::ok( RZPA_Google_SEO::test_connection() );
     }
 
     // AI
