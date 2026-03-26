@@ -4,11 +4,12 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 $opts  = get_option( 'rzpa_settings', [] );
 $saved = isset( $_GET['saved'] );
 
-// Manuel "Tjek opdateringer" – ryd transient og redirect til WP's update-side
+// Manuel "Tjek opdateringer" – ryd transient og bliv på siden
 if ( isset( $_GET['rzpa_check_updates'] ) && check_admin_referer( 'rzpa_check_updates' ) ) {
     RZPA_Updater::flush_cache();
     delete_site_transient( 'update_plugins' );
-    wp_redirect( admin_url( 'update-core.php' ) );
+    wp_update_plugins(); // Tvinger WP til at tjekke nu
+    wp_redirect( admin_url( 'admin.php?page=rzpa-settings&update_checked=1' ) );
     exit;
 }
 
@@ -36,6 +37,10 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
 
   <?php if ( $saved ) : ?>
   <div class="rzpa-notice success" style="margin-bottom:20px">✓ Indstillinger gemt.</div>
+  <?php endif; ?>
+
+  <?php if ( isset( $_GET['update_checked'] ) ) : ?>
+  <div class="rzpa-notice success" style="margin-bottom:20px">🔍 Opdateringstjek gennemført — siden er opdateret herunder.</div>
   <?php endif; ?>
 
   <?php if ( $update_info ) : ?>
