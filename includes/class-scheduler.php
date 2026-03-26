@@ -32,9 +32,10 @@ class RZPA_Scheduler {
 
     public static function run_ads_sync() {
         foreach ( [
-            [ 'RZPA_Meta_Ads',      'insert_meta_campaigns',   'meta_ads' ],
-            [ 'RZPA_Snapchat_Ads',  'insert_snap_campaigns',   'snapchat_ads' ],
-            [ 'RZPA_TikTok_Ads',    'insert_tiktok_campaigns', 'tiktok_ads' ],
+            [ 'RZPA_Meta_Ads',      'insert_meta_campaigns',        'meta_ads'    ],
+            [ 'RZPA_Snapchat_Ads',  'insert_snap_campaigns',        'snapchat_ads'],
+            [ 'RZPA_TikTok_Ads',    'insert_tiktok_campaigns',      'tiktok_ads'  ],
+            [ 'RZPA_Google_Ads',    'insert_google_ads_campaigns',  'google_ads'  ],
         ] as [ $class, $db_method, $source ] ) {
             try {
                 $rows = $class::fetch( 30 );

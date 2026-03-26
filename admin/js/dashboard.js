@@ -1293,6 +1293,312 @@ const RZPA_App = (() => {
     } catch(e) {}
   }
 
+  // ════════════════════════════════════════════════════
+  // PAGE: GOOGLE ADS
+  // ════════════════════════════════════════════════════
+
+  async function initGoogleAds() {
+    let days = 30, gadsAllData = [], gadsSortKey = 'spend', gadsSortDir = 'desc', gadsFilter = 'all';
+
+    function perfClassGads(ctr) { return ctr >= 2 ? 'perf-good' : ctr >= 0.5 ? 'perf-mid' : 'perf-bad'; }
+    function perfLabelGads(ctr) { return ctr >= 2 ? 'Godt' : ctr >= 0.5 ? 'Middel' : 'Svagt'; }
+
+    async function syncGads(d) {
+      const btn = el('rzpa-sync-gads');
+      if (btn) { btn.disabled = true; btn.textContent = 'Henter…'; }
+      try {
+        const r = await api('/google-ads/sync', { method: 'POST', body: JSON.stringify({days: d}) });
+        clearCache('/google-ads/');
+        if (btn) {
+          const ok = r.data?.success !== false;
+          if (!ok && r.data?.error) {
+            btn.textContent = '⚠️ Fejl';
+            const hBar = el('gads-health-bar');
+            if (hBar) { hBar.style.display='flex'; hBar.className='rzpa-health health-bad'; hBar.innerHTML=`<span class="h-icon">🔴</span><div class="h-text">${r.data.error}</div>`; }
+          } else {
+            btn.textContent = `✓ ${r.data?.count||0} kampagner hentet`;
+          }
+          setTimeout(() => { btn.disabled = false; btn.textContent = '⟳ Hent data'; }, 3000);
+        }
+        return true;
+      } catch(e) {
+        if (btn) { btn.disabled = false; btn.textContent = '⟳ Hent data'; }
+        return false;
+      }
+    }
+
+    async function maybeSync(d) {
+      const check = await api(`/google-ads/has-data?days=${d}`);
+      if (!check.data?.has_data) return await syncGads(d);
+      return true;
+    }
+
+    async function loadGads(d) {
+      const [sum, camps] = await Promise.all([
+        api(`/google-ads/summary?days=${d}`),
+        api(`/google-ads/campaigns?days=${d}`),
+      ]);
+      const s = sum.data || {};
+      gadsAllData = camps.data || [];
+
+      const spend  = parseFloat(s.total_spend) || 0;
+      const clicks = parseInt(s.total_clicks) || 0;
+      const impr   = parseInt(s.total_impressions) || 0;
+      const ctr    = parseFloat(s.avg_ctr) || (impr > 0 ? Math.round(clicks/impr*10000)/100 : 0);
+      const cpc    = parseFloat(s.avg_cpc) || (clicks > 0 ? Math.round(spend/clicks*100)/100 : 0);
+      const perDay = d > 0 ? Math.round(spend / d) : 0;
+
+      renderKPI('gads_kpi_spend',  spend  > 0 ? fmt(spend,0)  + ' kr' : '–', perDay > 0 ? '≈ ' + fmt(perDay,0) + ' kr/dag' : '');
+      renderKPI('gads_kpi_impr',   fmt(impr));
+      renderKPI('gads_kpi_clicks', fmt(clicks), cpc > 0 ? fmt(cpc,2) + ' kr per klik' : '');
+      renderKPI('gads_kpi_ctr',    ctr > 0 ? fmt(ctr,2) + '%' : '–');
+
+      const periodLabel = el('gads-period-label');
+      const periodDays  = el('gads-period-days');
+      if (periodLabel && spend > 0) { periodLabel.style.display='block'; if(periodDays) periodDays.textContent=d; }
+
+      // Health bar
+      const hBar = el('gads-health-bar');
+      if (hBar && spend > 0) {
+        if (ctr >= 2) {
+          hBar.className='rzpa-health health-good';
+          hBar.innerHTML=`<span class="h-icon">🟢</span><div class="h-text"><strong>Godt klaret!</strong> CTR på ${fmt(ctr,2)}% er over benchmark på 2%.<div class="h-sub">Søgeannoncerne fanger folks interesse.</div></div>`;
+        } else if (ctr >= 0.5) {
+          hBar.className='rzpa-health health-warn';
+          hBar.innerHTML=`<span class="h-icon">🟡</span><div class="h-text"><strong>Annoncerne virker, men kan forbedres.</strong> CTR på ${fmt(ctr,2)}% (mål: 2%+).<div class="h-sub">Test nye annoncetekster og søgeord.</div></div>`;
+        } else if (ctr > 0) {
+          hBar.className='rzpa-health health-bad';
+          hBar.innerHTML=`<span class="h-icon">🔴</span><div class="h-text"><strong>Lav CTR — annoncerne bør optimeres.</strong> ${fmt(ctr,2)}% klikker videre (mål: 2%+).<div class="h-sub">Gennemgå søgeord, annoncer og negative søgeord.</div></div>`;
+        }
+        hBar.style.display='flex';
+      }
+
+      // CTR badge
+      const ctrSub = el('gads_kpi_ctr_sub');
+      if (ctrSub) {
+        if (ctr >= 2)   ctrSub.innerHTML='<span class="rzpa-pill good">✓ Over benchmark</span>';
+        else if (ctr >= 0.5) ctrSub.innerHTML='<span class="rzpa-pill warn">⚠ Under mål (2%)</span>';
+        else if (ctr > 0)    ctrSub.innerHTML='<span class="rzpa-pill bad">✗ For lavt</span>';
+      }
+
+      // Story
+      const storyEl = el('gads-story');
+      if (storyEl && spend > 0) {
+        const ctrLabel = ctr>=2 ? 'rigtig godt — annoncerne rammer de rigtige søgere 🚀'
+                       : ctr>=0.5 ? 'okay, men der er plads til forbedring 💡'
+                       : ctr>0 ? 'lav — prøv nye annoncetekster og søgeord ⚠️' : '–';
+        storyEl.innerHTML = `I perioden brugte I <strong>${fmt(spend,0)} kr</strong> på Google Ads. `
+          + `Annoncerne dukkede op <strong>${fmt(impr)} gange</strong>, og <strong>${fmt(clicks)} personer</strong> klikkede videre. `
+          + (cpc>0 ? `Det svarer til <strong>${fmt(cpc,2)} kr per klik</strong>. ` : '')
+          + (ctr>0 ? `Klikprocenten er <strong>${fmt(ctr,2)}%</strong> — det er <strong>${ctrLabel}</strong>.` : '');
+        storyEl.classList.remove('hidden');
+      }
+
+      // Performance summary
+      const perfSum = el('gads-perf-summary');
+      if (perfSum && gadsAllData.length) {
+        const good = gadsAllData.filter(c => (parseFloat(c.ctr)||0) >= 2).length;
+        const mid  = gadsAllData.filter(c => { const v=parseFloat(c.ctr)||0; return v>=0.5&&v<2; }).length;
+        const bad  = gadsAllData.filter(c => (parseFloat(c.ctr)||0) < 0.5).length;
+        setText('gads_perf_good', good); setText('gads_perf_mid', mid); setText('gads_perf_bad', bad);
+        perfSum.style.display = 'flex';
+      }
+
+      // Grafer
+      const top6   = [...gadsAllData].sort((a,b)=>b.spend-a.spend).slice(0,6);
+      const labels = top6.map(c => c.campaign_name.slice(0,22));
+      barChart('chart_gads_spend', labels,
+        [{data:top6.map(c=>Math.round(c.spend||0)),backgroundColor:'#4285F4',borderRadius:5}],
+        {yTick: v => Math.round(v/1000)+'k kr'});
+      barChart('chart_gads_ctr', labels,
+        [{data:top6.map(c=>parseFloat(c.ctr||0)),
+          backgroundColor:top6.map(c=>(parseFloat(c.ctr)||0)>=2?'#CCFF00':(parseFloat(c.ctr)||0)>=0.5?'#f5a623':'#cc4400'),
+          borderRadius:5}],
+        {yTick: v => v.toFixed(1)+'%'});
+
+      renderGadsTable(gadsAllData);
+    }
+
+    function renderGadsTable(data) {
+      const tbody = el('gads_tbody');
+      if (!tbody) return;
+      let filtered = data;
+      if (gadsFilter === 'ACTIVE')  filtered = data.filter(c => c.status === 'ACTIVE');
+      else if (gadsFilter === 'PAUSED') filtered = data.filter(c => c.status === 'PAUSED');
+      else if (gadsFilter === 'good') filtered = data.filter(c => (parseFloat(c.ctr)||0) >= 2);
+      else if (gadsFilter === 'mid')  filtered = data.filter(c => { const v=parseFloat(c.ctr)||0; return v>=0.5&&v<2; });
+      else if (gadsFilter === 'bad')  filtered = data.filter(c => (parseFloat(c.ctr)||0) < 0.5);
+      filtered = [...filtered].sort((a,b) => {
+        const av = parseFloat(a[gadsSortKey])||0, bv = parseFloat(b[gadsSortKey])||0;
+        return gadsSortDir === 'desc' ? bv-av : av-bv;
+      });
+      if (!filtered.length) { tbody.innerHTML='<tr><td colspan="9" class="rzpa-empty">Ingen kampagner matcher filteret.</td></tr>'; return; }
+      tbody.innerHTML = filtered.map(c => {
+        const ctr = parseFloat(c.ctr)||0;
+        return `<tr>
+          <td style="color:#ddd;font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${c.campaign_name}">${c.campaign_name}</td>
+          <td>${badgeHtml(c.status)}</td>
+          <td>${fmt(c.spend,0)} kr</td>
+          <td>${fmt(c.impressions)}</td>
+          <td>${fmt(c.clicks)}</td>
+          <td style="font-weight:600">${fmt(ctr,2)}%</td>
+          <td>${fmt(c.cpc,2)} kr</td>
+          <td>${fmt(c.conversions||0,1)}</td>
+          <td><span class="perf-badge ${perfClassGads(ctr)}">${perfLabelGads(ctr)}</span></td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function loadGadsMonthly(months) {
+      months = months || 6;
+      try {
+        sessionStorage.removeItem('rzpa||/google-ads/monthly?months=' + months);
+        const r = await api('/google-ads/monthly?months=' + months);
+        const data = r.data || [];
+        const card = el('gads-monthly-card');
+        if (!data.length) { if(card) card.style.display='none'; return; }
+        if (card) card.style.display='block';
+        const mNames = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+        const labels = data.map(d => { const [y,m]=d.month.split('-'); return mNames[parseInt(m,10)-1]+' '+y.slice(2); });
+        const canvas = el('chart_gads_monthly');
+        if (!canvas) return;
+        if (canvas._chart) canvas._chart.destroy();
+        canvas._chart = new Chart(canvas, {
+          type: 'bar',
+          data: { labels, datasets: [
+            { label:'Forbrug (kr)', data:data.map(d=>Math.round(d.spend||0)), backgroundColor:'rgba(66,133,244,0.75)', borderRadius:6, yAxisID:'y', order:2 },
+            { label:'Klik', data:data.map(d=>d.clicks||0), type:'line', borderColor:'#CCFF00', backgroundColor:'rgba(204,255,0,0.08)', tension:0.3, pointRadius:4, pointBackgroundColor:'#CCFF00', fill:true, yAxisID:'y2', order:1 },
+          ]},
+          options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+            plugins: { legend:{display:true,labels:{color:'#888',font:{size:11},boxWidth:12,padding:16}},
+              tooltip:{callbacks:{label:ctx=>ctx.dataset.yAxisID==='y'?' Forbrug: '+ctx.parsed.y.toLocaleString('da-DK')+' kr':' Klik: '+ctx.parsed.y.toLocaleString('da-DK')}}},
+            scales: {
+              x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#666',font:{size:10}}},
+              y:{position:'left',grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#666',font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'k kr':v+' kr'}},
+              y2:{position:'right',grid:{drawOnChartArea:false},ticks:{color:'#CCFF00',font:{size:10},callback:v=>v.toLocaleString('da-DK')},min:0},
+            }
+          }
+        });
+      } catch(e) {}
+    }
+
+    // Init
+    initDateFilter('rzpa-date-filter', async d => {
+      days = d;
+      const tbody = el('gads_tbody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="rzpa-loading">Henter data for ' + d + ' dage fra Google Ads…</td></tr>';
+      await syncGads(d);
+      loadGads(d);
+    });
+    await maybeSync(days);
+    loadGads(days);
+    loadGadsMonthly(6);
+
+    el('gads-months-filter')?.addEventListener('click', e => {
+      const btn = e.target.closest('[data-months]');
+      if (!btn) return;
+      el('gads-months-filter').querySelectorAll('[data-months]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      loadGadsMonthly(parseInt(btn.dataset.months,10));
+    });
+
+    el('rzpa-sync-gads')?.addEventListener('click', async () => {
+      await syncGads(days);
+      loadGads(days);
+      loadGadsMonthly(6);
+    });
+
+    el('gads-filter-bar')?.addEventListener('click', e => {
+      const btn = e.target.closest('[data-filter]');
+      if (!btn) return;
+      gadsFilter = btn.dataset.filter;
+      el('gads-filter-bar').querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      renderGadsTable(gadsAllData);
+    });
+
+    el('gads-table')?.querySelector('thead')?.addEventListener('click', e => {
+      const th = e.target.closest('[data-sort]');
+      if (!th) return;
+      const key = th.dataset.sort;
+      gadsSortDir = (gadsSortKey===key && gadsSortDir==='desc') ? 'asc' : 'desc';
+      gadsSortKey = key;
+      renderGadsTable(gadsAllData);
+    });
+
+    // AI analyse
+    el('gads-ai-refresh')?.addEventListener('click', async () => {
+      const btn = el('gads-ai-refresh'), content = el('gads-ai-content');
+      if (btn) { btn.disabled=true; btn.textContent='⏳ Analyserer…'; }
+      if (content) content.innerHTML='<div style="color:#555;padding:16px 0">🤖 Sender kampagnedata til AI — tager 15-30 sekunder…</div>';
+      const res = await api('/google-ads/ai-analysis?days='+days, {method:'POST'});
+      if (btn) { btn.disabled=false; btn.textContent='✨ Analysér nu'; }
+      if (!content) return;
+      const d = res?.data || {};
+      if (d.error) { const e=typeof d.error==='string'?d.error:JSON.stringify(d.error); content.innerHTML=`<span style="color:#ff6b6b">⚠️ ${e}</span>`; return; }
+      if (d.analysis) {
+        const sectionColors={'1':'#60a5fa','2':'#CCFF00','3':'#4285F4','4':'#f59e0b','5':'#a78bfa'};
+        const sectionIcons ={'1':'📊','2':'🎯','3':'📋','4':'🔍','5':'⚙️'};
+        function mdToHtmlG(txt) {
+          if(!txt) return '';
+          return txt.replace(/\*\*([^*]+)\*\*/g,'<strong style="color:#ddd">$1</strong>').replace(/\*([^*]+)\*/g,'<em style="color:#bbb">$1</em>').replace(/^[-–]\s+(.+)$/gm,'<li>$1</li>').replace(/(<li>[\s\S]*?<\/li>)/g,'<ul style="margin:8px 0 8px 16px;padding:0;list-style:none">$1</ul>').replace(/<\/ul>\s*<ul[^>]*>/g,'').replace(/\n{2,}/g,'</p><p style="margin:8px 0">').replace(/\n/g,' ');
+        }
+        const raw = d.analysis.replace(/^#+\s*/gm,'');
+        const parts = raw.split(/(?=\b[1-5]\.\s+[A-ZÆØÅ]{3,})/);
+        content.innerHTML = parts.map(section => {
+          section = section.trim(); if(!section) return '';
+          const m = section.match(/^([1-5])\.\s+([^\n.]+)[.\n]?([\s\S]*)/);
+          if(!m) return `<p style="color:#888;font-size:12px;margin:8px 0">${mdToHtmlG(section)}</p>`;
+          const [,num,titleRaw,bodyRaw]=m;
+          const color=sectionColors[num]||'#888', icon=sectionIcons[num]||'•';
+          const title=titleRaw.replace(/\*\*/g,'').trim(), body=mdToHtmlG(bodyRaw.trim());
+          return `<div style="margin-bottom:14px;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.06)">
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.05)">
+              <span style="font-size:18px">${icon}</span>
+              <div><span style="font-size:10px;font-weight:700;letter-spacing:1px;color:${color};text-transform:uppercase">${num} / 5</span>
+              <div style="font-size:13px;font-weight:700;color:#fff;margin-top:1px">${title}</div></div>
+            </div>
+            <div style="padding:14px 16px;font-size:12px;color:#aaa;line-height:1.85"><p style="margin:0">${body}</p></div>
+          </div>`;
+        }).filter(Boolean).join('');
+        if (d.cached) content.insertAdjacentHTML('beforeend','<p style="font-size:11px;color:#444;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.05)">📋 Cachet analyse — klik igen for frisk analyse</p>');
+      }
+    });
+
+    // Fakturaer
+    el('gads-invoices-load')?.addEventListener('click', async () => {
+      const btn=el('gads-invoices-load'), content=el('gads-invoices-content'), csvBtn=el('gads-invoices-csv');
+      if(btn){btn.disabled=true;btn.textContent='⏳ Henter…';}
+      const res = await api('/google-ads/invoices');
+      if(btn){btn.disabled=false;btn.textContent='⬇ Hent betalinger';}
+      if(!content) return;
+      const data = res?.data||[];
+      if(data.error){content.innerHTML=`<span style="color:#ff6b6b">⚠️ ${typeof data.error==='string'?data.error:JSON.stringify(data.error)}</span>`;return;}
+      if(!data.length){content.innerHTML='<span style="color:#555">Ingen betalingsdata fundet.</span>';return;}
+      window._gadsInvoiceData = data;
+      if(csvBtn) csvBtn.style.display='inline-flex';
+      const total = data.reduce((s,r)=>s+(r.amount||0),0);
+      const mNames=['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+      content.innerHTML=`<div style="margin-bottom:12px;padding:12px 16px;background:rgba(66,133,244,0.05);border-radius:8px;border:1px solid rgba(66,133,244,0.15);display:flex;gap:24px;flex-wrap:wrap">
+        <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Total (vist periode)</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${fmt(total,2)} DKK</div></div>
+        <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Måneder</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${data.length}</div></div>
+      </div>
+      <div class="rzpa-table-wrap"><table class="rzpa-table"><thead><tr><th>Måned</th><th>Forbrug</th><th>Valuta</th><th>Status</th></tr></thead><tbody>
+      ${data.map(r=>{const[y,m]=r.month.split('-');const mn=mNames[parseInt(m,10)-1]+' '+y;return`<tr><td style="color:#ccc">${mn}</td><td style="font-weight:600;color:#fff">${fmt(r.amount,2)}</td><td style="color:#888">${r.currency}</td><td><span style="color:#4ade80;font-size:11px">✓ Betalt</span></td></tr>`;}).join('')}
+      </tbody></table></div>`;
+    });
+
+    el('gads-invoices-csv')?.addEventListener('click', () => {
+      const data = window._gadsInvoiceData||[];
+      if(!data.length) return;
+      const csv = ['Måned,Forbrug,Valuta',...data.map(r=>`${r.month},${r.amount},${r.currency}`)].join('\n');
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
+      a.download='google-ads-betalinger-'+new Date().toISOString().slice(0,10)+'.csv';
+      a.click();
+    });
+  }
+
   async function initMeta() {
     let days = 30;
 
@@ -1788,13 +2094,14 @@ const RZPA_App = (() => {
   // ── Section init map (IIFE-scoped so PJAX can reach it) ─────────────────
 
   const initMap = {
-    dashboard: initDashboard,
-    seo:       initSEO,
-    ai:        initAI,
-    meta:      initMeta,
-    snap:      initSnap,
-    tiktok:    initTikTok,
-    rapport:   initRapport,
+    dashboard:    initDashboard,
+    seo:          initSEO,
+    ai:           initAI,
+    meta:         initMeta,
+    'google-ads': initGoogleAds,
+    snap:         initSnap,
+    tiktok:       initTikTok,
+    rapport:      initRapport,
     // settings: pure PHP form — ingen JS init nødvendig
   };
 

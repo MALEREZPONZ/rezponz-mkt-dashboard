@@ -82,6 +82,24 @@ class RZPA_REST_API {
             ] );
         }
 
+        // Google Ads
+        foreach ( [
+            [ 'google-ads/campaigns', 'GET',  'google_ads_campaigns' ],
+            [ 'google-ads/summary',   'GET',  'google_ads_summary'   ],
+            [ 'google-ads/sync',      'POST', 'google_ads_sync'      ],
+            [ 'google-ads/has-data',  'GET',  'google_ads_has_data'  ],
+            [ 'google-ads/monthly',   'GET',  'google_ads_monthly'   ],
+            [ 'google-ads/invoices',  'GET',  'google_ads_invoices'  ],
+            [ 'google-ads/test',      'GET',  'google_ads_test'      ],
+            [ 'google-ads/ai-analysis','POST','google_ads_ai_analysis'],
+        ] as [ $path, $method, $cb ] ) {
+            register_rest_route( self::NS, '/' . $path, [
+                'methods'             => $method,
+                'callback'            => [ __CLASS__, $cb ],
+                'permission_callback' => $cap,
+            ] );
+        }
+
         // Trends (time-series for dashboard)
         register_rest_route( self::NS, '/ads/trends', [
             'methods'             => 'GET',
@@ -492,6 +510,111 @@ class RZPA_REST_API {
         $text    = $ai_body['choices'][0]['message']['content'] ?? '';
         if ( ! $text ) return self::ok( [ 'error' => $ai_body['error']['message'] ?? 'Ingen svar fra OpenAI' ] );
 
+        set_transient( $cache_key, $text, 4 * HOUR_IN_SECONDS );
+        return self::ok( [ 'analysis' => $text ] );
+    }
+
+    // ── Google Ads ─────────────────────────────────────────────────────────
+
+    public static function google_ads_sync( WP_REST_Request $r ) {
+        $days = self::days( $r );
+        $rows = RZPA_Google_Ads::fetch( $days );
+        $err  = RZPA_Google_Ads::$last_error;
+        if ( $err && empty( $rows ) ) return self::ok( [ 'success' => false, 'error' => $err ] );
+        RZPA_Database::insert_google_ads_campaigns( $rows, $days );
+        return self::ok( [ 'success' => true, 'count' => count( $rows ) ] );
+    }
+
+    public static function google_ads_summary( WP_REST_Request $r ) {
+        $s = RZPA_Database::get_google_ads_summary( self::days( $r ) );
+        return self::ok( array_merge( $s, [ 'configured' => true ] ) );
+    }
+
+    public static function google_ads_campaigns( WP_REST_Request $r ) {
+        return self::ok( RZPA_Database::get_google_ads_campaigns( self::days( $r ) ) );
+    }
+
+    public static function google_ads_has_data( WP_REST_Request $r ) {
+        $days = self::days( $r );
+        return self::ok( [ 'has_data' => RZPA_Database::has_google_ads_data( $days ), 'days' => $days ] );
+    }
+
+    public static function google_ads_monthly( WP_REST_Request $r ) {
+        $months = (int) ( $r->get_param( 'months' ) ?: 6 );
+        $key    = 'rzpa_gads_monthly_' . $months;
+        $cached = get_transient( $key );
+        if ( $cached !== false ) return self::ok( $cached );
+        $data = RZPA_Google_Ads::fetch_monthly( $months );
+        if ( $data ) set_transient( $key, $data, 6 * HOUR_IN_SECONDS );
+        return self::ok( $data );
+    }
+
+    public static function google_ads_invoices() {
+        $key    = 'rzpa_gads_invoices';
+        $cached = get_transient( $key );
+        if ( $cached !== false ) return self::ok( $cached );
+        $data = RZPA_Google_Ads::fetch_invoices();
+        if ( ! isset( $data['error'] ) ) set_transient( $key, $data, HOUR_IN_SECONDS );
+        return self::ok( $data );
+    }
+
+    public static function google_ads_test() {
+        return self::ok( RZPA_Google_Ads::test_connection() );
+    }
+
+    public static function google_ads_ai_analysis( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        $key  = $opts['openai_api_key'] ?? '';
+        if ( ! $key ) return self::ok( [ 'error' => 'Ingen OpenAI API-nøgle — tilføj den i Indstillinger' ] );
+
+        $days      = self::days( $r );
+        $summary   = RZPA_Database::get_google_ads_summary( $days );
+        $campaigns = RZPA_Database::get_google_ads_campaigns( $days );
+
+        if ( empty( $summary['total_spend'] ) || (float) $summary['total_spend'] === 0.0 ) {
+            return self::ok( [ 'error' => 'Ingen Google Ads-data — klik "Hent data" først' ] );
+        }
+
+        $spend  = round( (float) ( $summary['total_spend']      ?? 0 ) );
+        $clicks = (int)          ( $summary['total_clicks']      ?? 0 );
+        $impr   = (int)          ( $summary['total_impressions'] ?? 0 );
+        $ctr    = round( (float) ( $summary['avg_ctr']           ?? 0 ), 2 );
+        $cpc    = round( (float) ( $summary['avg_cpc']           ?? 0 ), 2 );
+        $conv   = round( (float) ( $summary['total_conversions'] ?? 0 ), 1 );
+
+        $campText = implode( "\n", array_map( fn($c) =>
+            sprintf( '- %s [%s]: %.0f kr, %d vis, %d klik, %.2f%% CTR, %.2f kr/klik, %.1f konv.',
+                $c['campaign_name'], $c['status'], $c['spend'],
+                $c['impressions'], $c['clicks'], $c['ctr'], $c['cpc'], $c['conversions'] ?? 0
+            ),
+            array_slice( $campaigns, 0, 15 )
+        ) );
+
+        $prompt = "Du er en certificeret Google Ads-specialist. Analyser disse Google Ads-data for Rezponz.dk — en dansk B2B-virksomhed der rekrutterer og outsourcer kundeservicemedarbejdere.\n\n"
+            . "PERIODE: Seneste {$days} dage\n"
+            . "TOTAL: {$spend} kr brugt · {$impr} visninger · {$clicks} klik · {$ctr}% CTR · {$cpc} kr/klik · {$conv} konverteringer\n\n"
+            . "KAMPAGNER:\n{$campText}\n\n"
+            . "Giv en struktureret analyse med præcis disse 5 sektioner:\n\n"
+            . "1. OVERORDNET VURDERING\nVurder samlet performance. Benchmarks for B2B Google Ads: CTR >2% søgenetværk, CPC <20 kr, konverteringsrate >3%.\n\n"
+            . "2. TOP PRIORITET NU\nÉt konkret tiltag der giver størst effekt straks. Vær meget specifik.\n\n"
+            . "3. KAMPAGNE-ANBEFALINGER\nGennemgå HVER aktiv kampagne: skalér, optimér eller pausér? Konkrete årsager med tal.\n\n"
+            . "4. SØGEORD & ANNONCER\nForslag til negative søgeord, nye søgeord og bedre annoncetekster for B2B rekruttering.\n\n"
+            . "5. TEKNISK OPTIMERING\nBudstrategi, Quality Score, målgrupper, remarketing og konverteringssporing.\n\n"
+            . "Skriv på dansk. Brug præcise tal. Max 700 ord.";
+
+        $cache_key = 'rzpa_gads_ai_' . md5( $days . $spend . $clicks . $ctr );
+        $cached    = get_transient( $cache_key );
+        if ( $cached !== false ) return self::ok( [ 'analysis' => $cached, 'cached' => true ] );
+
+        $ai_res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
+            'timeout' => 45,
+            'headers' => [ 'Authorization' => 'Bearer ' . $key, 'Content-Type' => 'application/json' ],
+            'body'    => wp_json_encode( [ 'model' => 'gpt-4o-mini', 'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ], 'max_tokens' => 1200 ] ),
+        ] );
+        if ( is_wp_error( $ai_res ) ) return self::ok( [ 'error' => $ai_res->get_error_message() ] );
+        $ai_body = json_decode( wp_remote_retrieve_body( $ai_res ), true );
+        $text    = $ai_body['choices'][0]['message']['content'] ?? '';
+        if ( ! $text ) return self::ok( [ 'error' => $ai_body['error']['message'] ?? 'Ingen svar fra OpenAI' ] );
         set_transient( $cache_key, $text, 4 * HOUR_IN_SECONDS );
         return self::ok( [ 'analysis' => $text ] );
     }

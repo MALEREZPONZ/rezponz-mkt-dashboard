@@ -368,6 +368,93 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
       </p>
     </div>
 
+      <!-- ══ Google Ads ════════════════════════════════════════════════════ -->
+      <div class="rzpa-settings-section" id="google-ads">
+        <h2>🟦 Google Ads</h2>
+        <p class="section-desc">Forbind din Google Ads-konto for at se kampagneperformance direkte i dashboardet.</p>
+
+        <?php
+        $gads_ok = ! empty( $opts['google_ads_refresh_token'] );
+        if ( $gads_ok ) : ?>
+          <div class="rzpa-connected-badge">✅ Forbundet til Google Ads</div>
+        <?php endif; ?>
+
+        <?php if ( isset( $_GET['gads_connected'] ) ) : ?>
+          <div class="rzpa-notice success">✅ Google Ads er nu forbundet!</div>
+        <?php elseif ( isset( $_GET['gads_error'] ) ) : ?>
+          <div class="rzpa-notice error">❌ Kunne ikke forbinde Google Ads. Prøv igen.</div>
+        <?php endif; ?>
+
+        <table class="form-table">
+          <tr>
+            <th>Developer Token</th>
+            <td>
+              <input type="password" name="google_ads_developer_token"
+                value="<?php echo esc_attr( $opts['google_ads_developer_token'] ?? '' ); ?>"
+                class="regular-text" placeholder="AaBbCcDdEeFfGgHh..." />
+              <p class="description">Hent fra <a href="https://ads.google.com/aw/apicenter" target="_blank">Google Ads API Center</a> → Tools → API Center</p>
+            </td>
+          </tr>
+          <tr>
+            <th>Customer ID</th>
+            <td>
+              <input type="text" name="google_ads_customer_id"
+                value="<?php echo esc_attr( $opts['google_ads_customer_id'] ?? '' ); ?>"
+                class="regular-text" placeholder="123-456-7890" />
+              <p class="description">Find det i øverste højre hjørne i Google Ads (format: 123-456-7890)</p>
+            </td>
+          </tr>
+          <?php
+          $gads_cid = $opts['google_ads_client_id'] ?? $opts['google_client_id'] ?? '';
+          $gads_csec = $opts['google_ads_client_secret'] ?? $opts['google_client_secret'] ?? '';
+          if ( empty( $opts['google_client_id'] ) ) : // Vis kun hvis Search Console ikke allerede er sat op
+          ?>
+          <tr>
+            <th>OAuth Client ID</th>
+            <td>
+              <input type="text" name="google_ads_client_id"
+                value="<?php echo esc_attr( $gads_cid ); ?>"
+                class="regular-text" placeholder="123...apps.googleusercontent.com" />
+              <p class="description">Brug samme OAuth-klient som Google Search Console, eller opret en ny</p>
+            </td>
+          </tr>
+          <tr>
+            <th>OAuth Client Secret</th>
+            <td>
+              <input type="password" name="google_ads_client_secret"
+                value="<?php echo esc_attr( $gads_csec ); ?>"
+                class="regular-text" />
+            </td>
+          </tr>
+          <?php endif; ?>
+          <tr>
+            <th>Autoriser</th>
+            <td>
+              <?php
+              $redirect_uri = admin_url( 'admin.php?page=rzpa-settings&rzpa_google_ads_oauth=1' );
+              $cid_for_auth = $opts['google_ads_client_id'] ?? $opts['google_client_id'] ?? '';
+              if ( $cid_for_auth ) :
+                $auth_url = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query( [
+                    'client_id'     => $cid_for_auth,
+                    'redirect_uri'  => $redirect_uri,
+                    'response_type' => 'code',
+                    'scope'         => 'https://www.googleapis.com/auth/adwords',
+                    'access_type'   => 'offline',
+                    'prompt'        => 'consent',
+                ] );
+              ?>
+              <a href="<?php echo esc_url( $auth_url ); ?>" class="button button-primary">
+                <?php echo $gads_ok ? '🔄 Genautoriser Google Ads' : '🔗 Forbind Google Ads'; ?>
+              </a>
+              <p class="description">Klik for at give adgang til din Google Ads-konto. Du skal godkende i din Google-konto.</p>
+              <?php else : ?>
+              <p class="description" style="color:#f59e0b">⚠️ Gem Client ID og Client Secret (eller opsæt Google Search Console) først, og genindlæs siden.</p>
+              <?php endif; ?>
+            </td>
+          </tr>
+        </table>
+      </div>
+
     <button type="submit" class="btn-primary" style="font-size:14px;padding:10px 24px">
       💾 Gem indstillinger
     </button>

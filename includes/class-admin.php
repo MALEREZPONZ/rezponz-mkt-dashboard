@@ -18,35 +18,60 @@ class RZPA_Admin {
     public static function handle_google_oauth() {
         if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) return;
         if ( empty( $_GET['page'] ) || $_GET['page'] !== 'rzpa-settings' ) return;
-        if ( empty( $_GET['rzpa_google_oauth'] ) || empty( $_GET['code'] ) ) return;
 
-        $code = sanitize_text_field( wp_unslash( $_GET['code'] ) );
-        $opts = get_option( 'rzpa_settings', [] );
-        $redirect_uri = admin_url( 'admin.php?page=rzpa-settings&rzpa_google_oauth=1' );
+        if ( isset( $_GET['rzpa_google_oauth'] ) && isset( $_GET['code'] ) ) {
+            $code = sanitize_text_field( wp_unslash( $_GET['code'] ) );
+            $opts = get_option( 'rzpa_settings', [] );
+            $redirect_uri = admin_url( 'admin.php?page=rzpa-settings&rzpa_google_oauth=1' );
 
-        $res = wp_remote_post( 'https://oauth2.googleapis.com/token', [
-            'timeout' => 15,
-            'body'    => [
-                'code'          => $code,
-                'client_id'     => $opts['google_client_id']     ?? '',
-                'client_secret' => $opts['google_client_secret'] ?? '',
-                'redirect_uri'  => $redirect_uri,
-                'grant_type'    => 'authorization_code',
-            ],
-        ] );
+            $res = wp_remote_post( 'https://oauth2.googleapis.com/token', [
+                'timeout' => 15,
+                'body'    => [
+                    'code'          => $code,
+                    'client_id'     => $opts['google_client_id']     ?? '',
+                    'client_secret' => $opts['google_client_secret'] ?? '',
+                    'redirect_uri'  => $redirect_uri,
+                    'grant_type'    => 'authorization_code',
+                ],
+            ] );
 
-        if ( ! is_wp_error( $res ) ) {
-            $data = json_decode( wp_remote_retrieve_body( $res ), true );
-            if ( ! empty( $data['refresh_token'] ) ) {
-                $opts['google_refresh_token'] = $data['refresh_token'];
-                update_option( 'rzpa_settings', $opts );
-                wp_redirect( admin_url( 'admin.php?page=rzpa-settings&google_connected=1' ) );
-                exit;
+            if ( ! is_wp_error( $res ) ) {
+                $data = json_decode( wp_remote_retrieve_body( $res ), true );
+                if ( ! empty( $data['refresh_token'] ) ) {
+                    $opts['google_refresh_token'] = $data['refresh_token'];
+                    update_option( 'rzpa_settings', $opts );
+                    wp_redirect( admin_url( 'admin.php?page=rzpa-settings&google_connected=1' ) );
+                    exit;
+                }
             }
+
+            wp_redirect( admin_url( 'admin.php?page=rzpa-settings&google_error=1' ) );
+            exit;
         }
 
-        wp_redirect( admin_url( 'admin.php?page=rzpa-settings&google_error=1' ) );
-        exit;
+        // Google Ads OAuth callback
+        if ( isset( $_GET['rzpa_google_ads_oauth'] ) && isset( $_GET['code'] ) ) {
+            $opts         = get_option( 'rzpa_settings', [] );
+            $redirect_uri = admin_url( 'admin.php?page=rzpa-settings&rzpa_google_ads_oauth=1' );
+            $res = wp_remote_post( 'https://oauth2.googleapis.com/token', [
+                'body' => [
+                    'code'          => sanitize_text_field( $_GET['code'] ),
+                    'client_id'     => $opts['google_ads_client_id'] ?? $opts['google_client_id'] ?? '',
+                    'client_secret' => $opts['google_ads_client_secret'] ?? $opts['google_client_secret'] ?? '',
+                    'redirect_uri'  => $redirect_uri,
+                    'grant_type'    => 'authorization_code',
+                ],
+            ] );
+            $body = json_decode( wp_remote_retrieve_body( $res ), true );
+            if ( ! empty( $body['refresh_token'] ) ) {
+                $opts['google_ads_refresh_token'] = $body['refresh_token'];
+                update_option( 'rzpa_settings', $opts );
+                wp_redirect( admin_url( 'admin.php?page=rzpa-settings&gads_connected=1' ) );
+            } else {
+                wp_redirect( admin_url( 'admin.php?page=rzpa-settings&gads_error=1' ) );
+            }
+            exit;
+        }
     }
 
     public static function add_menu() {
@@ -64,6 +89,7 @@ class RZPA_Admin {
             'rzpa-seo'       => [ 'SEO',              [ __CLASS__, 'page_seo' ] ],
             'rzpa-ai'        => [ 'AI-synlighed',     [ __CLASS__, 'page_ai' ] ],
             'rzpa-meta'      => [ 'Meta Ads',          [ __CLASS__, 'page_meta' ] ],
+            'rzpa-google-ads'=> [ 'Google Ads',        [ __CLASS__, 'page_google_ads' ] ],
             'rzpa-snapchat'  => [ 'Snapchat Ads',      [ __CLASS__, 'page_snap' ] ],
             'rzpa-tiktok'    => [ 'TikTok Ads',        [ __CLASS__, 'page_tiktok' ] ],
             'rzpa-rapport'   => [ 'PDF Rapport',       [ __CLASS__, 'page_rapport' ] ],
@@ -175,6 +201,8 @@ class RZPA_Admin {
             'snap_client_id', 'snap_client_secret', 'snap_access_token', 'snap_ad_account_id',
             'tiktok_access_token', 'tiktok_app_id', 'tiktok_advertiser_id',
             'openai_api_key',
+            'google_ads_developer_token', 'google_ads_customer_id',
+            'google_ads_client_id', 'google_ads_client_secret',
         ];
 
         $opts = [];
@@ -193,6 +221,9 @@ class RZPA_Admin {
     public static function page_seo()       { include RZPA_DIR . 'admin/views/seo.php'; }
     public static function page_ai()        { include RZPA_DIR . 'admin/views/ai-search.php'; }
     public static function page_meta()      { include RZPA_DIR . 'admin/views/meta-ads.php'; }
+    public static function page_google_ads() {
+        require RZPA_DIR . 'admin/views/google-ads.php';
+    }
     public static function page_snap()      { include RZPA_DIR . 'admin/views/snap-ads.php'; }
     public static function page_tiktok()    { include RZPA_DIR . 'admin/views/tiktok-ads.php'; }
     public static function page_rapport()   { include RZPA_DIR . 'admin/views/rapport.php'; }

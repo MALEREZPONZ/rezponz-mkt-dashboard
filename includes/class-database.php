@@ -119,6 +119,26 @@ class RZPA_Database {
             KEY idx_date_start (date_start)
         ) $c;" );
 
+        dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}rzpa_google_ads_campaigns (
+            id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            campaign_id   VARCHAR(100) NOT NULL,
+            campaign_name VARCHAR(255),
+            status        VARCHAR(50),
+            spend         FLOAT DEFAULT 0,
+            impressions   BIGINT DEFAULT 0,
+            clicks        INT DEFAULT 0,
+            conversions   FLOAT DEFAULT 0,
+            cpm           FLOAT DEFAULT 0,
+            cpc           FLOAT DEFAULT 0,
+            ctr           FLOAT DEFAULT 0,
+            date_start    DATE,
+            date_stop     DATE,
+            period_days   TINYINT UNSIGNED DEFAULT 30,
+            fetched_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_period (period_days)
+        ) $c;" );
+
         dbDelta( "CREATE TABLE {$wpdb->prefix}rzpa_sync_log (
             id        BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             source    VARCHAR(100) NOT NULL,
@@ -414,6 +434,61 @@ class RZPA_Database {
         return (bool) $wpdb->get_var( $wpdb->prepare(
             "SELECT COUNT(*) FROM $t WHERE period_days = %d", $days
         ) );
+    }
+
+    // ── Google Ads ────────────────────────────────────────────────────────────
+
+    public static function insert_google_ads_campaigns( array $rows, int $days = 30 ) : void {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_google_ads_campaigns';
+        $wpdb->delete( $t, [ 'period_days' => $days ], [ '%d' ] );
+        foreach ( $rows as $r ) {
+            $wpdb->insert( $t, [
+                'campaign_id'   => sanitize_text_field( $r['campaign_id'] ),
+                'campaign_name' => sanitize_text_field( $r['campaign_name'] ),
+                'status'        => sanitize_text_field( $r['status'] ),
+                'spend'         => (float) $r['spend'],
+                'impressions'   => (int)   $r['impressions'],
+                'clicks'        => (int)   $r['clicks'],
+                'conversions'   => (float) ( $r['conversions'] ?? 0 ),
+                'cpm'           => (float) $r['cpm'],
+                'cpc'           => (float) $r['cpc'],
+                'ctr'           => (float) $r['ctr'],
+                'date_start'    => sanitize_text_field( $r['date_start'] ),
+                'date_stop'     => sanitize_text_field( $r['date_stop'] ),
+                'period_days'   => $days,
+            ] );
+        }
+    }
+
+    public static function get_google_ads_campaigns( int $days = 30 ) : array {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_google_ads_campaigns';
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM $t WHERE period_days = %d ORDER BY spend DESC",
+            $days
+        ), ARRAY_A ) ?: [];
+    }
+
+    public static function get_google_ads_summary( int $days = 30 ) : array {
+        global $wpdb;
+        $t   = $wpdb->prefix . 'rzpa_google_ads_campaigns';
+        $row = $wpdb->get_row( $wpdb->prepare(
+            "SELECT SUM(spend) AS total_spend, SUM(impressions) AS total_impressions,
+                    SUM(clicks) AS total_clicks, SUM(conversions) AS total_conversions,
+                    CASE WHEN SUM(impressions) > 0 THEN ROUND(SUM(clicks)/SUM(impressions)*100,2) ELSE 0 END AS avg_ctr,
+                    CASE WHEN SUM(clicks) > 0 THEN ROUND(SUM(spend)/SUM(clicks),2) ELSE 0 END AS avg_cpc,
+                    COUNT(*) AS campaign_count
+             FROM $t WHERE period_days = %d",
+            $days
+        ), ARRAY_A );
+        return $row ?: [];
+    }
+
+    public static function has_google_ads_data( int $days = 30 ) : bool {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_google_ads_campaigns';
+        return (bool) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $t WHERE period_days = %d", $days ) );
     }
 
     // ── Snapchat ─────────────────────────────────────────────────────────────
