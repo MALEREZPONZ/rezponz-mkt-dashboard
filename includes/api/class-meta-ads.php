@@ -137,8 +137,9 @@ class RZPA_Meta_Ads {
 
         $url = self::API_BASE . '/' . $campaign_id . '/ads?' . http_build_query( [
             'access_token' => $token,
-            'fields'       => 'id,name,creative{id,name,thumbnail_url,image_url,video_id,body,title,call_to_action_type}',
-            'limit'        => 20,
+            'fields'       => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,body,title,call_to_action_type}',
+            'effective_status' => '["ACTIVE"]',
+            'limit'        => 50,
         ] );
 
         $res = wp_remote_get( $url, [ 'timeout' => 20 ] );
