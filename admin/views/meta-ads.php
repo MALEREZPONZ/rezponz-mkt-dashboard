@@ -28,6 +28,9 @@
   <div id="meta-story" class="rzpa-story hidden"></div>
 
   <!-- KPI kort med simple spørgsmål -->
+  <div id="meta-period-label" style="font-size:12px;color:#555;margin-bottom:8px;display:none">
+    📊 Viser data for de seneste <strong id="meta-period-days">30</strong> dage
+  </div>
   <div class="rzpa-kpi-grid v2">
     <div class="rzpa-kpi-v2">
       <div class="k2-q">💰 Hvad kostede annoncerne?</div>
@@ -60,11 +63,20 @@
     <div class="perf-item"><span id="perf_bad_count">0</span> kører <strong>svagt — overvej at pause dem</strong> 🔴</div>
   </div>
 
-  <!-- Månedlig oversigt -->
+  <!-- Performance over tid -->
   <div class="rzpa-card rzpa-monthly-card" id="meta-monthly-card" style="display:none">
-    <div class="rzpa-chart-title">📅 Månedligt forbrug — seneste 6 måneder</div>
-    <div class="rzpa-chart-sub">Hvad har I brugt per måned? Nyttig til at spotte tendenser.</div>
-    <div style="height:180px;margin-top:12px"><canvas id="chart_monthly"></canvas></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:4px">
+      <div>
+        <div class="rzpa-chart-title" style="margin:0">📈 Performance over tid</div>
+        <div class="rzpa-chart-sub" style="margin:4px 0 0">Forbrug (blå søjler) og antal klik (grøn linje) per måned</div>
+      </div>
+      <div id="meta-months-filter" class="rzpa-date-filter" style="font-size:12px">
+        <button data-months="3">3 mdr.</button>
+        <button data-months="6" class="active">6 mdr.</button>
+        <button data-months="12">12 mdr.</button>
+      </div>
+    </div>
+    <div style="height:220px;margin-top:12px"><canvas id="chart_monthly"></canvas></div>
   </div>
 
   <!-- Grafer -->

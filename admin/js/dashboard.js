@@ -16,8 +16,8 @@ const RZPA_App = (() => {
   // Matcher en API-sti til indlejret PHP-data (ignorerer ?days=X på første load)
   function _matchPreload(path) {
     if (path.includes('/dashboard/overview'))        return _preload.dashboard_overview;
-    if (path.includes('/meta/summary'))              return _preload.meta_summary;
-    if (path.includes('/meta/campaigns'))            return _preload.meta_campaigns;
+    if (path.includes('/meta/summary') && !path.includes('days=7') && !path.includes('days=90'))   return _preload.meta_summary;
+    if (path.includes('/meta/campaigns') && !path.includes('days=7') && !path.includes('days=90')) return _preload.meta_campaigns;
     if (path.includes('/meta/has-data'))             return { has_data: !!_preload.meta_has_data, days: 30 };
     if (path.includes('/seo/summary'))               return _preload.seo_summary;
     if (path.includes('/seo/keywords'))              return _preload.seo_keywords;
@@ -1140,24 +1140,85 @@ const RZPA_App = (() => {
     }
   }
 
-  async function loadMonthlyChart() {
+  async function loadMonthlyChart(months) {
+    months = months || 6;
     try {
-      const r = await api('/meta/monthly?months=6');
+      // Clear session cache so new months value always fetches fresh
+      try { sessionStorage.removeItem('rzpa||/meta/monthly?months=' + months); } catch(e) {}
+      const r = await api('/meta/monthly?months=' + months);
       const data = r.data || [];
-      if (!data.length) return;
       const card = el('meta-monthly-card');
+      if (!data.length) { if (card) card.style.display = 'none'; return; }
       if (card) card.style.display = 'block';
+      const mNames = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
       const labels = data.map(d => {
         const [y, m] = d.month.split('-');
-        const names = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
-        return names[parseInt(m,10)-1] + ' ' + y.slice(2);
+        return mNames[parseInt(m,10)-1] + ' ' + y.slice(2);
       });
-      barChart('chart_monthly', labels,
-        [{ data: data.map(d => Math.round(d.spend||0)),
-           backgroundColor: 'rgba(24,119,242,0.8)',
-           borderRadius: 6 }],
-        { yTick: v => (v>=1000?(v/1000).toFixed(0)+'k':v)+' kr' }
-      );
+      const ctrs = data.map(d => d.impressions > 0 ? Math.round(d.clicks/d.impressions*10000)/100 : 0);
+      const canvas = el('chart_monthly');
+      if (!canvas) return;
+      if (canvas._chart) canvas._chart.destroy();
+      canvas._chart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Forbrug (kr)',
+              data: data.map(d => Math.round(d.spend||0)),
+              backgroundColor: 'rgba(24,119,242,0.75)',
+              borderRadius: 6,
+              yAxisID: 'y',
+              order: 2,
+            },
+            {
+              label: 'Klik',
+              data: data.map(d => d.clicks||0),
+              type: 'line',
+              borderColor: '#CCFF00',
+              backgroundColor: 'rgba(204,255,0,0.08)',
+              tension: 0.3,
+              pointRadius: 4,
+              pointBackgroundColor: '#CCFF00',
+              fill: true,
+              yAxisID: 'y2',
+              order: 1,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: true, labels: { color: '#888', font: { size: 11 }, boxWidth: 12, padding: 16 } },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  if (ctx.dataset.yAxisID === 'y')  return ' Forbrug: ' + ctx.parsed.y.toLocaleString('da-DK') + ' kr';
+                  if (ctx.dataset.yAxisID === 'y2') return ' Klik: ' + ctx.parsed.y.toLocaleString('da-DK');
+                  return ctx.dataset.label + ': ' + ctx.parsed.y;
+                }
+              }
+            }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#666', font: { size: 10 } } },
+            y: {
+              position: 'left',
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#666', font: { size: 10 }, callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k kr' : v+' kr' }
+            },
+            y2: {
+              position: 'right',
+              grid: { drawOnChartArea: false },
+              ticks: { color: '#CCFF00', font: { size: 10 }, callback: v => v.toLocaleString('da-DK') },
+              min: 0,
+            },
+          },
+        },
+      });
     } catch(e) {}
   }
 
@@ -1185,12 +1246,21 @@ const RZPA_App = (() => {
     // Initial load
     await maybeSync(days);
     loadMeta(days);
-    loadMonthlyChart();
+    loadMonthlyChart(6);
+
+    // Måneder-filter til performance-over-tid grafen
+    el('meta-months-filter')?.addEventListener('click', e => {
+      const btn = e.target.closest('[data-months]');
+      if (!btn) return;
+      el('meta-months-filter').querySelectorAll('[data-months]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadMonthlyChart(parseInt(btn.dataset.months, 10));
+    });
 
     el('rzpa-sync-meta')?.addEventListener('click', async () => {
       if (await syncMeta(days)) {
         loadMeta(days);
-        loadMonthlyChart();
+        loadMonthlyChart(6);
       }
     });
 
@@ -1245,6 +1315,11 @@ const RZPA_App = (() => {
     const ctr    = parseFloat(s.avg_ctr) || (impr > 0 ? Math.round(clicks/impr*10000)/100 : 0);
     const cpc    = parseFloat(s.avg_cpc) || (clicks > 0 ? Math.round(spend/clicks*100)/100 : 0);
     const perDay = days > 0 ? Math.round(spend / days) : 0;
+
+    // Vis periode-label
+    const periodLabel = el('meta-period-label');
+    const periodDays = el('meta-period-days');
+    if (periodLabel && spend > 0) { periodLabel.style.display = 'block'; if (periodDays) periodDays.textContent = days; }
 
     renderKPI('kpi_spend',  spend > 0 ? fmt(spend,0) + ' kr' : '–',
       perDay > 0 ? '≈ ' + fmt(perDay,0) + ' kr/dag' : 'Klik "Hent data" for at hente kampagner');
