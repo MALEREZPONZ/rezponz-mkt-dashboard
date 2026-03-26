@@ -1,4 +1,8 @@
-<?php if ( ! defined( 'ABSPATH' ) ) exit; ?>
+<?php
+if ( ! defined( 'ABSPATH' ) ) exit;
+$meta_opts  = get_option( 'rzpa_settings', [] );
+$has_openai = ! empty( $meta_opts['openai_api_key'] );
+?>
 <div id="rzpa-app" data-rzpa-page="meta">
 
   <div class="rzpa-logo-bar">
@@ -62,6 +66,28 @@
     <div class="perf-item"><span id="perf_mid_count">0</span> kører <strong>middel</strong> 🟡</div>
     <div class="perf-item"><span id="perf_bad_count">0</span> kører <strong>svagt — overvej at pause dem</strong> 🔴</div>
   </div>
+
+  <!-- ══ META AI-SPECIALIST ═══════════════════════════════════════════════ -->
+  <?php if ( $has_openai ) : ?>
+  <div class="rzpa-card" id="meta-ai-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <h2 style="margin:0">🤖 Meta AI-specialist</h2>
+        <div class="rzpa-card-sub" style="margin:4px 0 0">Din personlige Meta Ads-rådgiver — analyserer dine kampagner og giver konkrete handlingsforslag</div>
+      </div>
+      <button id="meta-ai-refresh" class="btn-ghost" style="font-size:12px">✨ Analysér nu</button>
+    </div>
+    <div id="meta-ai-content" style="font-size:13px;color:#888;line-height:1.8">
+      Klik <strong style="color:#ccc">"Analysér nu"</strong> for at få en komplet AI-analyse af dine Meta-annoncer med prioriterede forbedringsforslag til kampagner, content og teknik.
+    </div>
+  </div>
+  <?php else : ?>
+  <div class="rzpa-card" style="border-color:rgba(24,119,242,.12)">
+    <h2>🤖 Meta AI-specialist</h2>
+    <div class="rzpa-card-sub">Tilføj en OpenAI API-nøgle i Indstillinger for at aktivere din personlige Meta Ads-rådgiver</div>
+    <a href="<?php echo esc_url( admin_url( 'admin.php?page=rzpa-settings' ) ); ?>" style="display:inline-block;margin-top:12px;font-size:12px;color:#1877F2;text-decoration:none">⚙️ Tilføj OpenAI nøgle →</a>
+  </div>
+  <?php endif; ?>
 
   <!-- Performance over tid -->
   <div class="rzpa-card rzpa-monthly-card" id="meta-monthly-card" style="display:none">

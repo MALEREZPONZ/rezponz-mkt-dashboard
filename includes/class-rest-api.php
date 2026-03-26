@@ -96,6 +96,12 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        register_rest_route( self::NS, '/meta/ai-analysis', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'meta_ai_analysis' ],
+            'permission_callback' => [ __CLASS__, 'check_permission' ],
+        ] );
+
         // Har vi data for en given periode?
         register_rest_route( self::NS, '/meta/has-data', [
             'methods'             => 'GET',
@@ -343,6 +349,84 @@ class RZPA_REST_API {
         // Ryd dashboard cache for denne periode
         delete_transient( 'rzpa_dash_overview_' . $days );
         return self::ok( [ 'count' => count( $rows ), 'days' => $days ] );
+    }
+
+    public static function meta_ai_analysis( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        $key  = $opts['openai_api_key'] ?? '';
+        if ( ! $key ) return self::ok( [ 'error' => 'Ingen OpenAI API-nøgle — tilføj den i Indstillinger' ] );
+
+        $days      = self::days( $r );
+        $summary   = RZPA_Database::get_meta_summary( $days );
+        $campaigns = RZPA_Database::get_meta_campaigns( $days );
+
+        if ( empty( $summary['total_spend'] ) || (float) $summary['total_spend'] === 0.0 ) {
+            return self::ok( [ 'error' => 'Ingen Meta-data — klik "Hent data" først' ] );
+        }
+
+        $spend   = round( (float) ( $summary['total_spend']       ?? 0 ) );
+        $clicks  = (int)          ( $summary['total_clicks']       ?? 0 );
+        $impr    = (int)          ( $summary['total_impressions']  ?? 0 );
+        $ctr     = round( (float) ( $summary['avg_ctr']            ?? 0 ), 2 );
+        $cpc     = round( (float) ( $summary['avg_cpc']            ?? 0 ), 2 );
+
+        $active = array_filter( $campaigns, fn($c) => ( $c['status'] ?? '' ) === 'ACTIVE' );
+        $campText = implode( "\n", array_map( fn($c) =>
+            sprintf( '- %s [%s]: %s kr, %s visninger, %s klik, %.2f%% CTR, %.2f kr/klik',
+                $c['campaign_name'], $c['status'],
+                number_format( (float) $c['spend'], 0, ',', '.' ),
+                number_format( (int) $c['impressions'], 0, ',', '.' ),
+                number_format( (int) $c['clicks'], 0, ',', '.' ),
+                (float) $c['ctr'],
+                (float) $c['cpc']
+            ),
+            array_slice( $campaigns, 0, 15 )
+        ) );
+
+        $prompt = "Du er en erfaren Meta Ads-specialist. Analyser disse Facebook/Instagram annonce-data for Rezponz.dk — en dansk B2B kundeservice-virksomhed der rekrutterer og outsourcer kundeservicemedarbejdere.\n\n"
+            . "PERIODE: Seneste {$days} dage\n"
+            . "TOTAL: {$spend} kr brugt · {$impr} visninger · {$clicks} klik · {$ctr}% CTR · {$cpc} kr/klik\n"
+            . "AKTIVE KAMPAGNER: " . count( $active ) . " ud af " . count( $campaigns ) . "\n\n"
+            . "KAMPAGNER:\n{$campText}\n\n"
+            . "Giv en struktureret analyse med præcis disse 5 sektioner (brug sektionstitlerne som overskrifter):\n\n"
+            . "1. OVERORDNET VURDERING\n"
+            . "Vurder performance samlet. Sammenlign CTR og CPC med branchestandarder for B2B (benchmark: CTR >1% er godt, CPC <5 kr er godt for DK B2B). Vær ærlig.\n\n"
+            . "2. TOP PRIORITET NU\n"
+            . "Ét konkret tiltag der vil have størst effekt med det samme. Vær meget specifik.\n\n"
+            . "3. KAMPAGNE-ANBEFALINGER\n"
+            . "Gennemgå HVER aktiv kampagne: skal den skaleres, optimeres eller pauseres? Konkrete årsager.\n\n"
+            . "4. CONTENT OG KREATIVT\n"
+            . "Konkrete forslag til annoncetekst, billedtype og format der virker for B2B rekruttering i Danmark. Nævn specifikke eksempler.\n\n"
+            . "5. TEKNISK OPTIMERING\n"
+            . "Budget-fordeling, budstrategi, målgrupper og retargeting-setup der vil forbedre resultaterne.\n\n"
+            . "Skriv på dansk. Brug præcise tal fra dataene. Max 600 ord total.";
+
+        // Cache i 4 timer baseret på data-hash
+        $cache_key = 'rzpa_meta_ai_' . md5( $days . $spend . $clicks . $ctr );
+        $cached    = get_transient( $cache_key );
+        if ( $cached !== false ) return self::ok( [ 'analysis' => $cached, 'cached' => true ] );
+
+        $ai_res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
+            'timeout' => 45,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $key,
+                'Content-Type'  => 'application/json',
+            ],
+            'body' => wp_json_encode( [
+                'model'      => 'gpt-4o-mini',
+                'messages'   => [ [ 'role' => 'user', 'content' => $prompt ] ],
+                'max_tokens' => 1200,
+            ] ),
+        ] );
+
+        if ( is_wp_error( $ai_res ) ) return self::ok( [ 'error' => $ai_res->get_error_message() ] );
+
+        $ai_body = json_decode( wp_remote_retrieve_body( $ai_res ), true );
+        $text    = $ai_body['choices'][0]['message']['content'] ?? '';
+        if ( ! $text ) return self::ok( [ 'error' => $ai_body['error']['message'] ?? 'Ingen svar fra OpenAI' ] );
+
+        set_transient( $cache_key, $text, 4 * HOUR_IN_SECONDS );
+        return self::ok( [ 'analysis' => $text ] );
     }
 
     public static function meta_monthly( $r ) {

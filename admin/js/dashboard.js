@@ -1238,8 +1238,8 @@ const RZPA_App = (() => {
     initDateFilter('rzpa-date-filter', async d => {
       days = d;
       const tbody = el('meta_tbody');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="11" class="rzpa-loading">Henter data…</td></tr>';
-      await maybeSync(d);
+      if (tbody) tbody.innerHTML = '<tr><td colspan="11" class="rzpa-loading">Henter data for ' + d + ' dage fra Meta…</td></tr>';
+      await syncMeta(d);
       loadMeta(d);
     });
 
@@ -1255,6 +1255,39 @@ const RZPA_App = (() => {
       el('meta-months-filter').querySelectorAll('[data-months]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       loadMonthlyChart(parseInt(btn.dataset.months, 10));
+    });
+
+    // Meta AI-specialist knap
+    el('meta-ai-refresh')?.addEventListener('click', async () => {
+      const btn     = el('meta-ai-refresh');
+      const content = el('meta-ai-content');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Analyserer…'; }
+      if (content) content.innerHTML = '<div style="color:#555;padding:16px 0">🤖 Sender kampagnedata til AI — tager 15-30 sekunder…</div>';
+      const res = await api('/meta/ai-analysis?days=' + days, { method: 'POST' });
+      if (btn) { btn.disabled = false; btn.textContent = '✨ Analysér nu'; }
+      if (!content) return;
+      const d = res?.data || {};
+      if (d.error) {
+        content.innerHTML = `<span style="color:#ff6b6b">⚠️ ${d.error}</span>`;
+        return;
+      }
+      if (d.analysis) {
+        const sectionColors = { '1': '#888', '2': '#CCFF00', '3': '#1877F2', '4': '#f59e0b', '5': '#a78bfa' };
+        const sections = d.analysis.split(/\n(?=\d+\. [A-ZÆØÅ])/);
+        content.innerHTML = sections.map(section => {
+          const match = section.match(/^(\d+)\.\s+([^\n]+)\n?([\s\S]*)/);
+          if (!match) return `<p style="color:#888;margin:8px 0">${section.trim()}</p>`;
+          const [, num, title, body] = match;
+          const color = sectionColors[num] || '#888';
+          return `<div style="margin-bottom:16px;padding:16px 18px;background:var(--bg-200);border-radius:10px;border-left:3px solid ${color}">
+            <div style="font-weight:700;color:#fff;margin-bottom:8px;font-size:13px;letter-spacing:.3px">${num}. ${title.trim()}</div>
+            <div style="color:#aaa;font-size:12px;line-height:1.9;white-space:pre-line">${body.trim()}</div>
+          </div>`;
+        }).join('');
+        if (d.cached) {
+          content.insertAdjacentHTML('beforeend', '<p style="font-size:11px;color:#444;margin-top:4px">📋 Cachet analyse (maks 4 timer) — klik igen for frisk analyse</p>');
+        }
+      }
     });
 
     el('rzpa-sync-meta')?.addEventListener('click', async () => {
