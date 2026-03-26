@@ -3,14 +3,49 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * Google Ads API integration.
- * Bruger Google Ads Query Language (GAQL) via REST API v18.
+ * Bruger Google Ads Query Language (GAQL) via REST API.
  * Auth: OAuth 2.0 med scope https://www.googleapis.com/auth/adwords
+ *
+ * API-version opdateres automatisk: prøver v19, v18, v17 indtil én virker.
  */
 class RZPA_Google_Ads {
 
-    const API_BASE = 'https://googleads.googleapis.com/v18';
+    const API_VERSIONS = [ 'v19', 'v18', 'v17' ];
 
     public static $last_error = null;
+
+    /**
+     * Finder den aktive API-version (cached i transient).
+     */
+    private static function api_base() : string {
+        $cached = get_transient( 'rzpa_gads_api_version' );
+        if ( $cached ) return 'https://googleads.googleapis.com/' . $cached;
+
+        // Prøv hver version med en simpel OPTIONS/HEAD – vi bruger den første der ikke giver 404
+        $opts  = get_option( 'rzpa_settings', [] );
+        $token = self::get_access_token( $opts );
+        $cid   = self::customer_id( $opts );
+
+        if ( $token && $cid ) {
+            foreach ( self::API_VERSIONS as $ver ) {
+                $url = "https://googleads.googleapis.com/{$ver}/customers/{$cid}/googleAds:searchStream";
+                $res = wp_remote_post( $url, [
+                    'timeout' => 10,
+                    'headers' => self::headers( $token, $opts ),
+                    'body'    => wp_json_encode( [ 'query' => "SELECT campaign.id FROM campaign LIMIT 1" ] ),
+                ] );
+                $http = wp_remote_retrieve_response_code( $res );
+                // 200 = OK, 400 = bad query (men version virker), 403 = auth issue (version virker)
+                if ( $http && $http !== 404 ) {
+                    set_transient( 'rzpa_gads_api_version', $ver, DAY_IN_SECONDS );
+                    return "https://googleads.googleapis.com/{$ver}";
+                }
+            }
+        }
+
+        // Fallback til nyeste
+        return 'https://googleads.googleapis.com/' . self::API_VERSIONS[0];
+    }
 
     // ── Token ────────────────────────────────────────────────────────────────
 
@@ -79,7 +114,7 @@ class RZPA_Google_Ads {
                   ORDER BY metrics.cost_micros DESC
                   LIMIT 100";
 
-        $url = self::API_BASE . "/customers/{$cid}/googleAds:searchStream";
+        $url = self::api_base() . "/customers/{$cid}/googleAds:searchStream";
         $res = wp_remote_post( $url, [
             'timeout' => 30,
             'headers' => self::headers( $token, $opts ),
@@ -97,8 +132,14 @@ class RZPA_Google_Ads {
         if ( $http !== 200 ) {
             $details = $body[0]['error']['details'][0]['errors'][0]['message']
                     ?? $body[0]['error']['message']
+                    ?? $body['error']['message']
                     ?? 'HTTP ' . $http;
-            self::$last_error = $details;
+            // Tilføj debug-info
+            $mcc = preg_replace( '/[^0-9]/', '', $opts['google_ads_manager_id'] ?? '' );
+            $extra = " [CID:{$cid}" . ($mcc ? " MCC:{$mcc}" : ' MCC:mangler') . " HTTP:{$http}]";
+            self::$last_error = $details . $extra;
+            // Ryd cached version ved 404 så den prøver igen
+            if ( $http === 404 ) delete_transient( 'rzpa_gads_api_version' );
             return [];
         }
 
@@ -147,7 +188,7 @@ class RZPA_Google_Ads {
                   WHERE segments.date BETWEEN '{$start}' AND '{$end}'
                   ORDER BY segments.month";
 
-        $url = self::API_BASE . "/customers/{$cid}/googleAds:searchStream";
+        $url = self::api_base() . "/customers/{$cid}/googleAds:searchStream";
         $res = wp_remote_post( $url, [
             'timeout' => 20,
             'headers' => self::headers( $token, $opts ),
@@ -189,7 +230,7 @@ class RZPA_Google_Ads {
                   WHERE segments.date DURING LAST_12_MONTHS
                   ORDER BY segments.month DESC";
 
-        $url = self::API_BASE . "/customers/{$cid}/googleAds:searchStream";
+        $url = self::api_base() . "/customers/{$cid}/googleAds:searchStream";
         $res = wp_remote_post( $url, [
             'timeout' => 20,
             'headers' => self::headers( $token, $opts ),
@@ -243,12 +284,26 @@ class RZPA_Google_Ads {
         ] );
 
         $http = wp_remote_retrieve_response_code( $res );
-        $body = json_decode( wp_remote_retrieve_body( $res ), true );
-        $err  = $body[0]['error']['message'] ?? null;
+        $raw  = wp_remote_retrieve_body( $res );
+        $body = json_decode( $raw, true );
+        $err  = $body[0]['error']['details'][0]['errors'][0]['message']
+             ?? $body[0]['error']['message']
+             ?? $body['error']['message']
+             ?? ( $http !== 200 ? 'HTTP ' . $http : null );
         $rows = 0;
         foreach ( (array) $body as $chunk ) { $rows += count( $chunk['results'] ?? [] ); }
 
-        return [ 'step' => 'api', 'http_code' => $http, 'customer_id' => $cid, 'campaigns_found' => $rows, 'error' => $err ];
+        $mcc = preg_replace( '/[^0-9]/', '', $opts['google_ads_manager_id'] ?? '' );
+        return [
+            'step'            => 'api',
+            'http_code'       => $http,
+            'customer_id'     => $cid,
+            'manager_id'      => $mcc ?: null,
+            'api_version'     => get_transient( 'rzpa_gads_api_version' ) ?: 'auto',
+            'campaigns_found' => $rows,
+            'error'           => $err,
+            'raw_snippet'     => $err ? substr( $raw, 0, 300 ) : null,
+        ];
     }
 
     // ── Hjælpefunktioner ─────────────────────────────────────────────────────
