@@ -1273,20 +1273,58 @@ const RZPA_App = (() => {
         return;
       }
       if (d.analysis) {
-        const sectionColors = { '1': '#888', '2': '#CCFF00', '3': '#1877F2', '4': '#f59e0b', '5': '#a78bfa' };
-        const sections = d.analysis.split(/\n(?=\d+\. [A-ZÆØÅ])/);
-        content.innerHTML = sections.map(section => {
-          const match = section.match(/^(\d+)\.\s+([^\n]+)\n?([\s\S]*)/);
-          if (!match) return `<p style="color:#888;margin:8px 0">${section.trim()}</p>`;
-          const [, num, title, body] = match;
-          const color = sectionColors[num] || '#888';
-          return `<div style="margin-bottom:16px;padding:16px 18px;background:var(--bg-200);border-radius:10px;border-left:3px solid ${color}">
-            <div style="font-weight:700;color:#fff;margin-bottom:8px;font-size:13px;letter-spacing:.3px">${num}. ${title.trim()}</div>
-            <div style="color:#aaa;font-size:12px;line-height:1.9;white-space:pre-line">${body.trim()}</div>
-          </div>`;
-        }).join('');
+        const sectionMeta = {
+          '1': { color: '#60a5fa', icon: '📊', label: 'OVERORDNET VURDERING' },
+          '2': { color: '#CCFF00', icon: '🎯', label: 'TOP PRIORITET NU' },
+          '3': { color: '#1877F2', icon: '📋', label: 'KAMPAGNE-ANBEFALINGER' },
+          '4': { color: '#f59e0b', icon: '🎨', label: 'CONTENT & KREATIVT' },
+          '5': { color: '#a78bfa', icon: '⚙️', label: 'TEKNISK OPTIMERING' },
+        };
+
+        // Konvertér markdown til HTML
+        function mdToHtml(txt) {
+          if (!txt) return '';
+          return txt
+            .replace(/\*\*([^*]+)\*\*/g, '<strong style="color:#ddd">$1</strong>')
+            .replace(/\*([^*]+)\*/g,     '<em style="color:#bbb">$1</em>')
+            .replace(/^[-–]\s+(.+)$/gm,  '<li>$1</li>')
+            .replace(/(<li>[\s\S]*?<\/li>)/g, '<ul style="margin:8px 0 8px 16px;padding:0;list-style:none">$1</ul>')
+            .replace(/<\/ul>\s*<ul[^>]*>/g, '')
+            .replace(/\n{2,}/g, '</p><p style="margin:8px 0">')
+            .replace(/\n/g, ' ');
+        }
+
+        // Split på sektioner: "# 1." eller "1." eller "**1." i starten af linje
+        const raw = d.analysis.replace(/^#+\s*/gm, ''); // fjern # præfikser
+        const parts = raw.split(/(?=\b[1-5]\.\s+[A-ZÆØÅ]{3,})/);
+
+        const cards = parts.map(section => {
+          section = section.trim();
+          if (!section) return '';
+          const m = section.match(/^([1-5])\.\s+([^\n.]+)[.\n]?([\s\S]*)/);
+          if (!m) return `<p style="color:#888;font-size:12px;margin:8px 0">${mdToHtml(section)}</p>`;
+          const [, num, titleRaw, bodyRaw] = m;
+          const meta  = sectionMeta[num] || { color: '#888', icon: '•', label: '' };
+          const title = titleRaw.replace(/\*\*/g,'').trim();
+          const body  = mdToHtml(bodyRaw.trim());
+          return `
+            <div style="margin-bottom:14px;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.06)">
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.05)">
+                <span style="font-size:18px">${meta.icon}</span>
+                <div>
+                  <span style="font-size:10px;font-weight:700;letter-spacing:1px;color:${meta.color};text-transform:uppercase">${num} / 5</span>
+                  <div style="font-size:13px;font-weight:700;color:#fff;margin-top:1px">${title}</div>
+                </div>
+              </div>
+              <div style="padding:14px 16px;font-size:12px;color:#aaa;line-height:1.85">
+                <p style="margin:0">${body}</p>
+              </div>
+            </div>`;
+        }).filter(Boolean).join('');
+
+        content.innerHTML = cards || `<p style="color:#888">Ingen analyse tilgængelig — prøv igen.</p>`;
         if (d.cached) {
-          content.insertAdjacentHTML('beforeend', '<p style="font-size:11px;color:#444;margin-top:4px">📋 Cachet analyse (maks 4 timer) — klik igen for frisk analyse</p>');
+          content.insertAdjacentHTML('beforeend', '<p style="font-size:11px;color:#444;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.05)">📋 Cachet analyse — klik igen for frisk analyse</p>');
         }
       }
     });
