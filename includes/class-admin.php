@@ -203,6 +203,7 @@ class RZPA_Admin {
             'openai_api_key',
             'google_ads_developer_token', 'google_ads_customer_id',
             'google_ads_client_id', 'google_ads_client_secret',
+            'google_ads_refresh_token',
         ];
 
         $opts = [];
@@ -222,7 +223,16 @@ class RZPA_Admin {
     public static function page_ai()        { include RZPA_DIR . 'admin/views/ai-search.php'; }
     public static function page_meta()      { include RZPA_DIR . 'admin/views/meta-ads.php'; }
     public static function page_google_ads() {
-        require RZPA_DIR . 'admin/views/google-ads.php';
+        $f = RZPA_DIR . 'admin/views/google-ads.php';
+        if ( file_exists( $f ) ) {
+            include $f;
+        } else {
+            echo '<div style="padding:40px;color:#fff;background:#1a1a1a;border-radius:12px;margin:20px">';
+            echo '<h2 style="color:#f87171">⚠️ Fejl: google-ads.php mangler</h2>';
+            echo '<p style="color:#888">Forventet sti: <code style="color:#CCFF00">' . esc_html( $f ) . '</code></p>';
+            echo '<p style="color:#888">Upload filen via FTP til denne placering og genindlæs siden.</p>';
+            echo '</div>';
+        }
     }
     public static function page_snap()      { include RZPA_DIR . 'admin/views/snap-ads.php'; }
     public static function page_tiktok()    { include RZPA_DIR . 'admin/views/tiktok-ads.php'; }
