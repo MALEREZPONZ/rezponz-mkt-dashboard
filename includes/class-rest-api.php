@@ -167,6 +167,20 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        // Snap ads (ad-level)
+        register_rest_route( self::NS, '/snap/ads', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'snap_ads' ],
+            'permission_callback' => $cap,
+        ] );
+
+        // TikTok ads (ad-level)
+        register_rest_route( self::NS, '/tiktok/ads', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'tiktok_ads' ],
+            'permission_callback' => $cap,
+        ] );
+
         // Kombineret dashboard endpoint – ét kald i stedet for 10
         register_rest_route( self::NS, '/dashboard/overview', [
             'methods'             => 'GET',
@@ -735,6 +749,24 @@ class RZPA_REST_API {
         RZPA_Database::insert_tiktok_campaigns( $rows );
         RZPA_Database::log_sync( 'tiktok_ads', 'success', count( $rows ) . ' campaigns' );
         return self::ok( [ 'count' => count( $rows ) ] );
+    }
+
+    public static function snap_ads( WP_REST_Request $r ) {
+        $key    = 'rzpa_snap_ads';
+        $cached = get_transient( $key );
+        if ( $cached !== false ) return self::ok( $cached );
+        $data = RZPA_Snapchat_Ads::fetch_ads( self::days( $r ) );
+        if ( $data ) set_transient( $key, $data, HOUR_IN_SECONDS );
+        return self::ok( $data );
+    }
+
+    public static function tiktok_ads( WP_REST_Request $r ) {
+        $key    = 'rzpa_tiktok_ads';
+        $cached = get_transient( $key );
+        if ( $cached !== false ) return self::ok( $cached );
+        $data = RZPA_TikTok_Ads::fetch_ads( self::days( $r ) );
+        if ( $data ) set_transient( $key, $data, HOUR_IN_SECONDS );
+        return self::ok( $data );
     }
 
     // Trends

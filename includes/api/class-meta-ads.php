@@ -259,10 +259,10 @@ class RZPA_Meta_Ads {
     }
 
     /**
-     * Henter ad-level performance data (top annoncer sorteret efter rækkevidde).
-     * Bruges til "Top Performing Ads" sektionen i dashboard.
+     * Henter ALLE aktive annoncer med creative-data og performance metrics.
+     * Bruges til "Top annoncer" og "Alle aktive annoncer" sektionerne.
      */
-    public static function fetch_ad_insights( int $days = 30 ) : array {
+    public static function fetch_top_ads( int $days = 30 ) : array {
         $opts = get_option( 'rzpa_settings', [] );
         if ( empty( $opts['meta_access_token'] ) || empty( $opts['meta_ad_account_id'] ) ) {
             return [];
@@ -270,16 +270,15 @@ class RZPA_Meta_Ads {
 
         $token      = $opts['meta_access_token'];
         $account_id = $opts['meta_ad_account_id'];
-        $end        = gmdate( 'Y-m-d' );
-        $start      = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
+        $since      = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
+        $until      = gmdate( 'Y-m-d' );
 
-        $url = self::API_BASE . '/act_' . $account_id . '/insights?' . http_build_query( [
-            'access_token' => $token,
-            'fields'       => 'ad_id,ad_name,reach,impressions,spend,clicks,cpc,cpm',
-            'time_range'   => wp_json_encode( [ 'since' => $start, 'until' => $end ] ),
-            'level'        => 'ad',
-            'limit'        => 50,
-            'sort'         => 'reach_descending',
+        // Hent alle aktive annoncer med creative data + insights
+        $url = self::API_BASE . '/act_' . $account_id . '/ads?' . http_build_query( [
+            'access_token'     => $token,
+            'fields'           => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec},insights.time_range({"since":"' . $since . '","until":"' . $until . '"}){reach,impressions,spend,clicks,cpc,cpm}',
+            'effective_status' => '["ACTIVE"]',
+            'limit'            => 100,
         ] );
 
         $res = wp_remote_get( $url, [ 'timeout' => 30 ] );
@@ -289,25 +288,51 @@ class RZPA_Meta_Ads {
         if ( ! empty( $body['error'] ) ) return [];
 
         $rows = [];
-        foreach ( $body['data'] ?? [] as $ins ) {
-            $impressions = (int) ( $ins['impressions'] ?? 0 );
-            $clicks      = (int) ( $ins['clicks'] ?? 0 );
-            $ctr         = $impressions > 0 ? round( $clicks / $impressions * 100, 2 ) : 0;
+        foreach ( $body['data'] ?? [] as $ad ) {
+            $creative = $ad['creative'] ?? [];
+            $insights = $ad['insights']['data'][0] ?? [];
+
+            // Bestem format
+            $spec = $creative['object_story_spec'] ?? [];
+            $format = 'image';
+            if ( ! empty( $creative['video_id'] ) || isset( $spec['video_data'] ) ) {
+                $format = 'video';
+            } elseif ( isset( $spec['link_data']['child_attachments'] ) ) {
+                $format = 'carousel';
+            }
+
+            $reach = (int) ( $insights['reach'] ?? 0 );
+            $impressions = (int) ( $insights['impressions'] ?? 0 );
+            $clicks = (int) ( $insights['clicks'] ?? 0 );
+            $spend = round( (float) ( $insights['spend'] ?? 0 ), 2 );
 
             $rows[] = [
-                'ad_id'       => $ins['ad_id'] ?? '',
-                'ad_name'     => $ins['ad_name'] ?? '',
-                'reach'       => (int) ( $ins['reach'] ?? 0 ),
-                'impressions' => $impressions,
-                'spend'       => (float) ( $ins['spend'] ?? 0 ),
-                'clicks'      => $clicks,
-                'cpc'         => (float) ( $ins['cpc'] ?? 0 ),
-                'cpm'         => (float) ( $ins['cpm'] ?? 0 ),
-                'ctr'         => $ctr,
+                'ad_id'         => $ad['id'] ?? '',
+                'ad_name'       => $ad['name'] ?? '',
+                'status'        => $ad['effective_status'] ?? '',
+                'creative_id'   => $creative['id'] ?? '',
+                'thumbnail_url' => $creative['thumbnail_url'] ?? '',
+                'image_url'     => $creative['image_url'] ?? '',
+                'has_video'     => $format === 'video',
+                'format'        => $format,
+                'reach'         => $reach,
+                'impressions'   => $impressions,
+                'spend'         => $spend,
+                'clicks'        => $clicks,
+                'cpc'           => round( (float) ( $insights['cpc'] ?? 0 ), 2 ),
+                'cpm'           => round( (float) ( $insights['cpm'] ?? 0 ), 2 ),
+                'ctr'           => $impressions > 0 ? round( $clicks / $impressions * 100, 2 ) : 0,
             ];
         }
 
+        // Sortér efter reach (højest først)
+        usort( $rows, fn($a, $b) => $b['reach'] <=> $a['reach'] );
         return $rows;
+    }
+
+    /** Alias for backward compatibility. */
+    public static function fetch_ad_insights( int $days = 30 ) : array {
+        return self::fetch_top_ads( $days );
     }
 
     /**

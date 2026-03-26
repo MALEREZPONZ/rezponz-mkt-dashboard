@@ -1733,86 +1733,81 @@ const RZPA_App = (() => {
 
     // ── Top Annoncer ──────────────────────────────────
     async function loadTopAds(d) {
-      const podium = el('meta-top-ads-podium');
-      const list = el('meta-top-ads-list');
       const card = el('meta-top-ads-card');
-      if (!podium || !list) return;
-      card.style.display = '';
-      podium.innerHTML = '<div class="rzpa-loading">⏳ Henter top annoncer…</div>';
-      list.innerHTML = '';
+      const content = el('meta-top-ads-content');
+      if (!card || !content) return;
+      content.innerHTML = '<div class="rzpa-loading">Henter annoncer…</div>';
+      card.style.display = 'block';
 
       const r = await api(`/meta/top-ads?days=${d}`);
       const ads = r.data || [];
+
       if (!ads.length) {
-        podium.innerHTML = '<p style="color:#555;text-align:center;padding:24px">Ingen annoncedata fundet for perioden.</p>';
+        content.innerHTML = '<p style="color:#555">Ingen aktive annoncer fundet i perioden.</p>';
         return;
       }
 
-      function perfTier(ad, allAds) {
-        const maxReach = Math.max(...allAds.map(a => a.reach || 0));
-        const ratio = (ad.reach || 0) / (maxReach || 1);
-        if (ratio >= 0.6) return { label: 'Winner', cls: 'tier-winner', icon: '🏆' };
-        if (ratio >= 0.2) return { label: 'Solid', cls: 'tier-solid', icon: '✅' };
-        return { label: 'Testing', cls: 'tier-testing', icon: '🧪' };
-      }
+      const maxReach = ads[0]?.reach || 1;
+      const tier = reach => reach >= maxReach * 0.5 ? 'winner' : reach >= maxReach * 0.15 ? 'solid' : 'testing';
+      const tierLabel = t => t === 'winner' ? '🏆 Winner' : t === 'solid' ? '✅ Solid' : '🧪 Testing';
+      const fmtBadge = f => f === 'video' ? '<span class="fmt-badge fmt-video">▶ Video</span>'
+                          : f === 'carousel' ? '<span class="fmt-badge fmt-carousel">◫ Carousel</span>'
+                          : '<span class="fmt-badge fmt-image">🖼 Billede</span>';
+      const thumbHtml = ad => {
+        const src = ad.thumbnail_url || ad.image_url;
+        return src
+          ? `<img src="${src}" class="rzpa-top-ad-thumb" alt="" loading="lazy" onerror="this.parentNode.innerHTML='<div class=rzpa-top-ad-no-thumb>📷</div>'">`
+          : '<div class="rzpa-top-ad-no-thumb">📷</div>';
+      };
 
-      function fmtBadge(ad) {
-        if (ad.has_video) return '<span class="rzpa-fmt-badge fmt-video">▶ Video</span>';
-        if (ad.format === 'carousel') return '<span class="rzpa-fmt-badge fmt-carousel">◫ Carousel</span>';
-        return '<span class="rzpa-fmt-badge fmt-image">🖼 Billede</span>';
-      }
-
+      // Podium: top 3
+      const podiumLabels = ['🏆 Højest rækkevidde', '🥈 Næsthøjest rækkevidde', '🥉 Tredjehøjest rækkevidde'];
+      const podiumColors = ['#CCFF00', '#60a5fa', '#f59e0b'];
       const top3 = ads.slice(0, 3);
-      const badges = [
-        { label: 'Højest rækkevidde', color: '#CCFF00', icon: '🏆' },
-        { label: 'Næsthøjest rækkevidde', color: '#60a5fa', icon: '🥈' },
-        { label: 'Tredjehøjest rækkevidde', color: '#f59e0b', icon: '🥉' },
-      ];
-
-      podium.innerHTML = `<div class="rzpa-top-ads-podium">${top3.map((ad, i) => {
-        const b = badges[i];
-        const tier = perfTier(ad, ads);
-        return `<div class="rzpa-top-ad-card">
-          <div class="rzpa-top-ad-badge" style="background:${b.color}20;color:${b.color};border:1px solid ${b.color}40">
-            ${b.icon} ${b.label}
-          </div>
-          ${ad.thumbnail_url ? `<img src="${ad.thumbnail_url}" class="rzpa-top-ad-thumb" alt="">` : '<div class="rzpa-top-ad-no-thumb">📷</div>'}
-          <div class="rzpa-top-ad-info">
-            <div class="rzpa-top-ad-name">${ad.ad_name || 'Unavngivet'}</div>
-            <div class="rzpa-top-ad-metrics">
-              <div class="rzpa-top-ad-metric"><span class="metric-label">👁 Rækkevidde</span><span class="metric-val">${(ad.reach||0).toLocaleString('da-DK')}</span></div>
-              <div class="rzpa-top-ad-metric"><span class="metric-label">💰 Forbrug</span><span class="metric-val">${parseFloat(ad.spend||0).toLocaleString('da-DK',{minimumFractionDigits:0,maximumFractionDigits:0})} kr</span></div>
+      let html = '<div class="rzpa-top-ads-podium">';
+      top3.forEach((ad, i) => {
+        const t = tier(ad.reach);
+        html += `
+          <div class="rzpa-podium-card">
+            <div class="rzpa-podium-badge" style="background:${podiumColors[i]}20;color:${podiumColors[i]};border:1px solid ${podiumColors[i]}40">${podiumLabels[i]}</div>
+            <div class="rzpa-podium-thumb">${thumbHtml(ad)}</div>
+            <div class="rzpa-podium-name">${ad.ad_name}</div>
+            <div class="rzpa-podium-metrics">
+              <div><span class="rzpa-podium-label">👁 Rækkevidde</span><strong>${num(ad.reach)}</strong></div>
+              <div><span class="rzpa-podium-label">💰 Forbrug</span><strong>${fmt(ad.spend,0)} kr</strong></div>
+              <div><span class="rzpa-podium-label">🖱 Klik</span><strong>${num(ad.clicks)}</strong></div>
             </div>
-            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-              ${fmtBadge(ad)}
-              <span class="rzpa-tier-badge ${tier.cls}">${tier.icon} ${tier.label}</span>
-            </div>
-          </div>
-        </div>`;
-      }).join('')}</div>`;
+            <div class="rzpa-podium-badges">${fmtBadge(ad.format)} <span class="tier-badge tier-${t}">${tierLabel(t)}</span></div>
+          </div>`;
+      });
+      html += '</div>';
 
-      if (ads.length > 3) {
-        const rest = ads.slice(3, 20);
-        list.innerHTML = `<div class="rzpa-top-ads-table">
-          <div class="rzpa-top-ads-header">
-            <span>#</span><span>Annonce</span><span>Rækkevidde</span><span>Forbrug</span><span>Klik</span><span>CTR</span><span>Type</span><span>Niveau</span>
-          </div>
-          ${rest.map((ad, i) => {
-            const tier = perfTier(ad, ads);
-            const ctr = ad.impressions > 0 ? (ad.clicks / ad.impressions * 100).toFixed(2) : '0';
-            return `<div class="rzpa-top-ads-row">
-              <span class="rank">#${i + 4}</span>
-              <span class="name">${ad.ad_name || 'Unavngivet'}</span>
-              <span>${(ad.reach||0).toLocaleString('da-DK')}</span>
-              <span>${parseFloat(ad.spend||0).toLocaleString('da-DK',{maximumFractionDigits:0})} kr</span>
-              <span>${(ad.clicks||0).toLocaleString('da-DK')}</span>
-              <span>${ctr}%</span>
-              <span>${fmtBadge(ad)}</span>
-              <span class="rzpa-tier-badge ${tier.cls}">${tier.icon} ${tier.label}</span>
+      // Alle annoncer grid
+      if (ads.length > 0) {
+        html += `<h3 style="margin:24px 0 12px;font-size:15px;color:#ccc">📋 Alle aktive annoncer (${ads.length})</h3>`;
+        html += '<div class="rzpa-ads-grid">';
+        ads.forEach((ad, i) => {
+          const t = tier(ad.reach);
+          html += `
+            <div class="rzpa-ad-card">
+              <div class="rzpa-ad-card-thumb">${thumbHtml(ad)}</div>
+              <div class="rzpa-ad-card-body">
+                <div class="rzpa-ad-card-rank">#${i+1}</div>
+                <div class="rzpa-ad-card-name" title="${ad.ad_name}">${ad.ad_name}</div>
+                <div class="rzpa-ad-card-metrics">
+                  <span>👁 ${num(ad.reach)}</span>
+                  <span>💰 ${fmt(ad.spend,0)} kr</span>
+                  <span>🖱 ${num(ad.clicks)}</span>
+                  ${ad.ctr > 0 ? `<span>📊 ${fmt(ad.ctr,2)}%</span>` : ''}
+                </div>
+                <div class="rzpa-ad-card-badges">${fmtBadge(ad.format)} <span class="tier-badge tier-${t}">${tierLabel(t)}</span></div>
+              </div>
             </div>`;
-          }).join('')}
-        </div>`;
+        });
+        html += '</div>';
       }
+
+      content.innerHTML = html;
     }
 
     el('meta-top-ads-load')?.addEventListener('click', () => loadTopAds(days));
@@ -2071,6 +2066,33 @@ const RZPA_App = (() => {
       await api('/snap/sync', { method: 'POST', body: JSON.stringify({days}) });
       loadSnap(days);
     });
+
+    el('snap-load-ads')?.addEventListener('click', async () => {
+      const btn = el('snap-load-ads');
+      const content = el('snap-ads-content');
+      const card = el('snap-ads-card');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Henter…'; }
+      const r = await api('/snap/ads');
+      if (btn) { btn.disabled = false; btn.textContent = '📋 Hent annoncer'; }
+      const ads = r.data || [];
+      if (!ads.length) {
+        if (content) content.innerHTML = '<span style="color:#555">Ingen aktive annoncer fundet.</span>';
+        return;
+      }
+      if (content) {
+        content.innerHTML = `<div class="rzpa-ads-grid">${ads.map((ad, i) => `
+          <div class="rzpa-ad-card">
+            <div class="rzpa-ad-card-thumb"><div class="rzpa-top-ad-no-thumb">👻</div></div>
+            <div class="rzpa-ad-card-body">
+              <div class="rzpa-ad-card-rank">#${i+1}</div>
+              <div class="rzpa-ad-card-name" title="${ad.ad_name}">${ad.ad_name}</div>
+              <div class="rzpa-ad-card-badges"><span class="fmt-badge fmt-video">📱 ${ad.format || 'Snap Ad'}</span></div>
+            </div>
+          </div>`).join('')}</div>`;
+      }
+    });
+    // Show card if snap is configured
+    if (el('snap-ads-card')) el('snap-ads-card').style.display = 'block';
   }
 
   async function loadSnap(days) {
@@ -2128,6 +2150,31 @@ const RZPA_App = (() => {
       await api('/tiktok/sync', { method: 'POST', body: JSON.stringify({days}) });
       loadTikTok(days);
     });
+
+    el('tiktok-load-ads')?.addEventListener('click', async () => {
+      const btn = el('tiktok-load-ads');
+      const content = el('tiktok-ads-content');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Henter…'; }
+      const r = await api('/tiktok/ads');
+      if (btn) { btn.disabled = false; btn.textContent = '📋 Hent annoncer'; }
+      const ads = r.data || [];
+      if (!ads.length) {
+        if (content) content.innerHTML = '<span style="color:#555">Ingen aktive annoncer fundet.</span>';
+        return;
+      }
+      if (content) {
+        content.innerHTML = `<div class="rzpa-ads-grid">${ads.map((ad, i) => `
+          <div class="rzpa-ad-card">
+            <div class="rzpa-ad-card-thumb">${ad.thumbnail_url ? `<img src="${ad.thumbnail_url}" alt="" loading="lazy">` : '<div class="rzpa-top-ad-no-thumb">🎵</div>'}</div>
+            <div class="rzpa-ad-card-body">
+              <div class="rzpa-ad-card-rank">#${i+1}</div>
+              <div class="rzpa-ad-card-name" title="${ad.ad_name}">${ad.ad_name}</div>
+              <div class="rzpa-ad-card-badges"><span class="fmt-badge fmt-${ad.format}">${ad.format === 'video' ? '▶ Video' : '🖼 Billede'}</span></div>
+            </div>
+          </div>`).join('')}</div>`;
+      }
+    });
+    if (el('tiktok-ads-card')) el('tiktok-ads-card').style.display = 'block';
   }
 
   async function loadTikTok(days) {

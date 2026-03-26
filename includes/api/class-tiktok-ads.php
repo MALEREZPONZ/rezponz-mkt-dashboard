@@ -116,4 +116,43 @@ class RZPA_TikTok_Ads {
         }
         return $rows;
     }
+
+    /**
+     * Henter aktive annoncer fra TikTok.
+     */
+    public static function fetch_ads( int $days = 30 ) : array {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['tiktok_access_token'] ) || empty( $opts['tiktok_advertiser_id'] ) ) return [];
+
+        $token         = $opts['tiktok_access_token'];
+        $advertiser_id = $opts['tiktok_advertiser_id'];
+
+        $url = self::API_BASE . '/ad/get?' . http_build_query( [
+            'advertiser_id' => $advertiser_id,
+            'filtering'     => wp_json_encode( [ 'status' => 'AD_STATUS_DELIVERY_OK' ] ),
+            'page_size'     => 100,
+        ] );
+
+        $res = wp_remote_get( $url, [
+            'timeout' => 20,
+            'headers' => [ 'Access-Token' => $token ],
+        ] );
+
+        if ( is_wp_error( $res ) ) return [];
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
+
+        $rows = [];
+        foreach ( $body['data']['list'] ?? [] as $ad ) {
+            $format = ! empty( $ad['video_id'] ) ? 'video' : 'image';
+            $rows[] = [
+                'ad_id'         => $ad['ad_id'] ?? '',
+                'ad_name'       => $ad['ad_name'] ?? '',
+                'status'        => 'ACTIVE',
+                'thumbnail_url' => $ad['image_ids'][0] ?? '',
+                'format'        => $format,
+                'landing_page'  => $ad['landing_page_url'] ?? '',
+            ];
+        }
+        return $rows;
+    }
 }

@@ -105,4 +105,40 @@ class RZPA_Snapchat_Ads {
         }
         return $rows;
     }
+
+    /**
+     * Henter aktive annoncer fra Snapchat.
+     */
+    public static function fetch_ads( int $days = 30 ) : array {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['snap_access_token'] ) || empty( $opts['snap_ad_account_id'] ) ) return [];
+
+        $token      = $opts['snap_access_token'];
+        $account_id = $opts['snap_ad_account_id'];
+
+        $url = self::API_BASE . '/adaccounts/' . $account_id . '/ads';
+        $res = wp_remote_get( $url, [
+            'timeout' => 20,
+            'headers' => [ 'Authorization' => 'Bearer ' . $token ],
+        ] );
+
+        if ( is_wp_error( $res ) ) return [];
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
+        if ( wp_remote_retrieve_response_code( $res ) !== 200 ) return [];
+
+        $rows = [];
+        foreach ( $body['ads'] ?? [] as $item ) {
+            $ad = $item['ad'] ?? [];
+            if ( ( $ad['status'] ?? '' ) !== 'ACTIVE' ) continue;
+            $rows[] = [
+                'ad_id'         => $ad['id'] ?? '',
+                'ad_name'       => $ad['name'] ?? '',
+                'status'        => $ad['status'] ?? '',
+                'creative_id'   => $ad['creative_id'] ?? '',
+                'thumbnail_url' => '',
+                'format'        => $ad['type'] ?? 'snap_ad',
+            ];
+        }
+        return $rows;
+    }
 }

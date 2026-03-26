@@ -52,4 +52,18 @@
     </div>
   </div>
 
+  <!-- Aktive annoncer -->
+  <div class="rzpa-card" id="snap-ads-card" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <h2 style="margin:0">📱 Aktive annoncer</h2>
+        <div class="rzpa-card-sub" style="margin:4px 0 0">Dine aktive Snapchat-annoncer</div>
+      </div>
+      <button id="snap-load-ads" class="btn-ghost" style="font-size:12px">📋 Hent annoncer</button>
+    </div>
+    <div id="snap-ads-content" style="color:#555;font-size:13px">
+      Klik <strong style="color:#888">"Hent annoncer"</strong> for at se dine aktive Snapchat-annoncer.
+    </div>
+  </div>
+
 </div>
