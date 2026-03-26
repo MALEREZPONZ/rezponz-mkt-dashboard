@@ -191,6 +191,45 @@ class RZPA_Meta_Ads {
         return html_entity_decode( $body['data'][0]['body'] ?? '', ENT_QUOTES, 'UTF-8' );
     }
 
+    /**
+     * Henter betalingshistorik fra Meta Ads.
+     * Bruger /transactions endpoint som virker for alle annoncekonto-typer.
+     */
+    public static function fetch_invoices() : array {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['meta_access_token'] ) || empty( $opts['meta_ad_account_id'] ) ) return [];
+
+        $token      = $opts['meta_access_token'];
+        $account_id = $opts['meta_ad_account_id'];
+
+        $url = self::API_BASE . '/act_' . $account_id . '/transactions?' . http_build_query( [
+            'access_token' => $token,
+            'fields'       => 'id,created_time,amount,currency,status,charge_type',
+            'limit'        => 50,
+        ] );
+
+        $res  = wp_remote_get( $url, [ 'timeout' => 20 ] );
+        if ( is_wp_error( $res ) ) return [ 'error' => $res->get_error_message() ];
+
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
+        if ( ! empty( $body['error'] ) ) return [ 'error' => $body['error']['message'] ?? 'API fejl' ];
+
+        $rows = [];
+        foreach ( $body['data'] ?? [] as $t ) {
+            $rows[] = [
+                'id'          => $t['id'] ?? '',
+                'date'        => substr( $t['created_time'] ?? '', 0, 10 ),
+                'amount'      => (float) ( $t['amount'] ?? 0 ),
+                'currency'    => strtoupper( $t['currency'] ?? 'DKK' ),
+                'status'      => $t['status'] ?? '',
+                'charge_type' => $t['charge_type'] ?? '',
+            ];
+        }
+        // Sortér nyeste først
+        usort( $rows, fn($a,$b) => strcmp($b['date'], $a['date']) );
+        return $rows;
+    }
+
     private static function mock_data( int $days ) : array {
         $start = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
         $end   = gmdate( 'Y-m-d' );

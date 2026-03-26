@@ -1017,15 +1017,28 @@ const RZPA_App = (() => {
         cards.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:48px 24px">Ingen annoncer fundet for denne kampagne.<br><small>Det kan skyldes at kampagnen er ny, eller at din token mangler ads-tilladelse.</small></p>';
         return;
       }
+      const acctId = (RZPA.meta_account_id || '').replace(/^act_/, '');
       cards.innerHTML = ads.map(ad => {
         const thumb = ad.thumbnail_url || ad.image_url;
+        const metaUrl = acctId
+          ? `https://adsmanager.facebook.com/adsmanager/manage/ads?act=${acctId}&selected_campaign_ids=${campaignId}`
+          : '';
         const mediaHtml = thumb
-          ? `<img src="${thumb}" class="rzpa-ad-thumb" alt="Annonce preview">`
+          ? (metaUrl
+              ? `<a href="${metaUrl}" target="_blank" title="Se annonce i Meta Ads Manager"><img src="${thumb}" class="rzpa-ad-thumb" alt="Annonce preview" style="cursor:pointer"></a>`
+              : `<img src="${thumb}" class="rzpa-ad-thumb" alt="Annonce preview">`)
           : `<div class="rzpa-ad-no-thumb">📷 Ingen preview tilgængeligt</div>`;
         const playBtn = ad.has_video
           ? `<button class="rzpa-play-btn" data-adid="${ad.ad_id}" title="Afspil annonce">▶</button>`
           : '';
         const cta = fmtCTA(ad.cta);
+        const metaLink = metaUrl
+          ? `<a href="${metaUrl}" target="_blank" style="font-size:11px;color:#1877F2;text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-top:6px">🔗 Se annonce i Meta →</a>`
+          : '';
+        const hasText = ad.title || ad.body;
+        const aiBtn = hasText
+          ? `<button class="rzpa-ai-copy-btn btn-ghost" data-adid="${ad.ad_id}" data-title="${encodeURIComponent(ad.title||'')}" data-body="${encodeURIComponent(ad.body||'')}" data-cta="${encodeURIComponent(cta||'')}" style="font-size:11px;margin-top:8px;padding:4px 10px">✨ Forbedre tekst</button>`
+          : '';
         return `<div class="rzpa-ad-card">
           <div class="rzpa-ad-preview-wrap" id="adprev-${ad.ad_id}">
             ${mediaHtml}${playBtn}
@@ -1033,8 +1046,11 @@ const RZPA_App = (() => {
           <div class="rzpa-ad-info">
             <div class="rzpa-ad-name">${ad.ad_name||'Unavngivet'}</div>
             ${ad.title ? `<div class="rzpa-ad-title">${ad.title}</div>` : ''}
-            ${ad.body  ? `<div class="rzpa-ad-body">${ad.body.substring(0,120)}${ad.body.length>120?'…':''}</div>` : ''}
+            ${ad.body  ? `<div class="rzpa-ad-body">${ad.body.substring(0,160)}${ad.body.length>160?'…':''}</div>` : ''}
             ${cta      ? `<div class="rzpa-ad-cta">${cta}</div>` : ''}
+            ${metaLink}
+            ${aiBtn}
+            <div class="rzpa-ai-copy-result" id="aicopy-${ad.ad_id}" style="display:none"></div>
           </div>
         </div>`;
       }).join('');
@@ -1042,6 +1058,61 @@ const RZPA_App = (() => {
       // Play-knapper: hent og vis Meta iframe-preview
       cards.querySelectorAll('.rzpa-play-btn').forEach(btn => {
         btn.addEventListener('click', () => loadAdPreview(btn.dataset.adid, document.getElementById('adprev-' + btn.dataset.adid)));
+      });
+
+      // AI copy-knapper
+      cards.querySelectorAll('.rzpa-ai-copy-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const result = document.getElementById('aicopy-' + btn.dataset.adid);
+          if (!result) return;
+          btn.disabled = true; btn.textContent = '⏳ Genererer…';
+          result.style.display = 'block';
+          result.innerHTML = '<div style="color:#555;font-size:12px;padding:8px 0">✨ AI analyserer teksten og laver 3 forbedringer…</div>';
+          const res = await api('/meta/ai-copy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: decodeURIComponent(btn.dataset.title || ''),
+              body:  decodeURIComponent(btn.dataset.body  || ''),
+              cta:   decodeURIComponent(btn.dataset.cta   || ''),
+            }),
+          });
+          btn.disabled = false; btn.textContent = '✨ Forbedre tekst';
+          const d = res?.data || {};
+          if (d.error) {
+            result.innerHTML = `<span style="color:#ff6b6b;font-size:12px">⚠️ ${d.error}</span>`;
+            return;
+          }
+          if (d.suggestions) {
+            const vColors = ['#60a5fa','#CCFF00','#f59e0b'];
+            const versions = d.suggestions.split(/\n(?=VERSION \d+:)/);
+            result.innerHTML = '<div style="margin-top:10px;border-top:1px solid rgba(255,255,255,0.06);padding-top:10px">'
+              + versions.map((v, i) => {
+                  const lines = v.replace(/^VERSION \d+:\n?/,'').split('\n').filter(l => l.trim());
+                  const headline = lines.find(l => l.startsWith('Overskrift:'))?.replace('Overskrift:','').trim() || '';
+                  const bodyTxt  = lines.find(l => l.startsWith('Brødtekst:'))?.replace('Brødtekst:','').trim() || '';
+                  const why      = lines.find(l => l.startsWith('Hvorfor:'))?.replace('Hvorfor:','').trim() || '';
+                  const color    = vColors[i] || '#888';
+                  return `<div style="margin-bottom:10px;padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border-left:2px solid ${color}">
+                    <div style="font-size:10px;font-weight:700;color:${color};letter-spacing:.8px;margin-bottom:6px">VERSION ${i+1}</div>
+                    ${headline ? `<div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:4px">${headline}</div>` : ''}
+                    ${bodyTxt  ? `<div style="font-size:11px;color:#aaa;line-height:1.7;margin-bottom:4px">${bodyTxt}</div>` : ''}
+                    ${why      ? `<div style="font-size:10px;color:#555;font-style:italic">${why}</div>` : ''}
+                    <button class="rzpa-copy-text-btn" data-text="${encodeURIComponent((headline?headline+'\n\n':'')+bodyTxt)}" style="font-size:10px;color:var(--neon);background:none;border:none;cursor:pointer;padding:4px 0;margin-top:4px">📋 Kopiér tekst</button>
+                  </div>`;
+                }).join('')
+              + '</div>';
+            // Kopiér-knapper
+            result.querySelectorAll('.rzpa-copy-text-btn').forEach(cb => {
+              cb.addEventListener('click', () => {
+                navigator.clipboard?.writeText(decodeURIComponent(cb.dataset.text)||'').then(() => {
+                  cb.textContent = '✓ Kopieret!';
+                  setTimeout(() => { cb.textContent = '📋 Kopiér tekst'; }, 2000);
+                });
+              });
+            });
+          }
+        });
       });
     }).catch(() => {
       if (cards) cards.innerHTML = '<p style="color:#ff6633;padding:40px;text-align:center">Fejl: Kunne ikke hente annoncer. Tjek din Meta Access Token i Indstillinger.</p>';
@@ -1327,6 +1398,67 @@ const RZPA_App = (() => {
           content.insertAdjacentHTML('beforeend', '<p style="font-size:11px;color:#444;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.05)">📋 Cachet analyse — klik igen for frisk analyse</p>');
         }
       }
+    });
+
+    // Fakturaer
+    el('meta-invoices-load')?.addEventListener('click', async () => {
+      const btn     = el('meta-invoices-load');
+      const content = el('meta-invoices-content');
+      const csvBtn  = el('meta-invoices-csv');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Henter…'; }
+      const res = await api('/meta/invoices');
+      if (btn) { btn.disabled = false; btn.textContent = '⬇ Hent betalinger'; }
+      if (!content) return;
+      const data = res?.data || [];
+      if (data.error) {
+        content.innerHTML = `<span style="color:#ff6b6b">⚠️ ${data.error}</span>`;
+        return;
+      }
+      if (!data.length) {
+        content.innerHTML = '<span style="color:#555">Ingen betalinger fundet — kontrollér at din token har billing-adgang.</span>';
+        return;
+      }
+      // Gem til CSV-eksport
+      window._metaInvoiceData = data;
+      if (csvBtn) csvBtn.style.display = 'inline-flex';
+      const totalAmount = data.reduce((s,r) => s + (r.amount||0), 0);
+      const statusLabel = s => s === 'SETTLED' ? '<span style="color:#4ade80;font-size:11px">✓ Betalt</span>'
+                              : s === 'PENDING' ? '<span style="color:#f59e0b;font-size:11px">⏳ Afventer</span>'
+                              : `<span style="color:#888;font-size:11px">${s}</span>`;
+      content.innerHTML = `
+        <div style="margin-bottom:12px;padding:12px 16px;background:rgba(204,255,0,0.05);border-radius:8px;border:1px solid rgba(204,255,0,0.1);display:flex;gap:24px;flex-wrap:wrap">
+          <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Total betalt</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${fmt(totalAmount,2)} ${data[0]?.currency||'DKK'}</div></div>
+          <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Antal transaktioner</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${data.length}</div></div>
+        </div>
+        <div class="rzpa-table-wrap">
+          <table class="rzpa-table">
+            <thead><tr>
+              <th>Dato</th><th>Beløb</th><th>Valuta</th><th>Type</th><th>Status</th>
+            </tr></thead>
+            <tbody>
+              ${data.map(r => `<tr>
+                <td style="color:#ccc">${r.date}</td>
+                <td style="font-weight:600;color:#fff">${fmt(r.amount,2)}</td>
+                <td style="color:#888">${r.currency}</td>
+                <td style="color:#888;font-size:11px">${r.charge_type||'–'}</td>
+                <td>${statusLabel(r.status)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    });
+
+    el('meta-invoices-csv')?.addEventListener('click', () => {
+      const data = window._metaInvoiceData || [];
+      if (!data.length) return;
+      const header = 'Dato,Beløb,Valuta,Type,Status';
+      const rows = data.map(r => `${r.date},${r.amount},${r.currency},${r.charge_type||''},${r.status}`);
+      const csv = [header, ...rows].join('\n');
+      const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'meta-betalinger-' + new Date().toISOString().slice(0,10) + '.csv';
+      a.click();
     });
 
     el('rzpa-sync-meta')?.addEventListener('click', async () => {

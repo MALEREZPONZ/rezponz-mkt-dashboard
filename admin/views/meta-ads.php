@@ -164,6 +164,25 @@ $has_openai = ! empty( $meta_opts['openai_api_key'] );
     </div>
   </div>
 
+
+  <!-- ══ FAKTURAER ═══════════════════════════════════════════════════════ -->
+  <div class="rzpa-card" id="meta-invoices-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <h2 style="margin:0">🧾 Betalingshistorik</h2>
+        <div class="rzpa-card-sub" style="margin:4px 0 0">Dine betalinger til Meta — hentes direkte fra din annoncekonto</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="meta-invoices-load" class="btn-ghost" style="font-size:12px">⬇ Hent betalinger</button>
+        <button id="meta-invoices-csv" class="btn-ghost" style="font-size:12px;display:none">📥 Eksportér CSV</button>
+        <a href="https://business.facebook.com/billing_hub/payment_activity" target="_blank" class="btn-ghost" style="font-size:12px;text-decoration:none">🔗 Åbn i Meta</a>
+      </div>
+    </div>
+    <div id="meta-invoices-content" style="color:#555;font-size:13px">
+      Klik <strong style="color:#888">"Hent betalinger"</strong> for at indlæse din betalingshistorik fra Meta.
+    </div>
+  </div>
+
 </div>
 
 <!-- ── Ad Creative Modal ─────────────────────────────────────────────── -->

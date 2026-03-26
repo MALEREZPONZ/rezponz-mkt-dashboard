@@ -96,9 +96,21 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        register_rest_route( self::NS, '/meta/invoices', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'meta_invoices' ],
+            'permission_callback' => $cap,
+        ] );
+
         register_rest_route( self::NS, '/meta/ai-analysis', [
             'methods'             => 'POST',
             'callback'            => [ __CLASS__, 'meta_ai_analysis' ],
+            'permission_callback' => $cap,
+        ] );
+
+        register_rest_route( self::NS, '/meta/ai-copy', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'meta_ai_copy' ],
             'permission_callback' => $cap,
         ] );
 
@@ -349,6 +361,61 @@ class RZPA_REST_API {
         // Ryd dashboard cache for denne periode
         delete_transient( 'rzpa_dash_overview_' . $days );
         return self::ok( [ 'count' => count( $rows ), 'days' => $days ] );
+    }
+
+    public static function meta_invoices() {
+        $key    = 'rzpa_meta_invoices';
+        $cached = get_transient( $key );
+        if ( $cached !== false ) return self::ok( $cached );
+        $data = RZPA_Meta_Ads::fetch_invoices();
+        if ( ! isset( $data['error'] ) ) set_transient( $key, $data, HOUR_IN_SECONDS );
+        return self::ok( $data );
+    }
+
+    public static function meta_ai_copy( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        $key  = $opts['openai_api_key'] ?? '';
+        if ( ! $key ) return self::ok( [ 'error' => 'Ingen OpenAI API-nøgle' ] );
+
+        $body  = $r->get_json_params() ?? [];
+        $title = sanitize_text_field( $body['title'] ?? '' );
+        $text  = sanitize_textarea_field( $body['body'] ?? '' );
+        $cta   = sanitize_text_field( $body['cta'] ?? '' );
+
+        if ( ! $title && ! $text ) return self::ok( [ 'error' => 'Ingen annoncetekst at forbedre' ] );
+
+        $current = trim( ( $title ? "Overskrift: {$title}\n" : '' ) . ( $text ? "Brødtekst: {$text}\n" : '' ) . ( $cta ? "CTA: {$cta}" : '' ) );
+
+        $prompt = "Du er en ekspert i Meta Ads-annoncetekster for B2B-virksomheder i Danmark.\n\n"
+            . "Denne annonce er for Rezponz.dk — et dansk B2B-firma der rekrutterer og outsourcer kundeservicemedarbejdere.\n\n"
+            . "NUVÆRENDE ANNONCETEKST:\n{$current}\n\n"
+            . "Lav 3 forbedrede versioner. Fokusér på:\n"
+            . "- Stærk hook i første linje (stop-scroll effekt)\n"
+            . "- Konkret benefit fremfor generelle påstande\n"
+            . "- Tydelig CTA med urgency\n"
+            . "- Maks 150 ord per version\n"
+            . "- Tal dansk og direkte til beslutningstagere\n\n"
+            . "Format PRÆCIST sådan (brug disse overskrifter):\n"
+            . "VERSION 1:\nOverskrift: [tekst]\nBrødtekst: [tekst]\nHvorfor: [1-2 sætninger om hvad der er forbedret]\n\n"
+            . "VERSION 2:\nOverskrift: [tekst]\nBrødtekst: [tekst]\nHvorfor: [1-2 sætninger]\n\n"
+            . "VERSION 3:\nOverskrift: [tekst]\nBrødtekst: [tekst]\nHvorfor: [1-2 sætninger]";
+
+        $ai_res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
+            'timeout' => 30,
+            'headers' => [ 'Authorization' => 'Bearer ' . $key, 'Content-Type' => 'application/json' ],
+            'body'    => wp_json_encode( [
+                'model'      => 'gpt-4o-mini',
+                'messages'   => [ [ 'role' => 'user', 'content' => $prompt ] ],
+                'max_tokens' => 800,
+            ] ),
+        ] );
+
+        if ( is_wp_error( $ai_res ) ) return self::ok( [ 'error' => $ai_res->get_error_message() ] );
+        $ai_body = json_decode( wp_remote_retrieve_body( $ai_res ), true );
+        $text    = $ai_body['choices'][0]['message']['content'] ?? '';
+        if ( ! $text ) return self::ok( [ 'error' => $ai_body['error']['message'] ?? 'Ingen svar fra OpenAI' ] );
+
+        return self::ok( [ 'suggestions' => $text ] );
     }
 
     public static function meta_ai_analysis( WP_REST_Request $r ) {

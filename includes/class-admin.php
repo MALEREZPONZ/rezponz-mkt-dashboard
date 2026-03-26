@@ -89,9 +89,10 @@ class RZPA_Admin {
         wp_script_add_data( 'rzpa-admin', 'defer', true );
 
         wp_localize_script( 'rzpa-admin', 'RZPA', [
-            'apiBase' => rest_url( 'rzpa/v1' ),
-            'nonce'   => wp_create_nonce( 'wp_rest' ),
-            'preload' => self::get_page_preload( $hook ), // Data indlejret i siden – ingen REST-kald
+            'apiBase'         => rest_url( 'rzpa/v1' ),
+            'nonce'           => wp_create_nonce( 'wp_rest' ),
+            'preload'         => self::get_page_preload( $hook ),
+            'meta_account_id' => sanitize_text_field( get_option( 'rzpa_settings', [] )['meta_ad_account_id'] ?? '' ),
         ] );
     }
 
