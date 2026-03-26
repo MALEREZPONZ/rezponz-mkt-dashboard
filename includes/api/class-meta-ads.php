@@ -215,7 +215,7 @@ class RZPA_Meta_Ads {
 
     /**
      * Henter betalingshistorik fra Meta Ads.
-     * Bruger /transactions endpoint som virker for alle annoncekonto-typer.
+     * Bruger /insights med monthly breakdown – virker for alle annoncekonto-typer.
      */
     public static function fetch_invoices() : array {
         $opts = get_option( 'rzpa_settings', [] );
@@ -224,10 +224,13 @@ class RZPA_Meta_Ads {
         $token      = $opts['meta_access_token'];
         $account_id = $opts['meta_ad_account_id'];
 
-        $url = self::API_BASE . '/act_' . $account_id . '/transactions?' . http_build_query( [
-            'access_token' => $token,
-            'fields'       => 'id,created_time,amount,currency,status,charge_type',
-            'limit'        => 50,
+        // Hent månedligt forbrug via insights (sidste 12 måneder)
+        $url = self::API_BASE . '/act_' . $account_id . '/insights?' . http_build_query( [
+            'access_token'  => $token,
+            'fields'        => 'spend,impressions,clicks,account_currency',
+            'time_increment'=> 'monthly',
+            'date_preset'   => 'last_year',
+            'limit'         => 50,
         ] );
 
         $res  = wp_remote_get( $url, [ 'timeout' => 20 ] );
@@ -238,13 +241,16 @@ class RZPA_Meta_Ads {
 
         $rows = [];
         foreach ( $body['data'] ?? [] as $t ) {
+            $start = $t['date_start'] ?? '';
+            $month = substr( $start, 0, 7 ); // YYYY-MM
             $rows[] = [
-                'id'          => $t['id'] ?? '',
-                'date'        => substr( $t['created_time'] ?? '', 0, 10 ),
-                'amount'      => (float) ( $t['amount'] ?? 0 ),
-                'currency'    => strtoupper( $t['currency'] ?? 'DKK' ),
-                'status'      => $t['status'] ?? '',
-                'charge_type' => $t['charge_type'] ?? '',
+                'month'       => $month,
+                'date'        => $start,
+                'amount'      => round( (float) ( $t['spend'] ?? 0 ), 2 ),
+                'currency'    => strtoupper( $t['account_currency'] ?? 'DKK' ),
+                'impressions' => (int) ( $t['impressions'] ?? 0 ),
+                'clicks'      => (int) ( $t['clicks'] ?? 0 ),
+                'status'      => 'SETTLED',
             ];
         }
         // Sortér nyeste først

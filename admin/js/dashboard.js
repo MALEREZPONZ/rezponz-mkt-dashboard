@@ -1863,26 +1863,28 @@ const RZPA_App = (() => {
       window._metaInvoiceData = data;
       if (csvBtn) csvBtn.style.display = 'inline-flex';
       const totalAmount = data.reduce((s,r) => s + (r.amount||0), 0);
-      const statusLabel = s => s === 'SETTLED' ? '<span style="color:#4ade80;font-size:11px">✓ Betalt</span>'
-                              : s === 'PENDING' ? '<span style="color:#f59e0b;font-size:11px">⏳ Afventer</span>'
-                              : `<span style="color:#888;font-size:11px">${s}</span>`;
+      const totalImpr   = data.reduce((s,r) => s + (r.impressions||0), 0);
+      const totalClicks = data.reduce((s,r) => s + (r.clicks||0), 0);
+      const monthName = m => { const [y,mo] = (m||'').split('-'); const names=['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec']; return (names[parseInt(mo,10)-1]||mo)+' '+y; };
       content.innerHTML = `
         <div style="margin-bottom:12px;padding:12px 16px;background:rgba(204,255,0,0.05);border-radius:8px;border:1px solid rgba(204,255,0,0.1);display:flex;gap:24px;flex-wrap:wrap">
-          <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Total betalt</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${fmt(totalAmount,2)} ${data[0]?.currency||'DKK'}</div></div>
-          <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Antal transaktioner</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${data.length}</div></div>
+          <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Total forbrug</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${fmt(totalAmount,2)} ${data[0]?.currency||'DKK'}</div></div>
+          <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Visninger</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${num(totalImpr)}</div></div>
+          <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Klik</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${num(totalClicks)}</div></div>
+          <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Antal måneder</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${data.length}</div></div>
         </div>
         <div class="rzpa-table-wrap">
           <table class="rzpa-table">
             <thead><tr>
-              <th>Dato</th><th>Beløb</th><th>Valuta</th><th>Type</th><th>Status</th>
+              <th>Måned</th><th>Forbrug</th><th>Visninger</th><th>Klik</th><th>Valuta</th>
             </tr></thead>
             <tbody>
               ${data.map(r => `<tr>
-                <td style="color:#ccc">${r.date}</td>
+                <td style="color:#ccc">${monthName(r.month)}</td>
                 <td style="font-weight:600;color:#fff">${fmt(r.amount,2)}</td>
+                <td style="color:#ccc">${num(r.impressions||0)}</td>
+                <td style="color:#ccc">${num(r.clicks||0)}</td>
                 <td style="color:#888">${r.currency}</td>
-                <td style="color:#888;font-size:11px">${r.charge_type||'–'}</td>
-                <td>${statusLabel(r.status)}</td>
               </tr>`).join('')}
             </tbody>
           </table>
@@ -1892,8 +1894,8 @@ const RZPA_App = (() => {
     el('meta-invoices-csv')?.addEventListener('click', () => {
       const data = window._metaInvoiceData || [];
       if (!data.length) return;
-      const header = 'Dato,Beløb,Valuta,Type,Status';
-      const rows = data.map(r => `${r.date},${r.amount},${r.currency},${r.charge_type||''},${r.status}`);
+      const header = 'Måned,Forbrug,Visninger,Klik,Valuta';
+      const rows = data.map(r => `${r.month},${r.amount},${r.impressions||0},${r.clicks||0},${r.currency}`);
       const csv = [header, ...rows].join('\n');
       const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' });
       const a = document.createElement('a');
