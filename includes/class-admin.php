@@ -193,9 +193,10 @@ class RZPA_Admin {
         if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
         check_admin_referer( 'rzpa_settings' );
 
-        $fields = [
+        // Felter der vises i formularen og kan ændres af brugeren
+        $form_fields = [
             'github_owner', 'github_repo', 'github_token',
-            'google_client_id', 'google_client_secret', 'google_refresh_token', 'google_site_url',
+            'google_client_id', 'google_client_secret', 'google_site_url',
             'serp_api_key',
             'meta_access_token', 'meta_ad_account_id',
             'snap_client_id', 'snap_client_secret', 'snap_access_token', 'snap_ad_account_id',
@@ -203,11 +204,11 @@ class RZPA_Admin {
             'openai_api_key',
             'google_ads_developer_token', 'google_ads_customer_id',
             'google_ads_client_id', 'google_ads_client_secret',
-            'google_ads_refresh_token',
         ];
 
-        $opts = [];
-        foreach ( $fields as $f ) {
+        // Start med eksisterende indstillinger så OAuth-tokens (refresh tokens) bevares
+        $opts = get_option( 'rzpa_settings', [] );
+        foreach ( $form_fields as $f ) {
             $opts[ $f ] = sanitize_text_field( $_POST[ $f ] ?? '' );
         }
         update_option( 'rzpa_settings', $opts );
