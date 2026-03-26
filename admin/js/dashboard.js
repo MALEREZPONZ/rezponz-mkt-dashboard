@@ -85,7 +85,7 @@ const RZPA_App = (() => {
 
   function renderKPI(id, value, extra = '') {
     const e = el(id);
-    if (e) { e.textContent = value; if (extra && el(id + '_sub')) el(id + '_sub').textContent = extra; }
+    if (e) { e.innerHTML = value; if (extra && el(id + '_sub')) el(id + '_sub').textContent = extra; }
   }
 
   function roasClass(v) {
