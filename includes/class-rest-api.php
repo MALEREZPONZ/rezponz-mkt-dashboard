@@ -153,6 +153,20 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        // Top ads – ad-level insights sorteret efter rækkevidde
+        register_rest_route( self::NS, '/meta/top-ads', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'meta_top_ads' ],
+            'permission_callback' => $cap,
+        ] );
+
+        // Landing pages – unikke URLs fra aktive annoncer
+        register_rest_route( self::NS, '/meta/landing-pages', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'meta_landing_pages' ],
+            'permission_callback' => $cap,
+        ] );
+
         // Kombineret dashboard endpoint – ét kald i stedet for 10
         register_rest_route( self::NS, '/dashboard/overview', [
             'methods'             => 'GET',
@@ -658,6 +672,25 @@ class RZPA_REST_API {
         $html = RZPA_Meta_Ads::fetch_ad_preview( $ad_id );
         if ( $html ) set_transient( $key, $html, 30 * MINUTE_IN_SECONDS );
         return self::ok( [ 'iframe_html' => $html ] );
+    }
+
+    public static function meta_top_ads( WP_REST_Request $r ) {
+        $days   = self::days( $r );
+        $key    = 'rzpa_meta_top_ads_' . $days;
+        $cached = get_transient( $key );
+        if ( $cached !== false ) return self::ok( $cached );
+        $data = RZPA_Meta_Ads::fetch_ad_insights( $days );
+        if ( $data ) set_transient( $key, $data, HOUR_IN_SECONDS );
+        return self::ok( $data );
+    }
+
+    public static function meta_landing_pages( WP_REST_Request $r ) {
+        $key    = 'rzpa_meta_landing_pages';
+        $cached = get_transient( $key );
+        if ( $cached !== false ) return self::ok( $cached );
+        $data = RZPA_Meta_Ads::fetch_landing_pages();
+        if ( $data ) set_transient( $key, $data, HOUR_IN_SECONDS );
+        return self::ok( $data );
     }
 
     // Snap

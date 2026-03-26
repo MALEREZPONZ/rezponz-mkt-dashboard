@@ -1039,12 +1039,33 @@ const RZPA_App = (() => {
         const aiBtn = hasText
           ? `<button class="rzpa-ai-copy-btn btn-ghost" data-adid="${ad.ad_id}" data-title="${encodeURIComponent(ad.title||'')}" data-body="${encodeURIComponent(ad.body||'')}" data-cta="${encodeURIComponent(cta||'')}" style="font-size:11px;margin-top:8px;padding:4px 10px">✨ Forbedre tekst</button>`
           : '';
+        // Format badge
+        let formatBadge = '<span class="rzpa-fmt-badge fmt-image">🖼 Billede</span>';
+        if (ad.has_video || ad.format === 'video') formatBadge = '<span class="rzpa-fmt-badge fmt-video">▶ Video</span>';
+        else if (ad.format === 'carousel') formatBadge = '<span class="rzpa-fmt-badge fmt-carousel">◫ Carousel</span>';
+        // Per-ad metrics
+        const hasMetrics = ad.reach > 0 || ad.spend > 0;
+        const metricsHtml = hasMetrics ? `<div class="rzpa-ad-modal-metrics">
+          ${ad.reach > 0 ? `<span>👁 ${(ad.reach).toLocaleString('da-DK')}</span>` : ''}
+          ${ad.spend > 0 ? `<span>💰 ${parseFloat(ad.spend).toLocaleString('da-DK',{maximumFractionDigits:0})} kr</span>` : ''}
+          ${ad.clicks > 0 ? `<span>🖱 ${(ad.clicks).toLocaleString('da-DK')} klik</span>` : ''}
+        </div>` : '';
+        // Performance tier
+        let tierHtml = '';
+        if (ad.reach > 0) {
+          const r = ad.reach;
+          if (r >= 5000) tierHtml = '<span class="rzpa-tier-badge tier-winner">🏆 Winner</span>';
+          else if (r >= 1000) tierHtml = '<span class="rzpa-tier-badge tier-solid">✅ Solid</span>';
+          else tierHtml = '<span class="rzpa-tier-badge tier-testing">🧪 Testing</span>';
+        }
         return `<div class="rzpa-ad-card">
           <div class="rzpa-ad-preview-wrap" id="adprev-${ad.ad_id}">
             ${mediaHtml}${playBtn}
           </div>
           <div class="rzpa-ad-info">
             <div class="rzpa-ad-name">${ad.ad_name||'Unavngivet'}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0">${formatBadge}${tierHtml}</div>
+            ${metricsHtml}
             ${ad.title ? `<div class="rzpa-ad-title">${ad.title}</div>` : ''}
             ${ad.body  ? `<div class="rzpa-ad-body">${ad.body.substring(0,160)}${ad.body.length>160?'…':''}</div>` : ''}
             ${cta      ? `<div class="rzpa-ad-cta">${cta}</div>` : ''}
@@ -1618,11 +1639,15 @@ const RZPA_App = (() => {
       if (tbody) tbody.innerHTML = '<tr><td colspan="11" class="rzpa-loading">Henter data for ' + d + ' dage fra Meta…</td></tr>';
       await syncMeta(d);
       loadMeta(d);
+      loadTopAds(d);
+      loadLandingPages(d);
     });
 
     // Initial load
     await maybeSync(days);
     loadMeta(days);
+    loadTopAds(days);
+    loadLandingPages(days);
     loadMonthlyChart(6);
 
     // Måneder-filter til performance-over-tid grafen
@@ -1705,6 +1730,116 @@ const RZPA_App = (() => {
         }
       }
     });
+
+    // ── Top Annoncer ──────────────────────────────────
+    async function loadTopAds(d) {
+      const podium = el('meta-top-ads-podium');
+      const list = el('meta-top-ads-list');
+      const card = el('meta-top-ads-card');
+      if (!podium || !list) return;
+      card.style.display = '';
+      podium.innerHTML = '<div class="rzpa-loading">⏳ Henter top annoncer…</div>';
+      list.innerHTML = '';
+
+      const r = await api(`/meta/top-ads?days=${d}`);
+      const ads = r.data || [];
+      if (!ads.length) {
+        podium.innerHTML = '<p style="color:#555;text-align:center;padding:24px">Ingen annoncedata fundet for perioden.</p>';
+        return;
+      }
+
+      function perfTier(ad, allAds) {
+        const maxReach = Math.max(...allAds.map(a => a.reach || 0));
+        const ratio = (ad.reach || 0) / (maxReach || 1);
+        if (ratio >= 0.6) return { label: 'Winner', cls: 'tier-winner', icon: '🏆' };
+        if (ratio >= 0.2) return { label: 'Solid', cls: 'tier-solid', icon: '✅' };
+        return { label: 'Testing', cls: 'tier-testing', icon: '🧪' };
+      }
+
+      function fmtBadge(ad) {
+        if (ad.has_video) return '<span class="rzpa-fmt-badge fmt-video">▶ Video</span>';
+        if (ad.format === 'carousel') return '<span class="rzpa-fmt-badge fmt-carousel">◫ Carousel</span>';
+        return '<span class="rzpa-fmt-badge fmt-image">🖼 Billede</span>';
+      }
+
+      const top3 = ads.slice(0, 3);
+      const badges = [
+        { label: 'Højest rækkevidde', color: '#CCFF00', icon: '🏆' },
+        { label: 'Næsthøjest rækkevidde', color: '#60a5fa', icon: '🥈' },
+        { label: 'Tredjehøjest rækkevidde', color: '#f59e0b', icon: '🥉' },
+      ];
+
+      podium.innerHTML = `<div class="rzpa-top-ads-podium">${top3.map((ad, i) => {
+        const b = badges[i];
+        const tier = perfTier(ad, ads);
+        return `<div class="rzpa-top-ad-card">
+          <div class="rzpa-top-ad-badge" style="background:${b.color}20;color:${b.color};border:1px solid ${b.color}40">
+            ${b.icon} ${b.label}
+          </div>
+          ${ad.thumbnail_url ? `<img src="${ad.thumbnail_url}" class="rzpa-top-ad-thumb" alt="">` : '<div class="rzpa-top-ad-no-thumb">📷</div>'}
+          <div class="rzpa-top-ad-info">
+            <div class="rzpa-top-ad-name">${ad.ad_name || 'Unavngivet'}</div>
+            <div class="rzpa-top-ad-metrics">
+              <div class="rzpa-top-ad-metric"><span class="metric-label">👁 Rækkevidde</span><span class="metric-val">${(ad.reach||0).toLocaleString('da-DK')}</span></div>
+              <div class="rzpa-top-ad-metric"><span class="metric-label">💰 Forbrug</span><span class="metric-val">${parseFloat(ad.spend||0).toLocaleString('da-DK',{minimumFractionDigits:0,maximumFractionDigits:0})} kr</span></div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+              ${fmtBadge(ad)}
+              <span class="rzpa-tier-badge ${tier.cls}">${tier.icon} ${tier.label}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}</div>`;
+
+      if (ads.length > 3) {
+        const rest = ads.slice(3, 20);
+        list.innerHTML = `<div class="rzpa-top-ads-table">
+          <div class="rzpa-top-ads-header">
+            <span>#</span><span>Annonce</span><span>Rækkevidde</span><span>Forbrug</span><span>Klik</span><span>CTR</span><span>Type</span><span>Niveau</span>
+          </div>
+          ${rest.map((ad, i) => {
+            const tier = perfTier(ad, ads);
+            const ctr = ad.impressions > 0 ? (ad.clicks / ad.impressions * 100).toFixed(2) : '0';
+            return `<div class="rzpa-top-ads-row">
+              <span class="rank">#${i + 4}</span>
+              <span class="name">${ad.ad_name || 'Unavngivet'}</span>
+              <span>${(ad.reach||0).toLocaleString('da-DK')}</span>
+              <span>${parseFloat(ad.spend||0).toLocaleString('da-DK',{maximumFractionDigits:0})} kr</span>
+              <span>${(ad.clicks||0).toLocaleString('da-DK')}</span>
+              <span>${ctr}%</span>
+              <span>${fmtBadge(ad)}</span>
+              <span class="rzpa-tier-badge ${tier.cls}">${tier.icon} ${tier.label}</span>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }
+    }
+
+    el('meta-top-ads-load')?.addEventListener('click', () => loadTopAds(days));
+
+    // ── Landing Pages ──────────────────────────────────
+    async function loadLandingPages(d) {
+      const card = el('meta-landing-pages-card');
+      const content = el('meta-landing-pages-content');
+      if (!card || !content) return;
+
+      const r = await api(`/meta/landing-pages?days=${d}`);
+      const pages = r.data || [];
+      if (!pages.length) return;
+
+      card.style.display = '';
+      content.innerHTML = `<div style="font-size:12px;color:#666;margin-bottom:12px">${pages.length} unikke landingssider fundet</div>
+        <div class="rzpa-landing-pages">
+          ${pages.map(p => `<div class="rzpa-landing-page-row">
+            <div class="lp-info">
+              <div class="lp-domain">${p.domain}</div>
+              <div class="lp-url">${p.url}</div>
+            </div>
+            <div class="lp-count">${p.ad_count} annoncer</div>
+            <a href="${p.url}" target="_blank" class="lp-link">Åbn →</a>
+          </div>`).join('')}
+        </div>`;
+    }
 
     // Fakturaer
     el('meta-invoices-load')?.addEventListener('click', async () => {

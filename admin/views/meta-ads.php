@@ -89,6 +89,32 @@ $has_openai = ! empty( $meta_opts['openai_api_key'] );
   </div>
   <?php endif; ?>
 
+  <!-- ══ TOP ANNONCER ═══════════════════════════════════════════════════ -->
+  <div class="rzpa-card" id="meta-top-ads-card" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <h2 style="margin:0">🏆 Top annoncer</h2>
+        <div class="rzpa-card-sub" style="margin:4px 0 0">Dine bedst performende annoncer baseret på rækkevidde</div>
+      </div>
+      <button id="meta-top-ads-load" class="btn-ghost" style="font-size:12px">📊 Hent top annoncer</button>
+    </div>
+    <div id="meta-top-ads-content">
+      <div id="meta-top-ads-podium"></div>
+      <div id="meta-top-ads-list"></div>
+    </div>
+  </div>
+
+  <!-- ══ LANDING PAGES ═══════════════════════════════════════════════════ -->
+  <div class="rzpa-card" id="meta-landing-pages-card" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <h2 style="margin:0">🔗 Landing pages</h2>
+        <div class="rzpa-card-sub" style="margin:4px 0 0">Hvilke sider sender dine annoncer trafik til?</div>
+      </div>
+    </div>
+    <div id="meta-landing-pages-content"></div>
+  </div>
+
   <!-- Performance over tid -->
   <div class="rzpa-card rzpa-monthly-card" id="meta-monthly-card" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:4px">

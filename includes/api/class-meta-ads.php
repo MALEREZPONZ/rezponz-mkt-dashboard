@@ -137,7 +137,7 @@ class RZPA_Meta_Ads {
 
         $url = self::API_BASE . '/' . $campaign_id . '/ads?' . http_build_query( [
             'access_token' => $token,
-            'fields'       => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,body,title,call_to_action_type}',
+            'fields'       => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,body,title,call_to_action_type,link_url,object_story_spec},insights.summary{reach,impressions,spend,clicks}',
             'effective_status' => '["ACTIVE"]',
             'limit'        => 50,
         ] );
@@ -151,6 +151,21 @@ class RZPA_Meta_Ads {
         $ads = [];
         foreach ( $body['data'] ?? [] as $ad ) {
             $creative = $ad['creative'] ?? [];
+            $insights = $ad['insights']['summary'] ?? [];
+
+            // Detect ad format
+            $format = 'image';
+            if ( ! empty( $creative['video_id'] ) ) {
+                $format = 'video';
+            } elseif ( ! empty( $creative['object_story_spec']['link_data']['child_attachments'] ) ) {
+                $format = 'carousel';
+            }
+
+            $link_url = $creative['link_url'] ?? '';
+            if ( ! $link_url ) {
+                $link_url = $creative['object_story_spec']['link_data']['link'] ?? '';
+            }
+
             $ads[] = [
                 'ad_id'         => $ad['id'],
                 'ad_name'       => $ad['name'] ?? '',
@@ -162,6 +177,12 @@ class RZPA_Meta_Ads {
                 'video_id'      => $creative['video_id'] ?? '',
                 'has_video'     => ! empty( $creative['video_id'] ),
                 'cta'           => $creative['call_to_action_type'] ?? '',
+                'link_url'      => $link_url,
+                'format'        => $format,
+                'reach'         => (int) ( $insights['reach'] ?? 0 ),
+                'impressions'   => (int) ( $insights['impressions'] ?? 0 ),
+                'spend'         => (float) ( $insights['spend'] ?? 0 ),
+                'clicks'        => (int) ( $insights['clicks'] ?? 0 ),
             ];
         }
         return $ads;
@@ -228,6 +249,112 @@ class RZPA_Meta_Ads {
         }
         // Sortér nyeste først
         usort( $rows, fn($a,$b) => strcmp($b['date'], $a['date']) );
+        return $rows;
+    }
+
+    /**
+     * Henter ad-level performance data (top annoncer sorteret efter rækkevidde).
+     * Bruges til "Top Performing Ads" sektionen i dashboard.
+     */
+    public static function fetch_ad_insights( int $days = 30 ) : array {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['meta_access_token'] ) || empty( $opts['meta_ad_account_id'] ) ) {
+            return [];
+        }
+
+        $token      = $opts['meta_access_token'];
+        $account_id = $opts['meta_ad_account_id'];
+        $end        = gmdate( 'Y-m-d' );
+        $start      = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
+
+        $url = self::API_BASE . '/act_' . $account_id . '/insights?' . http_build_query( [
+            'access_token' => $token,
+            'fields'       => 'ad_id,ad_name,reach,impressions,spend,clicks,cpc,cpm',
+            'time_range'   => wp_json_encode( [ 'since' => $start, 'until' => $end ] ),
+            'level'        => 'ad',
+            'limit'        => 50,
+            'sort'         => 'reach_descending',
+        ] );
+
+        $res = wp_remote_get( $url, [ 'timeout' => 30 ] );
+        if ( is_wp_error( $res ) ) return [];
+
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
+        if ( ! empty( $body['error'] ) ) return [];
+
+        $rows = [];
+        foreach ( $body['data'] ?? [] as $ins ) {
+            $impressions = (int) ( $ins['impressions'] ?? 0 );
+            $clicks      = (int) ( $ins['clicks'] ?? 0 );
+            $ctr         = $impressions > 0 ? round( $clicks / $impressions * 100, 2 ) : 0;
+
+            $rows[] = [
+                'ad_id'       => $ins['ad_id'] ?? '',
+                'ad_name'     => $ins['ad_name'] ?? '',
+                'reach'       => (int) ( $ins['reach'] ?? 0 ),
+                'impressions' => $impressions,
+                'spend'       => (float) ( $ins['spend'] ?? 0 ),
+                'clicks'      => $clicks,
+                'cpc'         => (float) ( $ins['cpc'] ?? 0 ),
+                'cpm'         => (float) ( $ins['cpm'] ?? 0 ),
+                'ctr'         => $ctr,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Henter unikke landing pages fra aktive annoncer.
+     * Bruges til "Landing Pages" sektionen i dashboard.
+     */
+    public static function fetch_landing_pages() : array {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['meta_access_token'] ) || empty( $opts['meta_ad_account_id'] ) ) {
+            return [];
+        }
+
+        $token      = $opts['meta_access_token'];
+        $account_id = $opts['meta_ad_account_id'];
+
+        $url = self::API_BASE . '/act_' . $account_id . '/ads?' . http_build_query( [
+            'access_token'     => $token,
+            'fields'           => 'creative{link_url,object_story_spec{link_data{link}}}',
+            'effective_status' => '["ACTIVE"]',
+            'limit'            => 100,
+        ] );
+
+        $res = wp_remote_get( $url, [ 'timeout' => 30 ] );
+        if ( is_wp_error( $res ) ) return [];
+
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
+        if ( ! empty( $body['error'] ) ) return [];
+
+        $url_counts = [];
+        foreach ( $body['data'] ?? [] as $ad ) {
+            $creative = $ad['creative'] ?? [];
+            $link     = $creative['link_url'] ?? '';
+            if ( ! $link ) {
+                $link = $creative['object_story_spec']['link_data']['link'] ?? '';
+            }
+            if ( $link ) {
+                $url_counts[ $link ] = ( $url_counts[ $link ] ?? 0 ) + 1;
+            }
+        }
+
+        $rows = [];
+        foreach ( $url_counts as $link => $count ) {
+            $parsed = wp_parse_url( $link );
+            $rows[] = [
+                'url'      => $link,
+                'ad_count' => $count,
+                'domain'   => $parsed['host'] ?? '',
+            ];
+        }
+
+        // Sortér efter antal annoncer (flest først)
+        usort( $rows, fn( $a, $b ) => $b['ad_count'] - $a['ad_count'] );
+
         return $rows;
     }
 
