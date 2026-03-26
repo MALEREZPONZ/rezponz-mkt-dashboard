@@ -1268,7 +1268,8 @@ const RZPA_App = (() => {
       if (!content) return;
       const d = res?.data || {};
       if (d.error) {
-        content.innerHTML = `<span style="color:#ff6b6b">⚠️ ${d.error}</span>`;
+        const errTxt = typeof d.error === 'string' ? d.error : JSON.stringify(d.error);
+        content.innerHTML = `<span style="color:#ff6b6b">⚠️ ${errTxt}</span>`;
         return;
       }
       if (d.analysis) {

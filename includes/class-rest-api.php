@@ -99,7 +99,7 @@ class RZPA_REST_API {
         register_rest_route( self::NS, '/meta/ai-analysis', [
             'methods'             => 'POST',
             'callback'            => [ __CLASS__, 'meta_ai_analysis' ],
-            'permission_callback' => [ __CLASS__, 'check_permission' ],
+            'permission_callback' => $cap,
         ] );
 
         // Har vi data for en given periode?

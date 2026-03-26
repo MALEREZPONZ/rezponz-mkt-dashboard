@@ -17,11 +17,13 @@ class RZPA_Meta_Ads {
         $end        = gmdate( 'Y-m-d' );
         $start      = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
 
-        $url = self::API_BASE . '/act_' . $account_id . '/campaigns?' . http_build_query( [
-            'access_token' => $token,
-            'fields'       => 'id,name,status,insights{spend,impressions,reach,clicks,cpm,cpc,actions}',
-            'time_range'   => wp_json_encode( [ 'since' => $start, 'until' => $end ] ),
-            'limit'        => 100,
+        // Brug /insights endpoint med level=campaign — time_range virker IKKE på nested insights{} felter
+        $url = self::API_BASE . '/act_' . $account_id . '/insights?' . http_build_query( [
+            'access_token'   => $token,
+            'fields'         => 'campaign_id,campaign_name,spend,impressions,reach,clicks,cpm,cpc',
+            'time_range'     => wp_json_encode( [ 'since' => $start, 'until' => $end ] ),
+            'level'          => 'campaign',
+            'limit'          => 100,
         ] );
 
         $res = wp_remote_get( $url, [ 'timeout' => 30 ] );
@@ -30,37 +32,55 @@ class RZPA_Meta_Ads {
             return []; // API fejl – vis ingen data
         }
 
-        $body      = json_decode( wp_remote_retrieve_body( $res ), true );
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
 
         // Token udløbet eller API-fejl
         if ( ! empty( $body['error'] ) ) {
             return [ '__error' => $body['error']['message'] ?? 'Token fejl' ];
         }
 
-        $campaigns = $body['data'] ?? [];
-        $rows      = [];
+        // Hent kampagne-status separat (insights API returnerer ikke status)
+        $status_map = self::fetch_campaign_statuses( $token, $account_id );
 
-        foreach ( $campaigns as $c ) {
-            $ins    = $c['insights']['data'][0] ?? [];
-            $spend  = (float) ( $ins['spend'] ?? 0 );
-
+        $rows = [];
+        foreach ( $body['data'] ?? [] as $ins ) {
+            $cid = $ins['campaign_id'] ?? '';
             $rows[] = [
-                'campaign_id'   => $c['id'],
-                'campaign_name' => $c['name'],
-                'status'        => $c['status'],
-                'spend'         => $spend,
-                'impressions'   => (int) ( $ins['impressions'] ?? 0 ),
-                'reach'         => (int) ( $ins['reach'] ?? 0 ),
-                'clicks'        => (int) ( $ins['clicks'] ?? 0 ),
-                'cpm'           => (float) ( $ins['cpm'] ?? 0 ),
-                'cpc'           => (float) ( $ins['cpc'] ?? 0 ),
-                'roas'          => 0.0, // ROAS kræver konverteringssporing (Meta Pixel)
+                'campaign_id'   => $cid,
+                'campaign_name' => $ins['campaign_name'] ?? '',
+                'status'        => $status_map[ $cid ] ?? 'UNKNOWN',
+                'spend'         => (float) ( $ins['spend']       ?? 0 ),
+                'impressions'   => (int)   ( $ins['impressions'] ?? 0 ),
+                'reach'         => (int)   ( $ins['reach']       ?? 0 ),
+                'clicks'        => (int)   ( $ins['clicks']      ?? 0 ),
+                'cpm'           => (float) ( $ins['cpm']         ?? 0 ),
+                'cpc'           => (float) ( $ins['cpc']         ?? 0 ),
+                'roas'          => 0.0,
                 'date_start'    => $start,
                 'date_stop'     => $end,
             ];
         }
 
-        return $rows; // Tom array er OK – ingen mock data
+        return $rows;
+    }
+
+    /**
+     * Henter kampagne-status (ACTIVE/PAUSED) som et id→status map.
+     * Bruges fordi /insights endpoint ikke returnerer status.
+     */
+    private static function fetch_campaign_statuses( string $token, string $account_id ) : array {
+        $url = self::API_BASE . '/act_' . $account_id . '/campaigns?' . http_build_query( [
+            'access_token' => $token,
+            'fields'       => 'id,status',
+            'limit'        => 200,
+        ] );
+        $res  = wp_remote_get( $url, [ 'timeout' => 15 ] );
+        $body = is_wp_error( $res ) ? [] : json_decode( wp_remote_retrieve_body( $res ), true );
+        $map  = [];
+        foreach ( $body['data'] ?? [] as $c ) {
+            $map[ $c['id'] ] = $c['status'] ?? 'UNKNOWN';
+        }
+        return $map;
     }
 
     /**
