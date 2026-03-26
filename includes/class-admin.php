@@ -202,7 +202,7 @@ class RZPA_Admin {
             'snap_client_id', 'snap_client_secret', 'snap_access_token', 'snap_ad_account_id',
             'tiktok_access_token', 'tiktok_app_id', 'tiktok_advertiser_id',
             'openai_api_key',
-            'google_ads_developer_token', 'google_ads_customer_id',
+            'google_ads_developer_token', 'google_ads_customer_id', 'google_ads_manager_id',
             'google_ads_client_id', 'google_ads_client_secret',
         ];
 

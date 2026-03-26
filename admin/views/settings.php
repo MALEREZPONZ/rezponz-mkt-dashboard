@@ -401,11 +401,18 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
             <small style="color:#555;font-size:11px;display:block;margin-top:4px">Hent fra <a href="https://ads.google.com/aw/apicenter" target="_blank" style="color:var(--neon)">Google Ads API Center</a> → Tools → API Center</small>
           </div>
           <div class="rzpa-field">
-            <label>Customer ID</label>
+            <label>Customer ID <span style="color:#555;font-weight:normal">(den konto du vil hente data fra)</span></label>
             <input type="text" name="google_ads_customer_id"
               value="<?php echo esc_attr( $opts['google_ads_customer_id'] ?? '' ); ?>"
-              placeholder="123-456-7890" />
-            <small style="color:#555;font-size:11px;display:block;margin-top:4px">Find det i øverste højre hjørne i Google Ads</small>
+              placeholder="147-605-4517" />
+            <small style="color:#555;font-size:11px;display:block;margin-top:4px">Kundekonto-ID — klik på kontoen i Google Ads for at se det</small>
+          </div>
+          <div class="rzpa-field">
+            <label>Manager Account ID (MCC) <span style="color:#555;font-weight:normal">(valgfrit — kun ved MCC)</span></label>
+            <input type="text" name="google_ads_manager_id"
+              value="<?php echo esc_attr( $opts['google_ads_manager_id'] ?? '' ); ?>"
+              placeholder="770-011-9764" />
+            <small style="color:#555;font-size:11px;display:block;margin-top:4px">Kun nødvendig hvis du tilgår kundekontoen via en managerkonto (MCC). Ses øverst i Google Ads-headeren.</small>
           </div>
           <div class="rzpa-field">
             <label>OAuth Client ID

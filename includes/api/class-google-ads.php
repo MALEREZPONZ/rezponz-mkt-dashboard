@@ -36,11 +36,17 @@ class RZPA_Google_Ads {
     }
 
     private static function headers( string $token, array $opts ) : array {
-        return [
+        $h = [
             'Authorization'   => 'Bearer ' . $token,
             'developer-token' => $opts['google_ads_developer_token'] ?? '',
             'Content-Type'    => 'application/json',
         ];
+        // MCC: login-customer-id er påkrævet når man tilgår kundekonti via en managerkonto
+        $mcc = preg_replace( '/[^0-9]/', '', $opts['google_ads_manager_id'] ?? '' );
+        if ( $mcc ) {
+            $h['login-customer-id'] = $mcc;
+        }
+        return $h;
     }
 
     private static function customer_id( array $opts ) : string {
