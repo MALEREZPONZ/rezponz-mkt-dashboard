@@ -53,7 +53,8 @@ const RZPA_App = (() => {
     }
 
     // ③ Rigtig REST-kald (kun når data mangler eller er forældet)
-    const res  = await fetch(API + path, { headers: HDR, ...opts });
+    const { headers: extraHdr, ...restOpts } = opts;
+    const res  = await fetch(API + path, { headers: { ...HDR, ...(extraHdr||{}) }, ...restOpts });
     const data = await res.json();
 
     if (isGet) {
@@ -802,12 +803,14 @@ const RZPA_App = (() => {
       quickWins.forEach(k => {
         const pos = Math.round(k.avg_position);
         const extraClicks = Math.round(k.total_clicks * (pos > 5 ? 1.5 : 0.8));
+        const googleUrl = `https://www.google.dk/search?q=${encodeURIComponent(k.keyword)}`;
         actions.push({
           prio: 'high',
           icon: '🚀',
           title: `Ryk "${k.keyword}" fra #${pos} til top 3`,
           desc: `Dette søgeord er tæt på top 3. Med lidt forbedring af siden kan I potentielt få ~${fmt(extraClicks)} flere klik om måneden.`,
           action: `Opdatér siden med søgeordet i overskriften (H1), meta-titlen og de første 100 ord. Tilføj interne links til siden fra andre sider på rezponz.dk.`,
+          links: [{ label: '🔍 Tjek din placering på Google', url: googleUrl }],
         });
       });
 
@@ -816,12 +819,17 @@ const RZPA_App = (() => {
                              .sort((a,b) => b.total_impressions - a.total_impressions).slice(0,2);
       ctrIssues.forEach(p => {
         const url = p.page_url.replace(/^https?:\/\/[^/]+/, '') || '/';
+        const slug = url.replace(/^\/|\/$/g,'').replace(/-/g,' ') || 'forsiden';
         actions.push({
           prio: 'medium',
           icon: '✏️',
           title: `Forbedre sidetitlen på ${url}`,
           desc: `Siden vises ${fmt(p.total_impressions)} gange på Google men kun ${fmt(p.avg_ctr,1)}% klikker ind. En bedre titel kan fordoble trafikken uden at ændre indholdet.`,
-          action: `Gå til WordPress → Rediger siden → Skift SEO-titlen (Yoast/RankMath) til noget mere fængende med et klart benefit. F.eks. "${url.replace(/\//g,'').replace(/-/g,' ')}" → "Hvad er [emne]? Alt du skal vide [${new Date().getFullYear()}]"`,
+          action: `Gå til WordPress → Rediger siden → Skift SEO-titlen (Yoast/RankMath) til noget mere fængende med et klart benefit. F.eks. "${slug}" → "Hvad er [emne]? Alt du skal vide [${new Date().getFullYear()}]"`,
+          links: [
+            { label: '🔗 Åbn siden', url: p.page_url },
+            { label: '✏️ Rediger i WordPress', url: (RZPA.admin_url || '/wp-admin/') + 'post.php?action=edit&rzpa_find_url=' + encodeURIComponent(p.page_url) },
+          ],
         });
       });
 
@@ -829,12 +837,14 @@ const RZPA_App = (() => {
       const candidates = kws.filter(k => k.avg_position > 10 && k.avg_position <= 15 && k.total_impressions > 50)
                             .sort((a,b) => b.total_impressions - a.total_impressions).slice(0,2);
       candidates.forEach(k => {
+        const googleUrl = `https://www.google.dk/search?q=${encodeURIComponent(k.keyword)}`;
         actions.push({
           prio: 'medium',
           icon: '💡',
           title: `Skub "${k.keyword}" op på side 1`,
           desc: `Position #${Math.round(k.avg_position)} — kun ét step fra side 1. Søgeordet vises allerede ${fmt(k.total_impressions)} gange.`,
           action: `Skriv et nyt blogindlæg der fokuserer specifikt på "${k.keyword}". Brug søgeordet i URL'en, overskriften og de første afsnit. Tilføj FAQ-sektion med relaterede spørgsmål.`,
+          links: [{ label: '🔍 Se placeringen på Google', url: googleUrl }],
         });
       });
 
@@ -850,6 +860,7 @@ const RZPA_App = (() => {
             <div class="action-title">${a.icon} ${a.title}</div>
             <div class="action-desc">${a.desc}</div>
             <div class="action-how"><strong>Sådan gør du:</strong> ${a.action}</div>
+            ${(a.links||[]).length ? `<div class="action-links">${a.links.map(l=>`<a href="${l.url}" target="_blank" class="action-link">${l.label}</a>`).join('')}</div>` : ''}
           </div>
           <div class="action-prio action-prio-${a.prio}">${a.prio === 'high' ? '🔥 Høj' : '⚡ Middel'}</div>
         </div>

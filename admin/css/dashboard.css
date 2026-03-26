@@ -34,6 +34,9 @@
 .action-desc  { font-size:12px; color:#888; line-height:1.6; margin-bottom:8px; }
 .action-how   { font-size:12px; color:#666; line-height:1.6; background:var(--bg-100); padding:8px 12px; border-radius:6px; }
 .action-how strong { color:#aaa; }
+.action-links { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.action-link  { font-size:11px; color:var(--neon); text-decoration:none; border:1px solid rgba(204,255,0,.25); padding:3px 10px; border-radius:20px; transition:background .15s; }
+.action-link:hover { background:rgba(204,255,0,.08); }
 .action-prio  { font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; white-space:nowrap; flex-shrink:0; }
 .action-prio-high   { background:rgba(204,255,0,.12); color:var(--neon); border:1px solid rgba(204,255,0,.2); }
 .action-prio-medium { background:rgba(245,158,11,.12); color:#f59e0b;    border:1px solid rgba(245,158,11,.2); }
