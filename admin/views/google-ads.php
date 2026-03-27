@@ -47,6 +47,17 @@ $has_openai      = ! empty( $gads_opts['openai_api_key'] );
   <!-- Health bar -->
   <div id="gads-health-bar" style="display:none"></div>
 
+  <!-- Diagnostik panel (vises kun ved fejl) -->
+  <div id="gads-diag-panel" style="display:none;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:20px 24px;margin-bottom:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:600;color:#e5e5e5">🔍 Google Ads Diagnostik</div>
+      <button id="gads-test-btn" class="btn-ghost" style="font-size:12px">🧪 Test forbindelse</button>
+    </div>
+    <div id="gads-diag-content" style="font-size:13px;color:#888">
+      Klik "Test forbindelse" for at se hvad Google siger.
+    </div>
+  </div>
+
   <!-- Story -->
   <div id="gads-story" class="rzpa-story hidden"></div>
 

@@ -114,12 +114,11 @@ class RZPA_Google_Ads {
                   ORDER BY metrics.cost_micros DESC
                   LIMIT 100";
 
-        $url = self::api_base() . "/customers/{$cid}/googleAds:searchStream";
-        $res = wp_remote_post( $url, [
-            'timeout' => 30,
-            'headers' => self::headers( $token, $opts ),
-            'body'    => wp_json_encode( [ 'query' => $query ] ),
-        ] );
+        $url     = self::api_base() . "/customers/{$cid}/googleAds:searchStream";
+        $headers = self::headers( $token, $opts );
+        $payload = wp_json_encode( [ 'query' => $query ] );
+
+        $res = wp_remote_post( $url, [ 'timeout' => 30, 'headers' => $headers, 'body' => $payload ] );
 
         if ( is_wp_error( $res ) ) {
             self::$last_error = $res->get_error_message();
@@ -129,16 +128,26 @@ class RZPA_Google_Ads {
         $http = wp_remote_retrieve_response_code( $res );
         $body = json_decode( wp_remote_retrieve_body( $res ), true );
 
+        // ── Fallback: hvis 404 med MCC, prøv uden login-customer-id ────────────
+        $mcc = preg_replace( '/[^0-9]/', '', $opts['google_ads_manager_id'] ?? '' );
+        if ( $http === 404 && $mcc ) {
+            $headers_direct = $headers;
+            unset( $headers_direct['login-customer-id'] );
+            $res2  = wp_remote_post( $url, [ 'timeout' => 30, 'headers' => $headers_direct, 'body' => $payload ] );
+            $http2 = wp_remote_retrieve_response_code( $res2 );
+            if ( ! is_wp_error( $res2 ) && $http2 === 200 ) {
+                $body = json_decode( wp_remote_retrieve_body( $res2 ), true );
+                $http = 200;
+            }
+        }
+
         if ( $http !== 200 ) {
             $details = $body[0]['error']['details'][0]['errors'][0]['message']
                     ?? $body[0]['error']['message']
                     ?? $body['error']['message']
                     ?? 'HTTP ' . $http;
-            // Tilføj debug-info
-            $mcc = preg_replace( '/[^0-9]/', '', $opts['google_ads_manager_id'] ?? '' );
-            $extra = " [CID:{$cid}" . ($mcc ? " MCC:{$mcc}" : ' MCC:mangler') . " HTTP:{$http}]";
+            $extra = " [CID:{$cid}" . ($mcc ? " MCC:{$mcc}" : '') . " HTTP:{$http}]";
             self::$last_error = $details . $extra;
-            // Ryd cached version ved 404 så den prøver igen
             if ( $http === 404 ) delete_transient( 'rzpa_gads_api_version' );
             return [];
         }
@@ -375,43 +384,81 @@ class RZPA_Google_Ads {
         $cid     = self::customer_id( $opts );
         $mcc     = preg_replace( '/[^0-9]/', '', $opts['google_ads_manager_id'] ?? '' );
         $api_ver = get_transient( 'rzpa_gads_api_version' ) ?: self::API_VERSIONS[0];
-        $query   = "SELECT campaign.id, campaign.name FROM campaign WHERE campaign.status = 'ENABLED' LIMIT 3";
-        $url     = "https://googleads.googleapis.com/{$api_ver}/customers/{$cid}/googleAds:searchStream";
 
-        $res  = wp_remote_post( $url, [
+        // ── Trin 1: List accessible customers ───────────────────────────────
+        $accessible = [];
+        $list_url  = "https://googleads.googleapis.com/{$api_ver}/customers:listAccessibleCustomers";
+        $list_res  = wp_remote_get( $list_url, [
+            'timeout' => 10,
+            'headers' => [
+                'Authorization'   => 'Bearer ' . $token,
+                'developer-token' => $opts['google_ads_developer_token'] ?? '',
+            ],
+        ] );
+        if ( ! is_wp_error( $list_res ) ) {
+            $list_body = json_decode( wp_remote_retrieve_body( $list_res ), true );
+            foreach ( $list_body['resourceNames'] ?? [] as $rn ) {
+                // resourceName format: "customers/1234567890"
+                $accessible[] = preg_replace( '/^customers\//', '', $rn );
+            }
+        }
+
+        // ── Trin 2: Test med MCC ─────────────────────────────────────────────
+        $query = "SELECT campaign.id, campaign.name FROM campaign LIMIT 3";
+        $url   = "https://googleads.googleapis.com/{$api_ver}/customers/{$cid}/googleAds:searchStream";
+
+        $headers = self::headers( $token, $opts );
+        $res     = wp_remote_post( $url, [
             'timeout' => 15,
-            'headers' => self::headers( $token, $opts ),
+            'headers' => $headers,
             'body'    => wp_json_encode( [ 'query' => $query ] ),
         ] );
-
         $http = wp_remote_retrieve_response_code( $res );
         $raw  = wp_remote_retrieve_body( $res );
         $body = json_decode( $raw, true );
 
-        // Try to extract a meaningful error message from Google's response
-        $google_msg = $body[0]['error']['details'][0]['errors'][0]['message']
-                   ?? $body[0]['error']['message']
-                   ?? $body['error']['message']
-                   ?? null;
-        $google_status = $body[0]['error']['status']
-                      ?? $body['error']['status']
+        // ── Trin 3: Fallback uden MCC ────────────────────────────────────────
+        $used_mcc     = true;
+        $http_no_mcc  = null;
+        if ( $http !== 200 && $mcc ) {
+            $hdrs_direct = $headers;
+            unset( $hdrs_direct['login-customer-id'] );
+            $res2  = wp_remote_post( $url, [
+                'timeout' => 15,
+                'headers' => $hdrs_direct,
+                'body'    => wp_json_encode( [ 'query' => $query ] ),
+            ] );
+            $http_no_mcc = wp_remote_retrieve_response_code( $res2 );
+            if ( $http_no_mcc === 200 ) {
+                $body     = json_decode( wp_remote_retrieve_body( $res2 ), true );
+                $http     = 200;
+                $used_mcc = false;
+            }
+        }
+
+        $google_msg    = $body[0]['error']['details'][0]['errors'][0]['message']
+                      ?? $body[0]['error']['message']
+                      ?? $body['error']['message']
                       ?? null;
-        $err = $google_msg ?? ( $http !== 200 ? 'HTTP ' . $http : null );
+        $google_status = $body[0]['error']['status'] ?? $body['error']['status'] ?? null;
+        $err           = $google_msg ?? ( $http !== 200 ? "HTTP {$http}" : null );
 
         $rows = 0;
         foreach ( (array) $body as $chunk ) { $rows += count( $chunk['results'] ?? [] ); }
 
         return [
-            'step'            => 'api',
-            'http_code'       => $http,
-            'customer_id'     => $cid,
-            'manager_id'      => $mcc ?: null,
-            'api_version'     => $api_ver,
-            'api_url'         => $url,
-            'campaigns_found' => $rows,
-            'error'           => $err,
-            'google_status'   => $google_status,
-            'raw_snippet'     => substr( $raw, 0, 500 ),
+            'step'              => 'api',
+            'http_code'         => $http,
+            'http_no_mcc'       => $http_no_mcc,
+            'customer_id'       => $cid,
+            'manager_id'        => $mcc ?: null,
+            'used_mcc'          => $used_mcc,
+            'api_version'       => $api_ver,
+            'campaigns_found'   => $rows,
+            'error'             => $err,
+            'google_status'     => $google_status,
+            'accessible_accounts' => $accessible,
+            'raw_snippet'       => substr( $raw, 0, 600 ),
         ];
     }
 

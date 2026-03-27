@@ -1366,6 +1366,7 @@ const RZPA_App = (() => {
               hBar.style.display='flex';
               hBar.className='rzpa-health health-bad';
               hBar.innerHTML=`<span class="h-icon">🔴</span><div class="h-text">${errMsg}</div>`;
+              showGadsDiagPanel();
             }
           } else {
             btn.textContent = `✓ ${r.data?.count||0} kampagner hentet`;
@@ -1559,6 +1560,77 @@ const RZPA_App = (() => {
       loadGads(days);
       loadGadsMonthly(6);
     });
+
+    // ── Google Ads diagnostik ────────────────────────────────────────────
+    el('gads-test-btn')?.addEventListener('click', async () => {
+      const btn     = el('gads-test-btn');
+      const content = el('gads-diag-content');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Tester…'; }
+
+      let td = {};
+      try {
+        const r = await api('/google-ads/test');
+        td = r?.data || {};
+      } catch(e) {
+        if (content) content.innerHTML = `<span style="color:#ef4444">Forbindelsesfejl: ${e.message}</span>`;
+        if (btn) { btn.disabled = false; btn.textContent = '🧪 Test forbindelse'; }
+        return;
+      }
+      if (btn) { btn.disabled = false; btn.textContent = '🔄 Test igen'; }
+
+      const ok  = td.http_code === 200;
+      const col = ok ? '#4ade80' : '#ef4444';
+      const settingsUrl = (RZPA?.settingsUrl || 'admin.php?page=rzpa-settings') + '#google-ads';
+
+      let accessHtml = '';
+      if (td.accessible_accounts?.length) {
+        const inList = td.accessible_accounts.includes(td.customer_id);
+        accessHtml = `
+          <div style="margin-top:12px">
+            <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Tilgængelige konti via dit token</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${td.accessible_accounts.map(a => {
+                const isTarget = a === td.customer_id;
+                return `<span style="background:${isTarget?'#4ade8020':'#1a1a1a'};border:1px solid ${isTarget?'#4ade80':'#333'};border-radius:6px;padding:3px 10px;font-family:monospace;font-size:12px;color:${isTarget?'#4ade80':'#888'}">${a}${isTarget?' ✓ (din CID)':''}</span>`;
+              }).join('')}
+            </div>
+            ${!inList ? `<div style="margin-top:8px;color:#f59e0b;font-size:12px">⚠️ Din Customer ID <strong>${td.customer_id}</strong> er IKKE i listen — det er sandsynligvis årsagen til fejlen. Tjek at du har brugt det rigtige Customer ID.</div>` : ''}
+          </div>`;
+      } else if (!ok) {
+        accessHtml = `<div style="margin-top:8px;color:#888;font-size:12px">Kunne ikke hente liste over tilgængelige konti.</div>`;
+      }
+
+      let statusHtml = ok
+        ? `<span style="color:#4ade80;font-weight:600">✅ Forbindelsen virker! ${td.campaigns_found} kampagner fundet${!td.used_mcc ? ' (direkte adgang uden MCC)' : ''}.</span>`
+        : `<span style="color:#ef4444;font-weight:600">❌ Fejl: ${td.error || 'Ukendt fejl'}</span>
+           ${td.http_no_mcc ? `<div style="margin-top:6px;color:#f59e0b;font-size:12px">ℹ️ Direkte adgang (uden MCC) returnerede HTTP ${td.http_no_mcc}</div>` : ''}
+           <div style="margin-top:10px"><a href="${settingsUrl}" style="color:#CCFF00;font-size:12px">⚙️ Gå til Google Ads Indstillinger →</a></div>`;
+
+      if (content) content.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">
+          <div style="background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:10px 14px">
+            <div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:3px">Customer ID</div>
+            <div style="font-family:monospace;color:#ccc">${td.customer_id || '–'}</div>
+          </div>
+          <div style="background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:10px 14px">
+            <div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:3px">Manager (MCC)</div>
+            <div style="font-family:monospace;color:#ccc">${td.manager_id || 'Ikke sat'}</div>
+          </div>
+          <div style="background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:10px 14px">
+            <div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:3px">API Version</div>
+            <div style="font-family:monospace;color:#ccc">${td.api_version || '–'}</div>
+          </div>
+        </div>
+        <div>${statusHtml}</div>
+        ${accessHtml}
+        ${td.raw_snippet && !ok ? `<details style="margin-top:10px"><summary style="color:#555;font-size:11px;cursor:pointer">Vis råt Google svar</summary><pre style="background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:10px;font-size:10px;color:#666;overflow:auto;margin-top:6px;white-space:pre-wrap">${td.raw_snippet}</pre></details>` : ''}`;
+    });
+
+    // Vis diagnostik-panelet automatisk ved fejl
+    function showGadsDiagPanel() {
+      const panel = el('gads-diag-panel');
+      if (panel) panel.style.display = 'block';
+    }
 
     el('gads-filter-bar')?.addEventListener('click', e => {
       const btn = e.target.closest('[data-filter]');
