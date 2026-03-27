@@ -201,6 +201,7 @@ $has_openai = ! empty( $meta_opts['openai_api_key'] );
       <div style="display:flex;gap:8px;align-items:center">
         <button id="meta-invoices-load" class="btn-ghost" style="font-size:12px">⬇ Hent betalinger</button>
         <button id="meta-invoices-csv" class="btn-ghost" style="font-size:12px;display:none">📥 Eksportér CSV</button>
+        <button id="meta-invoices-pdf" class="btn-ghost" style="font-size:12px;display:none">🖨 Download PDF</button>
         <a href="https://business.facebook.com/billing_hub/payment_activity" target="_blank" class="btn-ghost" style="font-size:12px;text-decoration:none">🔗 Åbn i Meta</a>
       </div>
     </div>

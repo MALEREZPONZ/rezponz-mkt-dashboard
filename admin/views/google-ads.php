@@ -177,6 +177,7 @@ $has_openai      = ! empty( $gads_opts['openai_api_key'] );
       <div style="display:flex;gap:8px;align-items:center">
         <button id="gads-invoices-load" class="btn-ghost" style="font-size:12px">⬇ Hent betalinger</button>
         <button id="gads-invoices-csv" class="btn-ghost" style="font-size:12px;display:none">📥 Eksportér CSV</button>
+        <button id="gads-invoices-pdf" class="btn-ghost" style="font-size:12px;display:none">🖨 Download PDF</button>
         <a href="https://ads.google.com/aw/billing/summary" target="_blank" class="btn-ghost" style="font-size:12px;text-decoration:none">🔗 Åbn i Google Ads</a>
       </div>
     </div>

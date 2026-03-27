@@ -276,7 +276,7 @@ class RZPA_Meta_Ads {
         // Hent alle aktive annoncer med creative data + insights
         $url = self::API_BASE . '/act_' . $account_id . '/ads?' . http_build_query( [
             'access_token'     => $token,
-            'fields'           => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec},insights.time_range({"since":"' . $since . '","until":"' . $until . '"}){reach,impressions,spend,clicks,cpc,cpm}',
+            'fields'           => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec{link_data{picture,image_url,name,child_attachments{picture}},video_data{image_url},photo_data{images{original{uri}}}}},insights.time_range({"since":"' . $since . '","until":"' . $until . '"}){reach,impressions,spend,clicks,cpc,cpm}',
             'effective_status' => '["ACTIVE"]',
             'limit'            => 100,
         ] );
@@ -306,13 +306,21 @@ class RZPA_Meta_Ads {
             $clicks = (int) ( $insights['clicks'] ?? 0 );
             $spend = round( (float) ( $insights['spend'] ?? 0 ), 2 );
 
+            // Byg bedste tilgængelige billede-URL — prioritér CDN-urls der ikke kræver auth
+            $img = $spec['link_data']['picture'] ?? ''          // Link-annoncer – mest pålidelig
+                ?: ( $spec['link_data']['image_url'] ?? '' )
+                ?: ( $spec['video_data']['image_url'] ?? '' )   // Video-thumbnail fra object_story_spec
+                ?: ( $spec['photo_data']['images']['original']['uri'] ?? '' )
+                ?: ( $creative['image_url'] ?? '' )
+                ?: ( $creative['thumbnail_url'] ?? '' );        // Sidst – kræver undertiden auth
+
             $rows[] = [
                 'ad_id'         => $ad['id'] ?? '',
                 'ad_name'       => $ad['name'] ?? '',
                 'status'        => $ad['effective_status'] ?? '',
                 'creative_id'   => $creative['id'] ?? '',
-                'thumbnail_url' => $creative['thumbnail_url'] ?? '',
-                'image_url'     => $creative['image_url'] ?? '',
+                'thumbnail_url' => $img,
+                'image_url'     => $img,
                 'has_video'     => $format === 'video',
                 'format'        => $format,
                 'reach'         => $reach,

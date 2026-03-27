@@ -316,6 +316,7 @@ const RZPA_App = (() => {
     initSyncBtn();
     initDateFilter('rzpa-date-filter', d => { days = d; loadDashboard(d); });
     loadDashboard(days);
+    initCrossChannelAds();
   }
 
   async function loadDashboard(days) {
@@ -545,6 +546,7 @@ const RZPA_App = (() => {
     initDateFilter('rzpa-date-filter', d => { days = d; loadSEO(d); });
     loadSEO(days);
     loadSEOMonthly();
+    initKeywordSuggestions();
 
     el('rzpa-seo-sync')?.addEventListener('click', async () => {
       const btn = el('rzpa-seo-sync');
@@ -1598,6 +1600,8 @@ const RZPA_App = (() => {
       if(!data.length){content.innerHTML='<span style="color:#555">Ingen betalingsdata fundet.</span>';return;}
       window._gadsInvoiceData = data;
       if(csvBtn) csvBtn.style.display='inline-flex';
+      const pdfBtnGads = el('gads-invoices-pdf');
+      if(pdfBtnGads) pdfBtnGads.style.display='inline-flex';
       const total = data.reduce((s,r)=>s+(r.amount||0),0);
       const mNames=['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
       content.innerHTML=`<div style="margin-bottom:12px;padding:12px 16px;background:rgba(66,133,244,0.05);border-radius:8px;border:1px solid rgba(66,133,244,0.15);display:flex;gap:24px;flex-wrap:wrap">
@@ -1618,6 +1622,8 @@ const RZPA_App = (() => {
       a.download='google-ads-betalinger-'+new Date().toISOString().slice(0,10)+'.csv';
       a.click();
     });
+
+    initGadsInvoicePDF();
   }
 
   async function initMeta() {
@@ -1854,9 +1860,11 @@ const RZPA_App = (() => {
         content.innerHTML = '<span style="color:#555">Ingen betalinger fundet — kontrollér at din token har billing-adgang.</span>';
         return;
       }
-      // Gem til CSV-eksport
+      // Gem til CSV/PDF-eksport
       window._metaInvoiceData = data;
       if (csvBtn) csvBtn.style.display = 'inline-flex';
+      const pdfBtnMeta = el('meta-invoices-pdf');
+      if (pdfBtnMeta) pdfBtnMeta.style.display = 'inline-flex';
       const totalAmount = data.reduce((s,r) => s + (r.amount||0), 0);
       const totalImpr   = data.reduce((s,r) => s + (r.impressions||0), 0);
       const totalClicks = data.reduce((s,r) => s + (r.clicks||0), 0);
@@ -1898,6 +1906,8 @@ const RZPA_App = (() => {
       a.download = 'meta-betalinger-' + new Date().toISOString().slice(0,10) + '.csv';
       a.click();
     });
+
+    initMetaInvoicePDF();
 
     el('rzpa-sync-meta')?.addEventListener('click', async () => {
       if (await syncMeta(days)) {
@@ -2388,6 +2398,232 @@ const RZPA_App = (() => {
         const topLi = li.closest('.wp-has-submenu') ?? li.parentElement?.closest('li');
         if (topLi) topLi.classList.add('wp-has-current-submenu', 'wp-menu-open');
       }
+    });
+  }
+
+  // ══ PDF DOWNLOAD HJÆLPER ══════════════════════════════════════════════════
+  // Åbner et nyt vindue med formateret faktura-HTML og trigger print → PDF.
+  function downloadInvoicePDF(data, platform, currency) {
+    if (!data || !data.length) return;
+    const total = data.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+    const mNames = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+    const monthName = m => { if (!m) return ''; const [y,mo] = m.split('-'); return (mNames[parseInt(mo,10)-1]||mo)+' '+y; };
+
+    const rows = data.map(r => `
+      <tr>
+        <td>${monthName(r.month)}</td>
+        <td style="text-align:right"><strong>${parseFloat(r.amount||0).toFixed(2)} ${r.currency||currency||'DKK'}</strong></td>
+        <td style="text-align:right">${(r.impressions||0).toLocaleString('da-DK')}</td>
+        <td style="text-align:right">${(r.clicks||0).toLocaleString('da-DK')}</td>
+        <td style="text-align:center;color:#2d8a4e">✓ Betalt</td>
+      </tr>`).join('');
+
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html>
+<html lang="da"><head><meta charset="UTF-8">
+<title>${platform} Betalingshistorik – Rezponz A/S</title>
+<style>
+  body { font-family: Arial, sans-serif; color: #1a1a1a; margin: 40px; font-size: 14px; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 24px; }
+  .summary { display: flex; gap: 32px; background: #f7f7f7; padding: 16px 20px; border-radius: 8px; margin-bottom: 24px; }
+  .sum-item label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .5px; display: block; }
+  .sum-item strong { font-size: 20px; color: #111; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 12px; background: #f0f0f0; border-bottom: 2px solid #ddd; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
+  td { padding: 9px 12px; border-bottom: 1px solid #eee; }
+  tr:last-child td { border-bottom: none; }
+  .footer { margin-top: 28px; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 12px; }
+  .print-btn { background: #111; color: #fff; border: none; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-bottom: 24px; }
+  @media print { .print-btn { display: none; } body { margin: 20px; } }
+</style></head><body>
+<button class="print-btn" onclick="window.print()">🖨 Gem som PDF</button>
+<h1>${platform} Betalingshistorik</h1>
+<div class="subtitle">Rezponz A/S · Genereret ${new Date().toLocaleDateString('da-DK', {year:'numeric',month:'long',day:'numeric'})}</div>
+<div class="summary">
+  <div class="sum-item"><label>Samlet forbrug</label><strong>${total.toFixed(2)} ${currency||'DKK'}</strong></div>
+  <div class="sum-item"><label>Antal måneder</label><strong>${data.length}</strong></div>
+  <div class="sum-item"><label>Periode</label><strong>${monthName(data[data.length-1]?.month)} – ${monthName(data[0]?.month)}</strong></div>
+</div>
+<table>
+  <thead><tr><th>Måned</th><th style="text-align:right">Forbrug</th><th style="text-align:right">Visninger</th><th style="text-align:right">Klik</th><th style="text-align:center">Status</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="footer">Eksporteret fra Rezponz Marketing Dashboard · Data fra ${platform} Ads API</div>
+</body></html>`);
+    win.document.close();
+    setTimeout(() => win.print(), 600);
+  }
+
+  // ══ CROSS-CHANNEL TOP ADS + BUDGET ANBEFALINGER (DASHBOARD) ═══════════════
+
+  function initCrossChannelAds() {
+    el('cross-channel-load-btn')?.addEventListener('click', loadCrossChannelAds);
+    el('budget-recs-btn')?.addEventListener('click', loadBudgetRecommendations);
+  }
+
+  async function loadCrossChannelAds() {
+    const btn = el('cross-channel-load-btn');
+    const content = el('cross-channel-ads-content');
+    if (!content) return;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Henter…'; }
+    content.innerHTML = '<div class="rzpa-loading">Henter annoncer fra alle kanaler…</div>';
+
+    // Hent Meta top ads + Snap/TikTok ads parallelt
+    const [metaR, snapR, ttR] = await Promise.all([
+      api('/meta/top-ads?days=30').catch(() => ({})),
+      api('/snap/ads?days=30').catch(() => ({})),
+      api('/tiktok/ads?days=30').catch(() => ({})),
+    ]);
+
+    if (btn) { btn.disabled = false; btn.textContent = '📊 Hent annoncer'; }
+
+    const metaAds = (metaR.data || []).slice(0, 3);
+    const snapAds = (snapR.data || []).slice(0, 3);
+    const ttAds   = (ttR.data   || []).slice(0, 3);
+
+    const allEmpty = !metaAds.length && !snapAds.length && !ttAds.length;
+    if (allEmpty) {
+      content.innerHTML = '<p style="color:#555">Ingen aktive annoncer fundet. Synkronisér dine platforme og prøv igen.</p>';
+      return;
+    }
+
+    const fmtBadge = f => f === 'video' ? '<span class="fmt-badge fmt-video">▶ Video</span>'
+                        : f === 'carousel' ? '<span class="fmt-badge fmt-carousel">◫ Carousel</span>'
+                        : '<span class="fmt-badge fmt-image">🖼 Billede</span>';
+
+    const renderGroup = (ads, platformName, color) => {
+      if (!ads.length) return '';
+      return `<div class="cc-platform-group">
+        <div class="cc-platform-label" style="color:${color}">${platformName}</div>
+        <div class="cc-ads-row">
+          ${ads.map(ad => {
+            const img = ad.thumbnail_url || ad.image_url || ad.thumb_url || '';
+            const name = ad.ad_name || ad.name || '';
+            const reach = ad.reach || ad.impressions || 0;
+            const spend = parseFloat(ad.spend||ad.cost||0);
+            return `<div class="cc-ad-card">
+              <div class="cc-ad-thumb">
+                ${img ? `<img src="${img}" alt="" loading="lazy" onerror="this.style.display='none'">` : '<div class="rzpa-top-ad-no-thumb">📷</div>'}
+              </div>
+              <div class="cc-ad-name" title="${name}">${name}</div>
+              <div class="cc-ad-metrics">
+                <span>👁 ${num(reach)}</span>
+                ${spend > 0 ? `<span>💰 ${fmt(spend,0)} kr</span>` : ''}
+              </div>
+              ${fmtBadge(ad.format || 'image')}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    };
+
+    content.innerHTML = [
+      renderGroup(metaAds, '📘 Meta (Facebook & Instagram)', '#1877F2'),
+      renderGroup(snapAds, '👻 Snapchat', '#FFFC00'),
+      renderGroup(ttAds,   '🎵 TikTok', '#ff2d55'),
+    ].filter(Boolean).join('');
+  }
+
+  async function loadBudgetRecommendations() {
+    const btn     = el('budget-recs-btn');
+    const content = el('budget-recs-content');
+    const note    = el('budget-recs-cache-note');
+    if (!content) return;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Analyserer…'; }
+    content.innerHTML = '<span style="color:#666">Sender data til AI — 10-20 sekunder…</span>';
+
+    const res = await api('/ads/budget-recommendations', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+    if (btn) { btn.disabled = false; btn.textContent = '💡 Analysér budget'; }
+
+    const d = res.data || {};
+    if (d.error) {
+      content.innerHTML = `<span style="color:#ff6b6b">⚠️ ${d.error}</span>`;
+      return;
+    }
+    if (note && d.cached) note.textContent = '📋 Cachet analyse';
+
+    if (d.analysis) {
+      const lines = d.analysis.split('\n').filter(l => l.trim());
+      content.innerHTML = lines.map(l =>
+        l.match(/^\d+\./) ?
+          `<div style="display:flex;gap:10px;margin-bottom:12px;padding:12px 14px;background:rgba(204,255,0,0.04);border-radius:8px;border-left:3px solid var(--neon)">
+            <div style="color:var(--neon);font-weight:700;flex-shrink:0;font-size:15px">${l.match(/^\d+/)[0]}.</div>
+            <div style="color:#ccc;font-size:13px;line-height:1.7">${l.replace(/^\d+\.\s*/, '')}</div>
+          </div>` : `<p style="color:#888;font-size:12px;margin:4px 0">${l}</p>`
+      ).join('');
+    }
+  }
+
+  // ══ SEO SØGEORDSANBEFALINGER ══════════════════════════════════════════════
+
+  function initKeywordSuggestions() {
+    el('seo-kw-suggestions-btn')?.addEventListener('click', loadKeywordSuggestions);
+  }
+
+  async function loadKeywordSuggestions() {
+    const btn     = el('seo-kw-suggestions-btn');
+    const content = el('seo-kw-suggestions-content');
+    const note    = el('seo-kw-cache-note');
+    if (!content) return;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Analyserer…'; }
+    content.innerHTML = '<div class="rzpa-loading">AI analyserer søgeordslandskab for Rezponz — 15-30 sekunder…</div>';
+
+    const res = await api('/seo/keyword-suggestions', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Hent søgeordsforslag'; }
+    const d = res.data || {};
+
+    if (d.error) {
+      content.innerHTML = `<span style="color:#ff6b6b">⚠️ ${d.error}</span>`;
+      return;
+    }
+    if (note && d.cached) note.textContent = '📋 Cachet — klik igen for ny analyse';
+
+    const kws = d.keywords || [];
+    if (!kws.length) { content.innerHTML = '<span style="color:#555">Ingen søgeordsforslag fundet.</span>'; return; }
+
+    const diffColor = diff => diff === 'Lav' ? '#4ade80' : diff === 'Medium' ? '#f59e0b' : '#ef4444';
+    const volColor  = vol  => vol  === 'Høj' ? '#4ade80' : vol  === 'Medium' ? '#f59e0b' : '#888';
+    const intentMap = { kommerciel: '💼', informativ: '📖', lokal: '📍', rekruttering: '👥' };
+
+    content.innerHTML = `
+      <div style="margin-bottom:14px;font-size:12px;color:#666">
+        ${kws.length} søgeordsforslag — sorteret efter prioritet. Grøn = nem at ranke på, Rød = svær konkurrence.
+      </div>
+      <div class="rzpa-kw-suggestions-grid">
+        ${kws.map((kw, i) => `
+          <div class="rzpa-kw-card">
+            <div class="rzpa-kw-card-header">
+              <div class="rzpa-kw-rank">#${i+1}</div>
+              <div class="rzpa-kw-intent" title="${kw.intent||''}">${intentMap[kw.intent]||'🔍'}</div>
+            </div>
+            <div class="rzpa-kw-phrase">${kw.keyword||''}</div>
+            <div class="rzpa-kw-badges">
+              <span class="rzpa-kw-badge" style="background:${volColor(kw.monthly_searches)}20;color:${volColor(kw.monthly_searches)};border-color:${volColor(kw.monthly_searches)}40">
+                📊 ${kw.monthly_searches||'?'} søgninger
+              </span>
+              <span class="rzpa-kw-badge" style="background:${diffColor(kw.difficulty)}20;color:${diffColor(kw.difficulty)};border-color:${diffColor(kw.difficulty)}40">
+                ${kw.difficulty === 'Lav' ? '✅' : kw.difficulty === 'Medium' ? '⚡' : '🔥'} ${kw.difficulty||'?'} konkurrence
+              </span>
+            </div>
+            <div class="rzpa-kw-action">${kw.action||''}</div>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  // ══ PDF KNAPPER – BETALINGSHISTORIK ════════════════════════════════════════
+
+  // Meta invoice PDF
+  function initMetaInvoicePDF() {
+    el('meta-invoices-pdf')?.addEventListener('click', () => {
+      downloadInvoicePDF(window._metaInvoiceData||[], 'Meta Ads', window._metaInvoiceData?.[0]?.currency||'DKK');
+    });
+  }
+
+  // Google Ads invoice PDF
+  function initGadsInvoicePDF() {
+    el('gads-invoices-pdf')?.addEventListener('click', () => {
+      downloadInvoicePDF(window._gadsInvoiceData||[], 'Google Ads', 'DKK');
     });
   }
 

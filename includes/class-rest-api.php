@@ -195,6 +195,20 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        // SEO keyword suggestions (AI)
+        register_rest_route( self::NS, '/seo/keyword-suggestions', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'seo_keyword_suggestions' ],
+            'permission_callback' => $cap,
+        ] );
+
+        // Budget recommendations (AI)
+        register_rest_route( self::NS, '/ads/budget-recommendations', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'ads_budget_recommendations' ],
+            'permission_callback' => $cap,
+        ] );
+
         // Ryd al data (bruges til at fjerne mock-data fra DB)
         register_rest_route( self::NS, '/clear-data', [
             'methods'             => 'POST',
@@ -844,5 +858,125 @@ class RZPA_REST_API {
         $days  = (int) ( $r->get_json_params()['days'] ?? 30 );
         $title = sanitize_text_field( $r->get_json_params()['title'] ?? '' );
         return RZPA_PDF_Generator::generate( $days, $title );
+    }
+
+    /**
+     * SEO keyword suggestions — AI-genererede søgeords-anbefalinger.
+     * Bruger eksisterende GSC-data + OpenAI til at finde 30 vigtige søgeord.
+     */
+    public static function seo_keyword_suggestions( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        $key  = $opts['openai_api_key'] ?? '';
+        if ( ! $key ) return self::ok( [ 'error' => 'Ingen OpenAI nøgle — tilføj den i Indstillinger' ] );
+
+        $force  = (bool) ( $r->get_json_params()['force'] ?? false );
+        $ck     = 'rzpa_seo_kw_suggestions';
+        $cached = get_transient( $ck );
+        if ( $cached !== false && ! $force ) return self::ok( [ 'keywords' => $cached, 'cached' => true ] );
+
+        // Nuværende GSC-søgeord som kontekst
+        $existing_kw = RZPA_Database::get_top_keywords( 30, 30 );
+        $existing    = implode( ', ', array_column( $existing_kw ?? [], 'keyword' ) );
+
+        $prompt = "Du er en erfaren dansk SEO-ekspert. Rezponz A/S i Aalborg er et professionelt kundeservicecenter og callcenter — de udfører udliciteret kundeservice og telemarketing for andre virksomheder i Danmark.
+
+De ranker allerede på: {$existing}
+
+Lav en liste med præcis 30 ANDRE søgeord/sætninger som Rezponz bør forsøge at rangere på Google for. Prioritér:
+- Sætninger folk bruger når de søger outsourcing af kundeservice
+- Brancherelaterede termer (callcenter, telemarketing, kundeservice, BPO)
+- Geografiske kombinationer (Aalborg, Nordjylland, Danmark)
+- Jobsøgere (kundeservice job, callcenter medarbejder)
+
+Svar KUN med et JSON-array — ingen tekst rundt om. Hvert element skal have præcis disse felter:
+{\"keyword\": \"sætningen her\", \"monthly_searches\": \"Lav|Medium|Høj\", \"difficulty\": \"Lav|Medium|Høj\", \"intent\": \"kommerciel|informativ|lokal|rekruttering\", \"priority\": 1, \"action\": \"Kort konkret anbefaling (max 80 tegn)\"}";
+
+        $ai_res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
+            'timeout' => 45,
+            'headers' => [ 'Authorization' => 'Bearer ' . $key, 'Content-Type' => 'application/json' ],
+            'body'    => wp_json_encode( [
+                'model'       => 'gpt-4o-mini',
+                'messages'    => [ [ 'role' => 'user', 'content' => $prompt ] ],
+                'max_tokens'  => 2500,
+            ] ),
+        ] );
+
+        if ( is_wp_error( $ai_res ) ) return self::ok( [ 'error' => $ai_res->get_error_message() ] );
+        $ai_body = json_decode( wp_remote_retrieve_body( $ai_res ), true );
+        $text    = $ai_body['choices'][0]['message']['content'] ?? '';
+        if ( ! $text ) return self::ok( [ 'error' => $ai_body['error']['message'] ?? 'Ingen svar fra OpenAI' ] );
+
+        // Udtræk JSON-array fra svaret
+        preg_match( '/\[[\s\S]+\]/u', $text, $matches );
+        $keywords = json_decode( $matches[0] ?? '[]', true );
+        if ( ! is_array( $keywords ) || empty( $keywords ) ) {
+            return self::ok( [ 'error' => 'Kunne ikke parse søgeords-data fra AI' ] );
+        }
+
+        // Sortér efter priority
+        usort( $keywords, fn( $a, $b ) => ( $b['priority'] ?? 5 ) <=> ( $a['priority'] ?? 5 ) );
+
+        set_transient( $ck, $keywords, 12 * HOUR_IN_SECONDS );
+        return self::ok( [ 'keywords' => $keywords ] );
+    }
+
+    /**
+     * AI budget-anbefalinger baseret på performance på tværs af kanaler.
+     */
+    public static function ads_budget_recommendations( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        $key  = $opts['openai_api_key'] ?? '';
+        if ( ! $key ) return self::ok( [ 'error' => 'Ingen OpenAI nøgle — tilføj den i Indstillinger' ] );
+
+        $force  = (bool) ( $r->get_json_params()['force'] ?? false );
+        $ck     = 'rzpa_budget_recs';
+        $cached = get_transient( $ck );
+        if ( $cached !== false && ! $force ) return self::ok( [ 'analysis' => $cached, 'cached' => true ] );
+
+        $days   = 30;
+        $meta   = RZPA_Database::get_meta_summary( $days );
+        $gads   = method_exists( 'RZPA_Database', 'get_google_ads_summary' ) ? RZPA_Database::get_google_ads_summary( $days ) : [];
+        $snap   = RZPA_Database::get_snap_summary( $days );
+        $tiktok = RZPA_Database::get_tiktok_summary( $days );
+
+        $lines = [];
+        if ( ! empty( $meta['spend'] ) && $meta['spend'] > 0 ) {
+            $cpc = $meta['clicks'] > 0 ? round( $meta['spend'] / $meta['clicks'], 2 ) : 0;
+            $ctr = $meta['impressions'] > 0 ? round( $meta['clicks'] / $meta['impressions'] * 100, 2 ) : 0;
+            $lines[] = "Meta (Facebook/Instagram): {$meta['spend']} kr brugt · {$meta['clicks']} klik · CPC {$cpc} kr · CTR {$ctr}%";
+        }
+        if ( ! empty( $gads['spend'] ) && $gads['spend'] > 0 ) {
+            $cpc = $gads['clicks'] > 0 ? round( $gads['spend'] / $gads['clicks'], 2 ) : 0;
+            $lines[] = "Google Ads: {$gads['spend']} kr brugt · {$gads['clicks']} klik · CPC {$cpc} kr";
+        }
+        if ( ! empty( $snap['spend'] ) && $snap['spend'] > 0 ) {
+            $lines[] = "Snapchat: {$snap['spend']} kr brugt · {$snap['clicks']} klik";
+        }
+        if ( ! empty( $tiktok['spend'] ) && $tiktok['spend'] > 0 ) {
+            $lines[] = "TikTok: {$tiktok['spend']} kr brugt · {$tiktok['clicks']} klik";
+        }
+
+        if ( empty( $lines ) ) return self::ok( [ 'error' => 'Ingen annoncedata tilgængelig endnu — synkronisér dine platforme først' ] );
+
+        $data_text = implode( "\n", $lines );
+        $prompt    = "Du er en senior dansk digital marketing-strateg. Analyser dette annonceforbrug de seneste 30 dage for Rezponz A/S (B2B kundeservice bureau i Aalborg):\n\n{$data_text}\n\nGiv 4 konkrete, handlingsrettede anbefalinger på dansk:\n1. Hvilken kanal performer bedst og bør skaleres\n2. Hvad der bør optimeres eller pauseres\n3. Konkret anbefalet budget-fordeling i procent\n4. Én specifik ting du skal gøre i dag\n\nVær direkte, brug tal, og svar på dansk. Max 300 ord.";
+
+        $ai_res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
+            'timeout' => 30,
+            'headers' => [ 'Authorization' => 'Bearer ' . $key, 'Content-Type' => 'application/json' ],
+            'body'    => wp_json_encode( [
+                'model'      => 'gpt-4o-mini',
+                'messages'   => [ [ 'role' => 'user', 'content' => $prompt ] ],
+                'max_tokens' => 600,
+            ] ),
+        ] );
+
+        if ( is_wp_error( $ai_res ) ) return self::ok( [ 'error' => $ai_res->get_error_message() ] );
+        $ai_body = json_decode( wp_remote_retrieve_body( $ai_res ), true );
+        $text    = $ai_body['choices'][0]['message']['content'] ?? '';
+        if ( ! $text ) return self::ok( [ 'error' => $ai_body['error']['message'] ?? 'Ingen svar fra OpenAI' ] );
+
+        set_transient( $ck, $text, 4 * HOUR_IN_SECONDS );
+        return self::ok( [ 'analysis' => $text ] );
     }
 }

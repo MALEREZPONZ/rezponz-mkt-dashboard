@@ -188,6 +188,36 @@ $has_openai     = ! empty( $seo_opts['openai_api_key'] );
     </div>
   </div>
 
+  <!-- ══ SØGEORDS-ANBEFALINGER ════════════════════════════════════════════ -->
+  <?php if ( $has_openai ) : ?>
+  <div class="rzpa-card" id="seo-kw-suggestions-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <h2 style="margin:0">🔍 Søgeordsanbefalinger</h2>
+        <div class="rzpa-card-sub" style="margin:4px 0 0">30 vigtige søgeord I bør ranke på — baseret på AI-analyse af jeres branche og konkurrenter</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="font-size:11px;color:#444;font-style:italic" id="seo-kw-cache-note"></div>
+        <button id="seo-kw-suggestions-btn" class="btn-ghost" style="font-size:12px">🔍 Hent søgeordsforslag</button>
+      </div>
+    </div>
+    <div id="seo-kw-suggestions-content" style="font-size:13px;color:#666;line-height:1.8">
+      Klik <strong style="color:#888">"Hent søgeordsforslag"</strong> for at få en AI-genereret liste over søgeord med god trafik som I bør fokusere på.
+    </div>
+  </div>
+  <?php else : ?>
+  <div class="rzpa-card" style="border-color:rgba(204,255,0,.08)">
+    <h2>🔍 Søgeordsanbefalinger</h2>
+    <div class="rzpa-card-sub">Tilføj en OpenAI API-nøgle i Indstillinger for at få AI-genererede søgeordsforslag</div>
+    <a href="<?php echo esc_url( admin_url( 'admin.php?page=rzpa-settings' ) ); ?>" style="display:inline-block;margin-top:12px;font-size:12px;color:var(--neon);text-decoration:none">⚙️ Tilføj OpenAI nøgle →</a>
+  </div>
+  <?php endif; ?>
+
+  <!-- ══ FORKLARING PÅ PLACERINGER ════════════════════════════════════════ -->
+  <div style="background:rgba(245,166,35,.05);border:1px solid rgba(245,166,35,.15);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:12px;color:#888;line-height:1.7">
+    <strong style="color:#f5a623">ℹ️ Om placeringer i tabellen:</strong> Tallene kommer fra Google Search Console og viser den <em>gennemsnitlige</em> placering over den valgte periode — ikke din placering i realtid. Din placering på Google varierer efter søgerens placering, browserhistorik og tidspunkt. Søg inkognito fra Aalborg for det mest præcise billede.
+  </div>
+
   <!-- CTR Optimizer: mange visninger, få klik -->
   <div class="rzpa-card">
     <h2>🎯 CTR-optimering — sider med mange visninger men få klik</h2>

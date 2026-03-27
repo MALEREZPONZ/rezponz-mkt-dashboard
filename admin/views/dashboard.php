@@ -122,4 +122,39 @@
     </div>
   </div>
 
+  <!-- ══ BEDSTE ANNONCER FRA ALLE KANALER ═══════════════════════════════ -->
+  <div class="rzpa-card" id="cross-channel-ads-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <h2 style="margin:0">🏆 Bedste annoncer fra alle kanaler</h2>
+        <div class="rzpa-card-sub" style="margin:4px 0 0">De mest sete aktive annoncer på tværs af Meta, Snapchat og TikTok</div>
+      </div>
+      <button id="cross-channel-load-btn" class="btn-ghost" style="font-size:12px">📊 Hent annoncer</button>
+    </div>
+    <div id="cross-channel-ads-content" style="color:#555;font-size:13px">
+      Klik <strong style="color:#888">"Hent annoncer"</strong> for at se dine bedste annoncecreatives på tværs af platforme.
+    </div>
+  </div>
+
+  <!-- ══ AI BUDGET ANBEFALINGER ══════════════════════════════════════════ -->
+  <?php
+  $dash_opts = get_option( 'rzpa_settings', [] );
+  if ( ! empty( $dash_opts['openai_api_key'] ) ) : ?>
+  <div class="rzpa-card" id="budget-recs-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <h2 style="margin:0">💡 Budget-anbefalinger</h2>
+        <div class="rzpa-card-sub" style="margin:4px 0 0">AI-analyse af dit annoncebudget — hvilken kanal performer bedst og bør have mere?</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="budget-recs-cache-note" style="font-size:11px;color:#444;font-style:italic"></span>
+        <button id="budget-recs-btn" class="btn-ghost" style="font-size:12px">💡 Analysér budget</button>
+      </div>
+    </div>
+    <div id="budget-recs-content" style="font-size:13px;color:#666;line-height:1.8">
+      Klik <strong style="color:#888">"Analysér budget"</strong> for at få AI-anbefalinger til din budget-fordeling.
+    </div>
+  </div>
+  <?php endif; ?>
+
 </div>
