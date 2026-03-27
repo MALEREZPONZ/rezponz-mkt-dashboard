@@ -1018,7 +1018,7 @@ Svar KUN med et JSON-array â€” ingen tekst rundt om. Hvert element skal have prÃ
         $position_map = [];
         foreach ( $gsc_raw as $row ) {
             $k = strtolower( trim( $row['keyword'] ?? '' ) );
-            if ( $k ) $position_map[ $k ] = round( (float) ( $row['position'] ?? 0 ), 1 );
+            if ( $k ) $position_map[ $k ] = round( (float) ( $row['avg_position'] ?? $row['position'] ?? 0 ), 1 );
         }
         foreach ( $keywords as &$kw_item ) {
             $lookup = strtolower( trim( $kw_item['keyword'] ?? '' ) );
