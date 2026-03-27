@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      1.4.8
+ * Version:      1.4.9
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+

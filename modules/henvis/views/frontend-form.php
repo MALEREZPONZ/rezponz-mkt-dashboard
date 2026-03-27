@@ -78,7 +78,7 @@
                     <label for="manager_key"><?php _e( 'Hvilken Senior Manager arbejder du for?', 'rezponz-analytics' ); ?> <span class="req">*</span></label>
                     <select name="manager_key" id="manager_key" required>
                         <option value=""><?php _e( '– Vælg Senior Manager –', 'rezponz-analytics' ); ?></option>
-                        <?php foreach ( RZPZ_Henvis::MANAGERS as $key => $mgr ) : ?>
+                        <?php foreach ( RZPZ_Henvis::get_managers() as $key => $mgr ) : ?>
                             <option value="<?php echo esc_attr( $key ); ?>"
                                 <?php selected( $_POST['manager_key'] ?? '', $key ); ?>>
                                 <?php echo esc_html( $mgr['label'] ); ?>

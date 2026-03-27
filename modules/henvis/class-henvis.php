@@ -7,32 +7,49 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class RZPZ_Henvis {
 
-    const DB_VERSION_KEY = 'rzpz_henvis_db_version';
-    const DB_VERSION     = '1';
+    const DB_VERSION_KEY  = 'rzpz_henvis_db_version';
+    const DB_VERSION      = '1';
+    const MANAGERS_OPTION = 'rzpz_henvis_managers';
 
-    const MANAGERS = [
-        'kasper_telenor'    => [ 'label' => 'Kasper – Telenor',   'email' => 'kapj@rezponz.dk',  'name' => 'Kasper' ],
-        'ahmad_telenor'     => [ 'label' => 'Ahmad – Telenor',    'email' => 'ahre@rezponz.dk',  'name' => 'Ahmad' ],
-        'dana_norlys'       => [ 'label' => 'Dana – Norlys',      'email' => 'dham@rezponz.dk',  'name' => 'Dana' ],
-        'jonas_norlys'      => [ 'label' => 'Jonas – Norlys',     'email' => 'joli@rezponz.dk',  'name' => 'Jonas' ],
-        'rasmus_norlys'     => [ 'label' => 'Rasmus – Norlys',    'email' => 'roj@rezponz.dk',   'name' => 'Rasmus' ],
-        'nicklas_nrgi'      => [ 'label' => 'Nicklas – NRGI',     'email' => 'nli@rezponz.dk',   'name' => 'Nicklas' ],
-        'alexander_cbb'     => [ 'label' => 'Alexander – CBB',    'email' => 'alww@rezponz.dk',  'name' => 'Alexander' ],
+    /** Default managers (used if no custom list saved yet) */
+    const DEFAULT_MANAGERS = [
+        'kasper_telenor'  => [ 'label' => 'Kasper – Telenor',   'email' => 'kapj@rezponz.dk',  'name' => 'Kasper' ],
+        'ahmad_telenor'   => [ 'label' => 'Ahmad – Telenor',    'email' => 'ahre@rezponz.dk',  'name' => 'Ahmad' ],
+        'dana_norlys'     => [ 'label' => 'Dana – Norlys',      'email' => 'dham@rezponz.dk',  'name' => 'Dana' ],
+        'jonas_norlys'    => [ 'label' => 'Jonas – Norlys',     'email' => 'joli@rezponz.dk',  'name' => 'Jonas' ],
+        'rasmus_norlys'   => [ 'label' => 'Rasmus – Norlys',    'email' => 'roj@rezponz.dk',   'name' => 'Rasmus' ],
+        'nicklas_nrgi'    => [ 'label' => 'Nicklas – NRGI',     'email' => 'nli@rezponz.dk',   'name' => 'Nicklas' ],
+        'alexander_cbb'   => [ 'label' => 'Alexander – CBB',    'email' => 'alww@rezponz.dk',  'name' => 'Alexander' ],
     ];
 
     // ── Boot ────────────────────────────────────────────────────────────────────
 
     public static function init() {
-        add_action( 'init', [ __CLASS__, 'maybe_install_db' ] );
-        add_action( 'admin_menu', [ __CLASS__, 'add_admin_menu' ] );
+        add_action( 'init',               [ __CLASS__, 'maybe_install_db' ] );
+        add_action( 'admin_menu',         [ __CLASS__, 'add_admin_menu' ] );
         add_shortcode( 'rezponz_henvis_ven', [ __CLASS__, 'shortcode' ] );
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_frontend' ] );
+
+        // Form handlers
+        add_action( 'admin_post_rzpz_henvis_save_manager',   [ __CLASS__, 'handle_save_manager' ] );
+        add_action( 'admin_post_rzpz_henvis_delete_manager', [ __CLASS__, 'handle_delete_manager' ] );
+        add_action( 'admin_post_rzpz_henvis_test_email',     [ __CLASS__, 'handle_test_email' ] );
     }
 
     public static function maybe_install_db() {
         if ( get_option( self::DB_VERSION_KEY ) !== self::DB_VERSION ) {
             self::install_db();
         }
+    }
+
+    // ── Managers ────────────────────────────────────────────────────────────────
+
+    public static function get_managers() : array {
+        $saved = get_option( self::MANAGERS_OPTION, null );
+        if ( is_array( $saved ) && ! empty( $saved ) ) {
+            return $saved;
+        }
+        return self::DEFAULT_MANAGERS;
     }
 
     // ── Database ────────────────────────────────────────────────────────────────
@@ -75,11 +92,90 @@ class RZPZ_Henvis {
             'rzpz-henvis',
             [ __CLASS__, 'render_admin' ]
         );
+        add_submenu_page(
+            'rzpa-dashboard',
+            __( 'Henvis – Indstillinger', 'rezponz-analytics' ),
+            null, // hidden from menu
+            'manage_options',
+            'rzpz-henvis-settings',
+            [ __CLASS__, 'render_settings' ]
+        );
     }
 
     public static function render_admin() {
         $view = RZPA_DIR . 'modules/henvis/views/admin-henvis-list.php';
         if ( file_exists( $view ) ) include $view;
+    }
+
+    public static function render_settings() {
+        $view = RZPA_DIR . 'modules/henvis/views/admin-henvis-settings.php';
+        if ( file_exists( $view ) ) include $view;
+    }
+
+    // ── Form handlers ───────────────────────────────────────────────────────────
+
+    public static function handle_save_manager() {
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
+        check_admin_referer( 'rzpz_henvis_save_manager' );
+
+        $name  = sanitize_text_field( $_POST['mgr_name']  ?? '' );
+        $label = sanitize_text_field( $_POST['mgr_label'] ?? '' );
+        $email = sanitize_email(      $_POST['mgr_email'] ?? '' );
+
+        if ( ! $name || ! $label || ! is_email( $email ) ) {
+            wp_redirect( admin_url( 'admin.php?page=rzpz-henvis-settings&error=invalid' ) );
+            exit;
+        }
+
+        $managers = self::get_managers();
+        // Generate unique key
+        $key = sanitize_key( $name . '_' . time() );
+        $managers[ $key ] = [ 'name' => $name, 'label' => $label, 'email' => $email ];
+        update_option( self::MANAGERS_OPTION, $managers );
+
+        wp_redirect( admin_url( 'admin.php?page=rzpz-henvis-settings&saved=1' ) );
+        exit;
+    }
+
+    public static function handle_delete_manager() {
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
+        check_admin_referer( 'rzpz_henvis_delete_manager' );
+
+        $key = sanitize_key( $_POST['mgr_key'] ?? '' );
+        $managers = self::get_managers();
+        unset( $managers[ $key ] );
+        update_option( self::MANAGERS_OPTION, $managers );
+
+        wp_redirect( admin_url( 'admin.php?page=rzpz-henvis-settings&deleted=1' ) );
+        exit;
+    }
+
+    public static function handle_test_email() {
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
+        check_admin_referer( 'rzpz_henvis_test_email' );
+
+        $to = sanitize_email( $_POST['test_email'] ?? '' );
+        if ( ! is_email( $to ) ) {
+            wp_redirect( admin_url( 'admin.php?page=rzpz-henvis-settings&error=email' ) );
+            exit;
+        }
+
+        $headers = [
+            'Content-Type: text/html; charset=UTF-8',
+            'From: Rezponz Marketing Platform <no-reply@rezponz.dk>',
+        ];
+        $subject = '✅ Test-email fra Rezponz Marketing Platform';
+        $body    = self::email_wrap( "
+            <p>Hej!</p>
+            <p>Dette er en test-email fra <strong>Rezponz Marketing Platform</strong>.</p>
+            <p>Hvis du modtager denne email, fungerer email-udsendelsen korrekt. 🎉</p>
+            <p>Shortcode til formularen: <code style='background:#111;padding:2px 8px;border-radius:4px;'>[rezponz_henvis_ven]</code></p>
+            <p>Bedste hilsner,<br>Rezponz Marketing Platform</p>
+        " );
+
+        $sent = wp_mail( $to, $subject, $body, $headers );
+        wp_redirect( admin_url( 'admin.php?page=rzpz-henvis-settings&test_sent=' . ( $sent ? '1' : '0' ) ) );
+        exit;
     }
 
     // ── Frontend assets ─────────────────────────────────────────────────────────
@@ -109,15 +205,13 @@ class RZPZ_Henvis {
     public static function shortcode( $atts ) {
         ob_start();
 
-        $result  = null;
+        $result     = null;
         $captcha_ok = false;
 
-        // ── Handle form submission ──────────────────────────────────────────────
         if ( isset( $_POST['rzpz_henvis_submit'] ) ) {
             if ( ! wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'rzpz_henvis_submit' ) ) {
                 $result = [ 'error' => __( 'Sikkerhedstjek fejlede. Prøv igen.', 'rezponz-analytics' ) ];
             } else {
-                // Verify captcha
                 $expected = intval( $_POST['rzpz_captcha_expected'] ?? 0 );
                 $provided = intval( $_POST['rzpz_captcha_answer']   ?? -999 );
                 $hash_in  = hash_hmac( 'sha256', (string) $expected, wp_salt( 'auth' ) );
@@ -132,7 +226,6 @@ class RZPZ_Henvis {
             }
         }
 
-        // ── Generate CAPTCHA numbers ────────────────────────────────────────────
         $a        = wp_rand( 2, 9 );
         $b        = wp_rand( 2, 9 );
         $expected = $a + $b;
@@ -155,23 +248,23 @@ class RZPZ_Henvis {
         $manager_key    = sanitize_key(        $post['manager_key']    ?? '' );
         $consent        = ! empty( $post['rzpz_consent'] );
 
-        // Validate
+        $managers = self::get_managers();
+
         if ( ! $referrer_name || ! $referrer_email || ! $friend_name || ! $friend_email ) {
             return [ 'error' => __( 'Udfyld venligst alle påkrævede felter.', 'rezponz-analytics' ) ];
         }
         if ( ! is_email( $referrer_email ) || ! is_email( $friend_email ) ) {
             return [ 'error' => __( 'En eller begge email-adresser er ugyldige.', 'rezponz-analytics' ) ];
         }
-        if ( ! isset( self::MANAGERS[ $manager_key ] ) ) {
+        if ( ! isset( $managers[ $manager_key ] ) ) {
             return [ 'error' => __( 'Vælg venligst en Senior Manager.', 'rezponz-analytics' ) ];
         }
         if ( ! $consent ) {
             return [ 'error' => __( 'Du skal bekræfte at din ven er okay med at blive kontaktet.', 'rezponz-analytics' ) ];
         }
 
-        $manager = self::MANAGERS[ $manager_key ];
+        $manager = $managers[ $manager_key ];
 
-        // Store in DB
         global $wpdb;
         $wpdb->insert(
             $wpdb->prefix . 'rzpz_referrals',
@@ -189,7 +282,6 @@ class RZPZ_Henvis {
             [ '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ]
         );
 
-        // Send emails
         self::send_emails( $referrer_name, $referrer_email, $friend_name, $friend_email, $manager );
 
         return [ 'success' => true ];
@@ -198,46 +290,56 @@ class RZPZ_Henvis {
     // ── Emails ──────────────────────────────────────────────────────────────────
 
     private static function send_emails( $referrer_name, $referrer_email, $friend_name, $friend_email, $manager ) {
-        $headers = [ 'Content-Type: text/html; charset=UTF-8' ];
-        $from    = 'Rezponz Marketing Platform <no-reply@rezponz.dk>';
-        $headers[] = 'From: ' . $from;
+        $headers = [
+            'Content-Type: text/html; charset=UTF-8',
+            'From: Rezponz Marketing Platform <no-reply@rezponz.dk>',
+        ];
 
         // Email 1 – To Senior Manager
-        $subject1 = sprintf( '🙌 %s har lige henvist en ven til Rezponz!', $referrer_name );
-        $body1 = self::email_wrap( "
-            <p>Hej {$manager['name']}!</p>
-            <p>Gode nyheder – <strong>{$referrer_name}</strong> har netop henvist <strong>{$friend_name}</strong> til at søge en stilling hos Rezponz. Det er præcis den slags engagement, der gør vores team stærkt! 💪</p>
-            <p><strong>{$friend_name}</strong> er nu informeret og har fået et link til at søge. Din opgave er nu at tage kontakten til vores medarbejder og max motivér dem. 🚀</p>
-            <p>Bedste hilsner,<br>Rezponz Marketing Platform</p>
-        " );
-        wp_mail( $manager['email'], $subject1, $body1, $headers );
+        wp_mail(
+            $manager['email'],
+            sprintf( '🙌 %s har lige henvist en ven til Rezponz!', $referrer_name ),
+            self::email_wrap( "
+                <p>Hej {$manager['name']}!</p>
+                <p>Gode nyheder – <strong>{$referrer_name}</strong> har netop henvist <strong>{$friend_name}</strong> til at søge en stilling hos Rezponz. Det er præcis den slags engagement, der gør vores team stærkt! 💪</p>
+                <p><strong>{$friend_name}</strong> er nu informeret og har fået et link til at søge. Din opgave er nu at tage kontakten til vores medarbejder og max motivér dem. 🚀</p>
+                <p>Bedste hilsner,<br>Rezponz Marketing Platform</p>
+            " ),
+            $headers
+        );
 
         // Email 2 – To the friend
-        $subject2 = sprintf( '👋 %s tror på dig – søg en stilling hos Rezponz!', $referrer_name );
-        $body2 = self::email_wrap( "
-            <p>Hej {$friend_name}!</p>
-            <p>Du er lige blevet henvist af <strong>{$referrer_name}</strong>, som mener at du ville passe perfekt ind hos os hos <strong>Rezponz</strong>.</p>
-            <p>Det er ikke tilfældigt – når en af vores egne peger på dig, så betyder det noget. Og vi vil rigtig gerne lære dig at kende.</p>
-            <p>Hos Rezponz arbejder vi med salg på vegne af nogle af Danmarks største brands. Vi er et ungt, ambitiøst team, der tror på at de rigtige mennesker kan nå langt – med den rette støtte og de rette muligheder.</p>
-            <p><strong>Er du klar til at tage skridtet?</strong></p>
-            <p>👉 <a href=\"https://rezponz.dk/karriere-stillinger/\" style=\"color:#CCFF00;\">Søg en stilling her</a></p>
-            <p>Vi glæder os til at høre fra dig!</p>
-            <p>Bedste hilsner,<br>Rezponz – Karriere &amp; Rekruttering</p>
-        " );
-        wp_mail( $friend_email, $subject2, $body2, $headers );
+        wp_mail(
+            $friend_email,
+            sprintf( '👋 %s tror på dig – søg en stilling hos Rezponz!', $referrer_name ),
+            self::email_wrap( "
+                <p>Hej {$friend_name}!</p>
+                <p>Du er lige blevet henvist af <strong>{$referrer_name}</strong>, som mener at du ville passe perfekt ind hos os hos <strong>Rezponz</strong>.</p>
+                <p>Det er ikke tilfældigt – når en af vores egne peger på dig, så betyder det noget. Og vi vil rigtig gerne lære dig at kende.</p>
+                <p>Hos Rezponz arbejder vi med salg på vegne af nogle af Danmarks største brands. Vi er et ungt, ambitiøst team, der tror på at de rigtige mennesker kan nå langt – med den rette støtte og de rette muligheder.</p>
+                <p><strong>Er du klar til at tage skridtet?</strong></p>
+                <p>👉 <a href=\"https://rezponz.dk/karriere-stillinger/\" style=\"color:#CCFF00;\">Søg en stilling her</a></p>
+                <p>Vi glæder os til at høre fra dig!</p>
+                <p>Bedste hilsner,<br>Rezponz – Karriere &amp; Rekruttering</p>
+            " ),
+            $headers
+        );
 
         // Email 3 – To the referrer
-        $subject3 = '✅ Tak for din henvisning – vi tager det herfra!';
-        $body3 = self::email_wrap( "
-            <p>Hej {$referrer_name}!</p>
-            <p>Tusind tak for at du henviste <strong>{$friend_name}</strong> til Rezponz. Det sætter vi stor pris på! 🙌</p>
-            <p>Vi har nu sendt <strong>{$friend_name}</strong> en mail med et link til vores ansøgningsskema, og din Senior Manager <strong>{$manager['name']}</strong> er også blevet notificeret og klar til at følge op.</p>
-            <p>Du behøver ikke gøre mere – men hvis du vil give din ven et ekstra personligt skub, er det aldrig forkert. 😊</p>
-            <p>Husk: Hvis din ven får tilbudt en stilling hos Rezponz, udløser det en <strong>bonus til dig på 500 kr.</strong></p>
-            <p>Godt gået – og tak fordi du tror på Rezponz!</p>
-            <p>Bedste hilsner,<br>Rezponz Marketing Platform</p>
-        " );
-        wp_mail( $referrer_email, $subject3, $body3, $headers );
+        wp_mail(
+            $referrer_email,
+            '✅ Tak for din henvisning – vi tager det herfra!',
+            self::email_wrap( "
+                <p>Hej {$referrer_name}!</p>
+                <p>Tusind tak for at du henviste <strong>{$friend_name}</strong> til Rezponz. Det sætter vi stor pris på! 🙌</p>
+                <p>Vi har nu sendt <strong>{$friend_name}</strong> en mail med et link til vores ansøgningsskema, og din Senior Manager <strong>{$manager['name']}</strong> er også blevet notificeret og klar til at følge op.</p>
+                <p>Du behøver ikke gøre mere – men hvis du vil give din ven et ekstra personligt skub, er det aldrig forkert. 😊</p>
+                <p>Husk: Hvis din ven får tilbudt en stilling hos Rezponz, udløser det en <strong>bonus til dig på 500 kr.</strong></p>
+                <p>Godt gået – og tak fordi du tror på Rezponz!</p>
+                <p>Bedste hilsner,<br>Rezponz Marketing Platform</p>
+            " ),
+            $headers
+        );
     }
 
     private static function email_wrap( string $inner ): string {
