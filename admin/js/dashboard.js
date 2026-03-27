@@ -1874,42 +1874,119 @@ const RZPA_App = (() => {
         </div>`;
     }
 
-    // Fakturaer
-    el('meta-invoices-load')?.addEventListener('click', async () => {
+    // ── Fakturaer / Transaktioner ─────────────────────────────────────────
+    async function loadMetaInvoices(force = false) {
       const btn     = el('meta-invoices-load');
       const content = el('meta-invoices-content');
-      const csvBtn  = el('meta-invoices-csv');
-      if (btn) { btn.disabled = true; btn.textContent = '⏳ Henter…'; }
-      const res = await api('/meta/invoices');
-      if (btn) { btn.disabled = false; btn.textContent = '⬇ Hent betalinger'; }
+      const since   = el('meta-inv-since')?.value || '';
+      const until   = el('meta-inv-until')?.value || '';
+      if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+      const params = new URLSearchParams({ since, until });
+      if (force) params.set('force', '1');
+      const res = await api('/meta/invoices?' + params.toString());
+      if (btn) { btn.disabled = false; btn.textContent = '⟳ Hent'; }
       if (!content) return;
       const data = res?.data || [];
       if (data.error) {
-        content.innerHTML = `<span style="color:#ff6b6b">⚠️ ${data.error}</span>`;
+        content.innerHTML = `<div style="color:#ef4444;padding:16px">⚠️ ${data.error}</div>`;
         return;
       }
-      if (!data.length) {
-        content.innerHTML = '<span style="color:#555">Ingen betalinger fundet — kontrollér at din token har billing-adgang.</span>';
+      if (!Array.isArray(data) || !data.length) {
+        content.innerHTML = '<div style="color:#555;padding:16px;text-align:center">Ingen transaktioner fundet i den valgte periode.</div>';
         return;
       }
-      // Gem til CSV/PDF-eksport
       window._metaInvoiceData = data;
+      const csvBtn = el('meta-invoices-csv');
+      const pdfBtn = el('meta-invoices-pdf');
       if (csvBtn) csvBtn.style.display = 'inline-flex';
-      const pdfBtnMeta = el('meta-invoices-pdf');
-      if (pdfBtnMeta) pdfBtnMeta.style.display = 'inline-flex';
-      renderInvoiceTable(content, data, 'Meta', '#1877F2');
-    });
+      if (pdfBtn) pdfBtn.style.display = 'inline-flex';
+      renderMetaTransactions(content, data);
+    }
+
+    function renderMetaTransactions(container, data) {
+      const total = data.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+      const currency = data[0]?.currency || 'DKK';
+      const hasIds   = data.some(r => r.transaction_id);
+
+      const statusBadge = s => {
+        const map = { SETTLED:'#4ade80', PAID:'#4ade80', COMPLETED:'#4ade80', FAILED:'#ef4444', PENDING:'#f59e0b', VOID:'#888' };
+        const col = map[s?.toUpperCase()] || '#888';
+        const label = s === 'SETTLED' || s === 'PAID' ? 'Betalt' : s === 'FAILED' ? 'Fejlet' : s === 'PENDING' ? 'Afventer' : s || 'Betalt';
+        return `<span style="display:inline-flex;align-items:center;gap:4px;background:${col}18;color:${col};border:1px solid ${col}40;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600">${label}</span>`;
+      };
+
+      const fmtDate = d => {
+        if (!d) return '–';
+        const [y,m,day] = d.split('-');
+        const months = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+        return `${parseInt(day,10)}. ${months[parseInt(m,10)-1]} ${y}`;
+      };
+
+      const shortTxId = id => {
+        if (!id) return '–';
+        const parts = id.split('-');
+        if (parts.length >= 2) return parts[0].slice(-8) + '-' + parts[1].slice(-8);
+        return id.slice(-16);
+      };
+
+      container.innerHTML = `
+        <div style="display:flex;gap:24px;flex-wrap:wrap;padding:14px 18px;background:rgba(24,119,242,.06);border-radius:10px;border:1px solid rgba(24,119,242,.15);margin-bottom:16px">
+          <div><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Samlet forbrug</div>
+               <div style="font-size:22px;font-weight:700;color:#fff">${fmt(total,2)} ${currency}</div></div>
+          <div><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Transaktioner</div>
+               <div style="font-size:22px;font-weight:700;color:#fff">${data.length}</div></div>
+        </div>
+        <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:#1a1a1a">
+              ${hasIds ? '<th style="padding:10px 12px;text-align:left;color:#888;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #2a2a2a">Transaktions-ID</th>' : ''}
+              <th style="padding:10px 12px;text-align:left;color:#888;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #2a2a2a">Dato</th>
+              <th style="padding:10px 12px;text-align:right;color:#888;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #2a2a2a">Beløb</th>
+              <th style="padding:10px 12px;text-align:left;color:#888;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #2a2a2a">Status</th>
+              ${hasIds ? '<th style="padding:10px 12px;text-align:left;color:#888;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #2a2a2a">Momsfakturerings-ID</th>' : ''}
+              <th style="padding:10px 12px;text-align:center;color:#888;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #2a2a2a">Handling</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map(r => `
+              <tr style="border-bottom:1px solid #1e1e1e" onmouseenter="this.style.background='rgba(255,255,255,.025)'" onmouseleave="this.style.background=''">
+                ${hasIds ? `<td style="padding:12px;color:#aaa;font-family:monospace;font-size:11px">${shortTxId(r.transaction_id)}</td>` : ''}
+                <td style="padding:12px;color:#ccc">${fmtDate(r.date)}</td>
+                <td style="padding:12px;text-align:right;font-weight:700;color:#fff">${fmt(parseFloat(r.amount||0),2)} ${r.currency||currency}</td>
+                <td style="padding:12px">${statusBadge(r.status)}</td>
+                ${hasIds ? `<td style="padding:12px;color:#aaa;font-size:12px;font-family:monospace">${r.invoice_id || '–'}</td>` : ''}
+                <td style="padding:12px;text-align:center">
+                  <a href="${r.download_url || '#'}" target="_blank" rel="noopener"
+                     style="display:inline-flex;align-items:center;gap:4px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#ccc;font-size:11px;font-weight:500;padding:5px 10px;text-decoration:none;transition:all .15s"
+                     onmouseenter="this.style.borderColor='#1877F2';this.style.color='#1877F2'"
+                     onmouseleave="this.style.borderColor='#333';this.style.color='#ccc'">
+                    ⬇ Download
+                  </a>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+        </div>`;
+    }
+
+    el('meta-invoices-load')?.addEventListener('click', () => loadMetaInvoices(true));
+    el('meta-inv-since')?.addEventListener('change', () => loadMetaInvoices());
+    el('meta-inv-until')?.addEventListener('change', () => loadMetaInvoices());
+
+    // Auto-load ved sideindlæsning
+    if (el('meta-invoices-card')) loadMetaInvoices();
 
     el('meta-invoices-csv')?.addEventListener('click', () => {
       const data = window._metaInvoiceData || [];
       if (!data.length) return;
-      const header = 'Måned,Forbrug,Visninger,Klik,Valuta';
-      const rows = data.map(r => `${r.month},${r.amount},${r.impressions||0},${r.clicks||0},${r.currency}`);
+      const header = 'Dato,Beløb,Valuta,Status,Faktura-ID,Transaktions-ID';
+      const rows = data.map(r => `"${r.date}","${r.amount}","${r.currency}","${r.status}","${r.invoice_id||''}","${r.transaction_id||''}"`);
       const csv = [header, ...rows].join('\n');
       const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'meta-betalinger-' + new Date().toISOString().slice(0,10) + '.csv';
+      a.download = 'meta-transaktioner-' + new Date().toISOString().slice(0,10) + '.csv';
       a.click();
     });
 

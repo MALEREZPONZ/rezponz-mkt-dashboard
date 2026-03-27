@@ -196,17 +196,24 @@ $has_openai = ! empty( $meta_opts['openai_api_key'] );
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
       <div>
         <h2 style="margin:0">🧾 Betalingshistorik</h2>
-        <div class="rzpa-card-sub" style="margin:4px 0 0">Dine betalinger til Meta — hentes direkte fra din annoncekonto</div>
+        <div class="rzpa-card-sub" style="margin:4px 0 0">Dine transaktioner fra Meta — med faktura-ID og direkte download</div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button id="meta-invoices-load" class="btn-ghost" style="font-size:12px">⬇ Hent betalinger</button>
-        <button id="meta-invoices-csv" class="btn-ghost" style="font-size:12px;display:none">📥 Eksportér CSV</button>
-        <button id="meta-invoices-pdf" class="btn-ghost" style="font-size:12px;display:none">🖨 Download PDF</button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="date" id="meta-inv-since" class="rzpa-date-input"
+               value="<?php echo esc_attr( gmdate('Y-m-d', strtotime('-90 days')) ); ?>"
+               style="background:#1a1a1a;border:1px solid #333;color:#ccc;border-radius:6px;padding:5px 8px;font-size:12px">
+        <span style="color:#555;font-size:12px">til</span>
+        <input type="date" id="meta-inv-until" class="rzpa-date-input"
+               value="<?php echo esc_attr( gmdate('Y-m-d') ); ?>"
+               style="background:#1a1a1a;border:1px solid #333;color:#ccc;border-radius:6px;padding:5px 8px;font-size:12px">
+        <button id="meta-invoices-load" class="btn-ghost" style="font-size:12px">⟳ Hent</button>
+        <button id="meta-invoices-csv" class="btn-ghost" style="font-size:12px;display:none">📥 CSV</button>
+        <button id="meta-invoices-pdf" class="btn-ghost" style="font-size:12px;display:none">🖨 PDF</button>
         <a href="https://business.facebook.com/billing_hub/payment_activity" target="_blank" class="btn-ghost" style="font-size:12px;text-decoration:none">🔗 Åbn i Meta</a>
       </div>
     </div>
     <div id="meta-invoices-content" style="color:#555;font-size:13px">
-      Klik <strong style="color:#888">"Hent betalinger"</strong> for at indlæse din betalingshistorik fra Meta.
+      <div style="text-align:center;padding:24px;color:#444">⏳ Henter transaktioner…</div>
     </div>
   </div>
 

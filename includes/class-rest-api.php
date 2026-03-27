@@ -437,12 +437,22 @@ class RZPA_REST_API {
         return self::ok( [ 'count' => count( $rows ), 'days' => $days ] );
     }
 
-    public static function meta_invoices() {
-        $key    = 'rzpa_meta_invoices';
-        $cached = get_transient( $key );
-        if ( $cached !== false ) return self::ok( $cached );
-        $data = RZPA_Meta_Ads::fetch_invoices();
-        if ( ! isset( $data['error'] ) ) set_transient( $key, $data, HOUR_IN_SECONDS );
+    public static function meta_invoices( WP_REST_Request $r ) {
+        $since = sanitize_text_field( $r->get_param( 'since' ) ?: '' );
+        $until = sanitize_text_field( $r->get_param( 'until' ) ?: '' );
+        $force = (bool) $r->get_param( 'force' );
+
+        // Cache-nøgle inkluderer datofilter
+        $key = 'rzpa_meta_invoices_' . md5( $since . '|' . $until );
+        if ( ! $force ) {
+            $cached = get_transient( $key );
+            if ( $cached !== false ) return self::ok( $cached );
+        } else {
+            delete_transient( $key );
+        }
+
+        $data = RZPA_Meta_Ads::fetch_invoices( $since, $until );
+        if ( ! isset( $data['error'] ) ) set_transient( $key, $data, 30 * MINUTE_IN_SECONDS );
         return self::ok( $data );
     }
 

@@ -219,17 +219,70 @@ class RZPA_Meta_Ads {
      * Henter betalingshistorik fra Meta Ads.
      * Bruger /insights med monthly breakdown – virker for alle annoncekonto-typer.
      */
-    public static function fetch_invoices() : array {
+    /**
+     * Henter rigtige transaktioner fra Meta Ads API (ikke insights-aggregater).
+     * Returnerer transaction_id, dato, beløb, betalingsstatus, momsfaktura-ID og download-link.
+     *
+     * @param string $since  Dato format YYYY-MM-DD (default: 1 år bagud)
+     * @param string $until  Dato format YYYY-MM-DD (default: i dag)
+     */
+    public static function fetch_invoices( string $since = '', string $until = '' ) : array {
         $opts = get_option( 'rzpa_settings', [] );
         if ( empty( $opts['meta_access_token'] ) || empty( $opts['meta_ad_account_id'] ) ) return [];
 
         $token      = $opts['meta_access_token'];
         $account_id = $opts['meta_ad_account_id'];
 
-        // Hent månedligt forbrug via insights — op til 36 måneder bagud og frem til i dag
-        $since = gmdate( 'Y-m-d', strtotime( '-36 months' ) );
-        $until = gmdate( 'Y-m-d' ); // altid dags dato
+        if ( ! $since ) $since = gmdate( 'Y-m-d', strtotime( '-12 months' ) );
+        if ( ! $until ) $until = gmdate( 'Y-m-d' );
 
+        // ── Trin 1: Hent transaktioner fra /transactions endpoint ─────────────
+        $url = self::API_BASE . '/act_' . $account_id . '/transactions?' . http_build_query( [
+            'access_token' => $token,
+            'fields'       => 'id,created_time,amount,currency,status,vat_invoice_id,payment_option,billing_reason',
+            'time_range'   => wp_json_encode( [ 'since' => $since, 'until' => $until ] ),
+            'limit'        => 200,
+        ] );
+
+        $res  = wp_remote_get( $url, [ 'timeout' => 20 ] );
+        if ( is_wp_error( $res ) ) return [ 'error' => $res->get_error_message() ];
+
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
+
+        // Fallback: hvis transactions-endpoint ikke returnerer data, brug insights
+        if ( ! empty( $body['error'] ) || empty( $body['data'] ) ) {
+            return self::fetch_invoices_from_insights( $token, $account_id, $since, $until );
+        }
+
+        $rows = [];
+        foreach ( $body['data'] as $t ) {
+            $invoice_id  = $t['vat_invoice_id'] ?? '';
+            $download_url = $invoice_id
+                ? 'https://business.facebook.com/billing_hub/invoice?invoice_id=' . rawurlencode( $invoice_id )
+                    . '&business_id=' . $account_id
+                : 'https://business.facebook.com/billing_hub/payment_activity';
+
+            $rows[] = [
+                'transaction_id' => $t['id'] ?? '',
+                'date'           => substr( $t['created_time'] ?? '', 0, 10 ),
+                'month'          => substr( $t['created_time'] ?? '', 0, 7 ),
+                'amount'         => round( (float) ( $t['amount'] ?? 0 ), 2 ),
+                'currency'       => strtoupper( $t['currency'] ?? 'DKK' ),
+                'status'         => $t['status'] ?? 'SETTLED',
+                'invoice_id'     => $invoice_id,
+                'payment_option' => $t['payment_option'] ?? '',
+                'billing_reason' => $t['billing_reason'] ?? '',
+                'download_url'   => $download_url,
+            ];
+        }
+
+        // Sortér nyeste først
+        usort( $rows, fn($a,$b) => strcmp($b['date'], $a['date']) );
+        return $rows;
+    }
+
+    /** Fallback: månedligt forbrug fra insights hvis transactions-endpoint fejler */
+    private static function fetch_invoices_from_insights( string $token, string $account_id, string $since, string $until ) : array {
         $url = self::API_BASE . '/act_' . $account_id . '/insights?' . http_build_query( [
             'access_token'   => $token,
             'fields'         => 'spend,impressions,clicks,account_currency',
@@ -237,34 +290,29 @@ class RZPA_Meta_Ads {
             'time_range'     => wp_json_encode( [ 'since' => $since, 'until' => $until ] ),
             'limit'          => 100,
         ] );
-
         $res  = wp_remote_get( $url, [ 'timeout' => 20 ] );
         if ( is_wp_error( $res ) ) return [ 'error' => $res->get_error_message() ];
-
         $body = json_decode( wp_remote_retrieve_body( $res ), true );
         if ( ! empty( $body['error'] ) ) return [ 'error' => $body['error']['message'] ?? 'API fejl' ];
 
         $rows = [];
         foreach ( $body['data'] ?? [] as $t ) {
-            $start = $t['date_start'] ?? '';
-            $month = substr( $start, 0, 7 ); // YYYY-MM
-            // Link til Meta Business billing-side for den specifikke måned
-            $end_of_month = gmdate( 'Y-m-d', strtotime( 'last day of ' . $month ) );
-            $billing_url  = 'https://business.facebook.com/billing_hub/payment_activity'
-                . '?start_date=' . $month . '-01&end_date=' . $end_of_month;
-
+            $month = substr( $t['date_start'] ?? '', 0, 7 );
             $rows[] = [
-                'month'       => $month,
-                'date'        => $start,
-                'amount'      => round( (float) ( $t['spend'] ?? 0 ), 2 ),
-                'currency'    => strtoupper( $t['account_currency'] ?? 'DKK' ),
-                'impressions' => (int) ( $t['impressions'] ?? 0 ),
-                'clicks'      => (int) ( $t['clicks'] ?? 0 ),
-                'status'      => 'SETTLED',
-                'billing_url' => $billing_url,
+                'transaction_id' => '',
+                'date'           => $t['date_start'] ?? '',
+                'month'          => $month,
+                'amount'         => round( (float) ( $t['spend'] ?? 0 ), 2 ),
+                'currency'       => strtoupper( $t['account_currency'] ?? 'DKK' ),
+                'status'         => 'SETTLED',
+                'invoice_id'     => '',
+                'payment_option' => '',
+                'billing_reason' => '',
+                'impressions'    => (int) ( $t['impressions'] ?? 0 ),
+                'clicks'         => (int) ( $t['clicks'] ?? 0 ),
+                'download_url'   => 'https://business.facebook.com/billing_hub/payment_activity',
             ];
         }
-        // Sortér nyeste først
         usort( $rows, fn($a,$b) => strcmp($b['date'], $a['date']) );
         return $rows;
     }
