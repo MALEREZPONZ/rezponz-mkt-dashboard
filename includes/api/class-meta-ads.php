@@ -5,6 +5,8 @@ class RZPA_Meta_Ads {
 
     const API_BASE = 'https://graph.facebook.com/v19.0';
 
+    public static $last_error = null;
+
     public static function fetch( int $days = 30 ) : array {
         $opts = get_option( 'rzpa_settings', [] );
 
@@ -274,6 +276,7 @@ class RZPA_Meta_Ads {
     public static function fetch_top_ads( int $days = 30 ) : array {
         $opts = get_option( 'rzpa_settings', [] );
         if ( empty( $opts['meta_access_token'] ) || empty( $opts['meta_ad_account_id'] ) ) {
+            self::$last_error = 'Meta Ads er ikke konfigureret (mangler access token eller konto-ID)';
             return [];
         }
 
@@ -282,27 +285,67 @@ class RZPA_Meta_Ads {
         $since      = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
         $until      = gmdate( 'Y-m-d' );
 
-        // Hent aktive + pauserede annoncer med creative data + insights
-        $url = self::API_BASE . '/act_' . $account_id . '/ads?' . http_build_query( [
-            'access_token'     => $token,
-            'fields'           => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec{link_data{picture,image_url,name,child_attachments{picture}},video_data{image_url},photo_data{images{original{uri}}}}},insights.time_range({"since":"' . $since . '","until":"' . $until . '"}){reach,impressions,spend,clicks,cpc,cpm}',
-            'effective_status' => '["ACTIVE","PAUSED"]',
-            'limit'            => 100,
+        // ── Trin 1: Hent performance-metrics via /insights endpoint ──────────
+        // Bruger dedikeret insights-endpoint i stedet for field expansion (mere pålidelig)
+        $insights_url = self::API_BASE . '/act_' . $account_id . '/insights?' . http_build_query( [
+            'access_token' => $token,
+            'level'        => 'ad',
+            'time_range'   => wp_json_encode( [ 'since' => $since, 'until' => $until ] ),
+            'fields'       => 'ad_id,ad_name,reach,impressions,spend,clicks,cpc,cpm',
+            'sort'         => 'reach_descending',
+            'limit'        => 25,
         ] );
 
-        $res = wp_remote_get( $url, [ 'timeout' => 30 ] );
-        if ( is_wp_error( $res ) ) return [];
+        $res = wp_remote_get( $insights_url, [ 'timeout' => 30 ] );
+        if ( is_wp_error( $res ) ) {
+            self::$last_error = $res->get_error_message();
+            return [];
+        }
 
+        $http = wp_remote_retrieve_response_code( $res );
         $body = json_decode( wp_remote_retrieve_body( $res ), true );
-        if ( ! empty( $body['error'] ) ) return [];
 
+        if ( ! empty( $body['error'] ) ) {
+            self::$last_error = $body['error']['message'] ?? "Meta API fejl (HTTP {$http})";
+            return [];
+        }
+
+        if ( empty( $body['data'] ) ) return [];
+
+        // Byg metrics-map: ad_id → row
+        $metrics = [];
+        foreach ( $body['data'] as $row ) {
+            if ( ! empty( $row['ad_id'] ) ) {
+                $metrics[ $row['ad_id'] ] = $row;
+            }
+        }
+        if ( empty( $metrics ) ) return [];
+
+        // ── Trin 2: Hent creative-data for disse annoncer ────────────────────
+        $ad_ids    = array_keys( $metrics );
+        $ads_data  = [];
+        $batch_url = self::API_BASE . '?' . http_build_query( [
+            'access_token' => $token,
+            'ids'          => implode( ',', $ad_ids ),
+            'fields'       => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec{link_data{picture,image_url,child_attachments{picture}},video_data{image_url},photo_data{images{original{uri}}}}}',
+        ] );
+
+        $res2 = wp_remote_get( $batch_url, [ 'timeout' => 30 ] );
+        if ( ! is_wp_error( $res2 ) ) {
+            $body2 = json_decode( wp_remote_retrieve_body( $res2 ), true );
+            if ( ! empty( $body2 ) && empty( $body2['error'] ) ) {
+                $ads_data = $body2;
+            }
+        }
+
+        // ── Trin 3: Join metrics + creative og byg output ────────────────────
         $rows = [];
-        foreach ( $body['data'] ?? [] as $ad ) {
+        foreach ( $ad_ids as $ad_id ) {
+            $m        = $metrics[ $ad_id ];
+            $ad       = $ads_data[ $ad_id ] ?? [];
             $creative = $ad['creative'] ?? [];
-            $insights = $ad['insights']['data'][0] ?? [];
+            $spec     = $creative['object_story_spec'] ?? [];
 
-            // Bestem format
-            $spec = $creative['object_story_spec'] ?? [];
             $format = 'image';
             if ( ! empty( $creative['video_id'] ) || isset( $spec['video_data'] ) ) {
                 $format = 'video';
@@ -310,24 +353,23 @@ class RZPA_Meta_Ads {
                 $format = 'carousel';
             }
 
-            $reach = (int) ( $insights['reach'] ?? 0 );
-            $impressions = (int) ( $insights['impressions'] ?? 0 );
-            $clicks = (int) ( $insights['clicks'] ?? 0 );
-            $spend = round( (float) ( $insights['spend'] ?? 0 ), 2 );
-
-            // Byg bedste tilgængelige billede-URL — prioritér CDN-urls der ikke kræver auth
-            $img = $spec['link_data']['picture'] ?? ''          // Link-annoncer – mest pålidelig
-                ?: ( $spec['link_data']['image_url'] ?? '' )
-                ?: ( $spec['video_data']['image_url'] ?? '' )   // Video-thumbnail fra object_story_spec
+            $img = $spec['link_data']['picture']                  ?? ''
+                ?: ( $spec['link_data']['image_url']              ?? '' )
+                ?: ( $spec['video_data']['image_url']             ?? '' )
                 ?: ( $spec['photo_data']['images']['original']['uri'] ?? '' )
-                ?: ( $creative['image_url'] ?? '' )
-                ?: ( $creative['thumbnail_url'] ?? '' );        // Sidst – kræver undertiden auth
+                ?: ( $creative['image_url']                       ?? '' )
+                ?: ( $creative['thumbnail_url']                   ?? '' );
+
+            $reach       = (int)   ( $m['reach']       ?? 0 );
+            $impressions = (int)   ( $m['impressions'] ?? 0 );
+            $clicks      = (int)   ( $m['clicks']      ?? 0 );
+            $spend       = round( (float) ( $m['spend'] ?? 0 ), 2 );
 
             $rows[] = [
-                'ad_id'         => $ad['id'] ?? '',
-                'ad_name'       => $ad['name'] ?? '',
-                'status'        => $ad['effective_status'] ?? '',
-                'creative_id'   => $creative['id'] ?? '',
+                'ad_id'         => $ad_id,
+                'ad_name'       => $m['ad_name']              ?? ( $ad['name'] ?? '' ),
+                'status'        => $ad['effective_status']    ?? 'ACTIVE',
+                'creative_id'   => $creative['id']            ?? '',
                 'thumbnail_url' => $img,
                 'image_url'     => $img,
                 'has_video'     => $format === 'video',
@@ -336,14 +378,12 @@ class RZPA_Meta_Ads {
                 'impressions'   => $impressions,
                 'spend'         => $spend,
                 'clicks'        => $clicks,
-                'cpc'           => round( (float) ( $insights['cpc'] ?? 0 ), 2 ),
-                'cpm'           => round( (float) ( $insights['cpm'] ?? 0 ), 2 ),
+                'cpc'           => round( (float) ( $m['cpc'] ?? 0 ), 2 ),
+                'cpm'           => round( (float) ( $m['cpm'] ?? 0 ), 2 ),
                 'ctr'           => $impressions > 0 ? round( $clicks / $impressions * 100, 2 ) : 0,
             ];
         }
 
-        // Sortér efter reach (højest først)
-        usort( $rows, fn($a, $b) => $b['reach'] <=> $a['reach'] );
         return $rows;
     }
 

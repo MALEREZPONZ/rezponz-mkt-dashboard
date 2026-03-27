@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      1.4.4
+ * Version:      1.4.6
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '1.4.4' );
+define( 'RZPA_VERSION',     '1.4.6' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -32,18 +32,39 @@ require_once RZPA_DIR . 'includes/api/class-google-ads.php';
 require_once RZPA_DIR . 'includes/class-rest-api.php';
 require_once RZPA_DIR . 'includes/class-admin.php';
 
-register_activation_hook( __FILE__, [ 'RZPA_Database', 'install' ] );
+// ── Crew Module ─────────────────────────────────────────────────────────────
+require_once RZPA_DIR . 'modules/crew/class-crew-db.php';
+require_once RZPA_DIR . 'modules/crew/class-crew-tracking.php';
+require_once RZPA_DIR . 'modules/crew/class-crew.php';
+
+// ── Henvis Din Ven Module ────────────────────────────────────────────────────
+require_once RZPA_DIR . 'modules/henvis/class-henvis.php';
+
+register_activation_hook( __FILE__, function () {
+    RZPA_Database::install();
+    RZPZ_Crew_DB::install();
+    RZPZ_Henvis::install_db();
+} );
 register_deactivation_hook( __FILE__, [ 'RZPA_Scheduler', 'clear_crons' ] );
 
 add_action( 'plugins_loaded', function () {
     // Auto-upgrade DB schema when plugin version changes
     if ( get_option( 'rzpa_db_version' ) !== RZPA_DB_VER ) {
         RZPA_Database::install();
+        RZPZ_Crew_DB::install();
     }
 
     RZPA_Admin::init();
     RZPA_REST_API::init();
     RZPA_Scheduler::init();
+
+    // Crew module – auto-install tables if missing or outdated
+    if ( get_option( RZPZ_Crew_DB::DB_VERSION_KEY ) !== RZPZ_Crew_DB::DB_VERSION ) {
+        RZPZ_Crew_DB::install();
+    }
+    RZPZ_Crew::init();
+    RZPZ_Crew_Tracking::init();
+    RZPZ_Henvis::init();
 
     // ── Auto-opdatering via GitHub ──────────────────────────────────────────
     $opts  = get_option( 'rzpa_settings', [] );

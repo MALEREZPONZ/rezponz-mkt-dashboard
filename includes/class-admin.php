@@ -76,8 +76,8 @@ class RZPA_Admin {
 
     public static function add_menu() {
         add_menu_page(
-            'Rezponz Analytics',
-            'Rezponz Analytics',
+            'Rezponz Marketing Platform',
+            'Rezponz',
             'manage_options',
             'rzpa-dashboard',
             [ __CLASS__, 'page_dashboard' ],
@@ -97,7 +97,7 @@ class RZPA_Admin {
         ];
 
         foreach ( $pages as $slug => [$label, $cb] ) {
-            add_submenu_page( 'rzpa-dashboard', $label . ' – Rezponz Analytics', $label, 'manage_options', $slug, $cb );
+            add_submenu_page( 'rzpa-dashboard', $label . ' – Rezponz Marketing Platform', $label, 'manage_options', $slug, $cb );
         }
     }
 

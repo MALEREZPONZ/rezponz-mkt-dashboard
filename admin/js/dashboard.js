@@ -1340,11 +1340,28 @@ const RZPA_App = (() => {
             const hBar = el('gads-health-bar');
             if (hBar) {
               let errMsg = r.data.error;
-              const settingsLink = `<a href="${(RZPA?.settingsUrl||'admin.php?page=rzpa-settings')+'#google-ads'}" style="color:#CCFF00;text-decoration:underline">⚙️ Gå til Indstillinger → Google Ads</a>`;
+              const settingsLink = `<a href="${(RZPA?.settingsUrl||'admin.php?page=rzpa-settings')+'#google-ads'}" style="color:#CCFF00;text-decoration:underline">⚙️ Indstillinger → Google Ads</a>`;
               if (errMsg.includes('MCC:mangler')) {
-                errMsg += ` — Manager Account ID mangler (770-011-9764). ${settingsLink} og udfyld feltet "Manager Account ID".`;
+                errMsg += ` — Manager Account ID mangler. ${settingsLink} og udfyld feltet.`;
               } else if (errMsg.includes('HTTP:404')) {
-                errMsg += ` — ${settingsLink} og tjek at API-versionen er korrekt.`;
+                // Try to get a more specific error via test endpoint
+                try {
+                  const testR = await api('/google-ads/test');
+                  const td = testR.data || {};
+                  if (td.raw_snippet) {
+                    let hint = '';
+                    const raw = td.raw_snippet.toLowerCase();
+                    if (raw.includes('customer not found') || raw.includes('not found')) hint = 'Customer ID er ikke tilgængeligt via dette Manager Account.';
+                    else if (raw.includes('permission') || raw.includes('denied')) hint = 'Adgang nægtet — tjek Developer Token og tilladelser.';
+                    else if (raw.includes('invalid customer')) hint = 'Ugyldigt Customer ID — tjek at nummeret er korrekt.';
+                    else hint = `Google svarede: <code style="font-size:11px;color:#aaa">${td.raw_snippet.substring(0,200)}</code>`;
+                    errMsg = `HTTP 404 — ${hint} ${settingsLink}`;
+                  } else {
+                    errMsg += ` — ${settingsLink} og tjek Customer ID og Manager Account.`;
+                  }
+                } catch(te) {
+                  errMsg += ` — ${settingsLink} og tjek at Customer ID og Manager Account er korrekte.`;
+                }
               }
               hBar.style.display='flex';
               hBar.className='rzpa-health health-bad';
@@ -1750,10 +1767,18 @@ const RZPA_App = (() => {
       card.style.display = 'block';
 
       const r = await api(`/meta/top-ads?days=${d}`);
-      const ads = r.data || [];
+      const raw = r.data;
+
+      // API-fejl
+      if (raw && raw.__error) {
+        content.innerHTML = `<p style="color:#ef4444">⚠️ Meta API fejl: ${raw.__error}</p>`;
+        return;
+      }
+
+      const ads = Array.isArray(raw) ? raw : [];
 
       if (!ads.length) {
-        content.innerHTML = '<p style="color:#555">Ingen aktive annoncer fundet i perioden.</p>';
+        content.innerHTML = '<p style="color:#555">Ingen annoncer fundet. Tjek at dit Meta access token er gyldigt og at annoncekontoen har annoncer.</p>';
         return;
       }
 
@@ -2677,7 +2702,7 @@ const RZPA_App = (() => {
     el('seo-kw-suggestions-btn')?.addEventListener('click', loadKeywordSuggestions);
   }
 
-  async function loadKeywordSuggestions() {
+  async function loadKeywordSuggestions(force = false) {
     const btn     = el('seo-kw-suggestions-btn');
     const content = el('seo-kw-suggestions-content');
     const note    = el('seo-kw-cache-note');
@@ -2685,7 +2710,7 @@ const RZPA_App = (() => {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Analyserer…'; }
     content.innerHTML = '<div class="rzpa-loading">AI analyserer søgeordslandskab for Rezponz — 15-30 sekunder…</div>';
 
-    const res = await api('/seo/keyword-suggestions', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+    const res = await api('/seo/keyword-suggestions', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({force}) });
     if (btn) { btn.disabled = false; btn.textContent = '🔍 Hent søgeordsforslag'; }
     const d = res.data || {};
 
@@ -2705,9 +2730,9 @@ const RZPA_App = (() => {
 
     const ranked = kws.filter(k => k.current_position).length;
     content.innerHTML = `
-      <div style="margin-bottom:14px;font-size:12px;color:#666">
-        ${kws.length} søgeordsforslag — sorteret efter prioritet · ${ranked} ranker du allerede på Google.
-        Grøn = nem at ranke på, Rød = svær konkurrence.
+      <div style="margin-bottom:14px;font-size:12px;color:#666;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <span>${kws.length} søgeordsforslag — sorteret efter prioritet · <strong style="color:${ranked>0?'#4ade80':'#888'}">${ranked} ranker du allerede på Google</strong>.</span>
+        <button id="rzpa-kw-force-refresh" style="background:#1e1e1e;border:1px solid #333;color:#aaa;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;">🔄 Opdater med ny analyse</button>
       </div>
       <div class="rzpa-kw-suggestions-grid">
         ${kws.map((kw, i) => {
@@ -2735,6 +2760,9 @@ const RZPA_App = (() => {
           </div>`;
         }).join('')}
       </div>`;
+
+    // Force-refresh knap
+    document.getElementById('rzpa-kw-force-refresh')?.addEventListener('click', () => loadKeywordSuggestions(true));
   }
 
   // ══ PDF KNAPPER – BETALINGSHISTORIK ════════════════════════════════════════

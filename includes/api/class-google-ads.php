@@ -372,9 +372,11 @@ class RZPA_Google_Ads {
         $token = self::get_access_token( $opts );
         if ( ! $token ) return [ 'step' => 'token', 'error' => self::$last_error ];
 
-        $cid   = self::customer_id( $opts );
-        $query = "SELECT campaign.id, campaign.name FROM campaign WHERE campaign.status = 'ENABLED' LIMIT 3";
-        $url   = self::API_BASE . "/customers/{$cid}/googleAds:searchStream";
+        $cid     = self::customer_id( $opts );
+        $mcc     = preg_replace( '/[^0-9]/', '', $opts['google_ads_manager_id'] ?? '' );
+        $api_ver = get_transient( 'rzpa_gads_api_version' ) ?: self::API_VERSIONS[0];
+        $query   = "SELECT campaign.id, campaign.name FROM campaign WHERE campaign.status = 'ENABLED' LIMIT 3";
+        $url     = "https://googleads.googleapis.com/{$api_ver}/customers/{$cid}/googleAds:searchStream";
 
         $res  = wp_remote_post( $url, [
             'timeout' => 15,
@@ -385,23 +387,31 @@ class RZPA_Google_Ads {
         $http = wp_remote_retrieve_response_code( $res );
         $raw  = wp_remote_retrieve_body( $res );
         $body = json_decode( $raw, true );
-        $err  = $body[0]['error']['details'][0]['errors'][0]['message']
-             ?? $body[0]['error']['message']
-             ?? $body['error']['message']
-             ?? ( $http !== 200 ? 'HTTP ' . $http : null );
+
+        // Try to extract a meaningful error message from Google's response
+        $google_msg = $body[0]['error']['details'][0]['errors'][0]['message']
+                   ?? $body[0]['error']['message']
+                   ?? $body['error']['message']
+                   ?? null;
+        $google_status = $body[0]['error']['status']
+                      ?? $body['error']['status']
+                      ?? null;
+        $err = $google_msg ?? ( $http !== 200 ? 'HTTP ' . $http : null );
+
         $rows = 0;
         foreach ( (array) $body as $chunk ) { $rows += count( $chunk['results'] ?? [] ); }
 
-        $mcc = preg_replace( '/[^0-9]/', '', $opts['google_ads_manager_id'] ?? '' );
         return [
             'step'            => 'api',
             'http_code'       => $http,
             'customer_id'     => $cid,
             'manager_id'      => $mcc ?: null,
-            'api_version'     => get_transient( 'rzpa_gads_api_version' ) ?: 'auto',
+            'api_version'     => $api_ver,
+            'api_url'         => $url,
             'campaigns_found' => $rows,
             'error'           => $err,
-            'raw_snippet'     => $err ? substr( $raw, 0, 300 ) : null,
+            'google_status'   => $google_status,
+            'raw_snippet'     => substr( $raw, 0, 500 ),
         ];
     }
 

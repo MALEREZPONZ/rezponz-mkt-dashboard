@@ -718,10 +718,20 @@ class RZPA_REST_API {
 
     public static function meta_top_ads( WP_REST_Request $r ) {
         $days   = self::days( $r );
+        $force  = (bool) $r->get_param( 'force' );
         $key    = 'rzpa_meta_top_ads_' . $days;
-        $cached = get_transient( $key );
-        if ( $cached !== false ) return self::ok( $cached );
+        if ( ! $force ) {
+            $cached = get_transient( $key );
+            if ( $cached !== false ) return self::ok( $cached );
+        } else {
+            delete_transient( $key );
+        }
+        RZPA_Meta_Ads::$last_error = null;
         $data = RZPA_Meta_Ads::fetch_ad_insights( $days );
+        $err  = RZPA_Meta_Ads::$last_error;
+        if ( $err && empty( $data ) ) {
+            return self::ok( [ '__error' => $err ] );
+        }
         if ( $data ) set_transient( $key, $data, HOUR_IN_SECONDS );
         return self::ok( $data );
     }
@@ -1004,7 +1014,7 @@ Svar KUN med et JSON-array â€” ingen tekst rundt om. Hvert element skal have prÃ
         usort( $keywords, fn( $a, $b ) => ( $b['priority'] ?? 5 ) <=> ( $a['priority'] ?? 5 ) );
 
         // Hent aktuelle GSC-placeringer og tilknyt til hvert sÃ¸geord
-        $gsc_raw     = RZPA_Database::get_top_keywords( 90, 200 );
+        $gsc_raw      = RZPA_Database::get_top_keywords( 90, 500 );
         $position_map = [];
         foreach ( $gsc_raw as $row ) {
             $k = strtolower( trim( $row['keyword'] ?? '' ) );
@@ -1012,7 +1022,25 @@ Svar KUN med et JSON-array â€” ingen tekst rundt om. Hvert element skal have prÃ
         }
         foreach ( $keywords as &$kw_item ) {
             $lookup = strtolower( trim( $kw_item['keyword'] ?? '' ) );
-            $kw_item['current_position'] = $position_map[ $lookup ] ?? null;
+            // 1) Exact match
+            if ( isset( $position_map[ $lookup ] ) ) {
+                $kw_item['current_position'] = $position_map[ $lookup ];
+                continue;
+            }
+            // 2) Fuzzy: find GSC keyword that contains all words from suggestion (or vice versa)
+            $words  = array_filter( explode( ' ', $lookup ) );
+            $best   = null;
+            foreach ( $position_map as $gsc_kw => $pos ) {
+                // All words of the suggestion appear in the GSC keyword
+                $all_match = true;
+                foreach ( $words as $w ) {
+                    if ( strpos( $gsc_kw, $w ) === false ) { $all_match = false; break; }
+                }
+                if ( $all_match ) { $best = $pos; break; }
+                // Or: GSC keyword is a substring of the suggestion
+                if ( strpos( $lookup, $gsc_kw ) !== false ) { $best = $pos; break; }
+            }
+            $kw_item['current_position'] = $best;
         }
         unset( $kw_item );
 

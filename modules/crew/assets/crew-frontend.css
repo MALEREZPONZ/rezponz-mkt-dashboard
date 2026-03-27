@@ -1,0 +1,156 @@
+/* ═══════════════════════════════════════
+   Rezponz Crew – Frontend Dashboard
+   ═══════════════════════════════════════ */
+
+.rzpz-crew-frontend {
+  --neon:    #CCFF00;
+  --bg:      #0f0f0f;
+  --bg2:     #181818;
+  --bg3:     #1e1e1e;
+  --border:  rgba(255,255,255,.08);
+  --text:    #e5e5e5;
+  --muted:   #888;
+  --green:   #4ade80;
+  --yellow:  #f59e0b;
+  --radius:  14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--text);
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+/* Login notice */
+.rzpz-crew-login-notice {
+  background: #181818;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  padding: 32px;
+  text-align: center;
+  color: #888;
+}
+.rzpz-crew-btn {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 10px 24px;
+  background: #CCFF00;
+  color: #000;
+  font-weight: 700;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+/* Header */
+.rzpz-crew-fe-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0;
+  margin-bottom: 16px;
+}
+.rzpz-crew-fe-avatar img,
+.rzpz-crew-fe-avatar-initials {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.rzpz-crew-fe-avatar-initials {
+  background: linear-gradient(135deg, #CCFF00, #00ffaa);
+  color: #000;
+  font-size: 22px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rzpz-crew-fe-hello { font-size: 20px; color: #fff; }
+.rzpz-crew-fe-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* Period selector */
+.rzpz-crew-fe-period { display: flex; gap: 6px; margin-bottom: 20px; }
+.rzpz-crew-fe-period-btn {
+  padding: 5px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.rzpz-crew-fe-period-btn.active,
+.rzpz-crew-fe-period-btn:hover { background: var(--neon); color: #000; border-color: transparent; font-weight: 700; }
+
+/* KPIs */
+.rzpz-crew-fe-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.rzpz-crew-fe-kpi {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+  text-align: center;
+}
+.rzpz-crew-fe-kpi-highlight { border-color: rgba(204,255,0,.25); background: rgba(204,255,0,.04); }
+.rzpz-crew-fe-kpi-bonus { border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.04); }
+.rzpz-crew-fe-kpi-icon  { font-size: 22px; margin-bottom: 8px; }
+.rzpz-crew-fe-kpi-val   { font-size: 24px; font-weight: 800; color: #fff; }
+.rzpz-crew-fe-kpi-highlight .rzpz-crew-fe-kpi-val { color: var(--neon); }
+.rzpz-crew-fe-kpi-bonus .rzpz-crew-fe-kpi-val     { color: var(--yellow); }
+.rzpz-crew-fe-kpi-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* Cards */
+.rzpz-crew-fe-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.rzpz-crew-fe-card-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.rzpz-crew-fe-empty { text-align: center; color: var(--muted); padding: 24px; font-size: 13px; }
+
+/* Links */
+.rzpz-crew-fe-link-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.rzpz-crew-fe-link-row:last-child { border-bottom: none; }
+.rzpz-crew-fe-link-rank { width: 28px; height: 28px; border-radius: 50%; background: var(--bg3); color: var(--muted); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.rzpz-crew-fe-link-info { flex: 1; }
+.rzpz-crew-fe-link-campaign { font-size: 13px; font-weight: 600; color: #fff; }
+.rzpz-crew-fe-link-stats { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.rzpz-crew-fe-link-copy { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.rzpz-crew-fe-link-tag { flex-shrink: 0; font-size: 11px; background: var(--bg3); padding: 2px 8px; border-radius: 10px; color: var(--muted); }
+.rzpz-crew-fe-link-input { flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 11px; font-family: monospace; color: var(--muted); outline: none; }
+
+.rzpz-crew-fe-copy-btn {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all .15s;
+}
+.rzpz-crew-fe-copy-btn:hover { border-color: var(--neon); color: var(--neon); }
+
+/* Bonus list */
+.rzpz-crew-fe-bonus-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.rzpz-crew-fe-bonus-row:last-child { border-bottom: none; }
+.rzpz-crew-fe-bonus-period { font-size: 13px; color: #fff; }
+.rzpz-crew-fe-bonus-stats  { font-size: 11px; color: var(--muted); }
+.rzpz-crew-fe-bonus-amount { margin-left: auto; font-size: 16px; font-weight: 700; color: #fff; }
+.rzpz-crew-fe-bonus-status { font-size: 12px; }
+.rzpz-crew-fe-bonus-paid    .rzpz-crew-fe-bonus-amount { color: var(--green); }
+.rzpz-crew-fe-bonus-approved .rzpz-crew-fe-bonus-amount { color: var(--yellow); }
+
+/* Info box */
+.rzpz-crew-fe-info { background: rgba(204,255,0,.03); border-color: rgba(204,255,0,.12); }
+.rzpz-crew-fe-rules { margin: 0; padding: 0 0 0 18px; }
+.rzpz-crew-fe-rules li { font-size: 13px; color: var(--muted); line-height: 1.7; }
+.rzpz-crew-fe-rules strong { color: var(--neon); }
