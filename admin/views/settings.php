@@ -466,11 +466,12 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
           </div>
           <code style="background:var(--bg-300);color:#CCFF00;padding:6px 10px;border-radius:4px;font-size:11px;word-break:break-all;display:block"><?php echo esc_html( $redirect_uri_gads ); ?></code>
         </div>
-        <div style="margin-top:8px">
-          <a href="<?php echo esc_url( $gads_auth_url ); ?>" class="btn-primary" style="text-decoration:none;display:inline-block">
+        <input type="hidden" name="rzpa_gads_oauth_url" value="<?php echo esc_attr( $gads_auth_url ); ?>" />
+        <div style="margin-top:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button type="submit" name="rzpa_redirect_oauth" value="google_ads" class="btn-primary" style="font-size:13px">
             <?php echo $gads_ok ? '🔄 Genautoriser Google Ads' : '🔗 Forbind Google Ads →'; ?>
-          </a>
-          <span style="font-size:12px;color:#555;margin-left:12px">Gem indstillinger først, derefter klik for at forbinde.</span>
+          </button>
+          <span style="font-size:12px;color:#4ade80">✓ Gemmer automatisk dine indstillinger og omdirigerer til Google</span>
         </div>
         <?php else : ?>
         <div style="background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.2);border-radius:10px;padding:14px 18px;margin-top:16px">

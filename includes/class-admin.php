@@ -214,6 +214,16 @@ class RZPA_Admin {
         }
         update_option( 'rzpa_settings', $opts );
 
+        // Gem + redirect til OAuth hvis brugeren klikkede på forbind-knappen
+        if ( ! empty( $_POST['rzpa_redirect_oauth'] ) && ! empty( $_POST['rzpa_gads_oauth_url'] ) ) {
+            $oauth_url = esc_url_raw( wp_unslash( $_POST['rzpa_gads_oauth_url'] ) );
+            // Valider at URL'en peger på Google OAuth
+            if ( str_starts_with( $oauth_url, 'https://accounts.google.com/o/oauth2/' ) ) {
+                wp_redirect( $oauth_url );
+                exit;
+            }
+        }
+
         wp_redirect( admin_url( 'admin.php?page=rzpa-settings&saved=1' ) );
         exit;
     }
