@@ -310,7 +310,53 @@ class RZPA_Meta_Ads {
             return [];
         }
 
-        if ( empty( $body['data'] ) ) return [];
+        if ( empty( $body['data'] ) ) {
+            // Fallback: Hent annoncer direkte fra /ads endpoint (viser paused/arkiverede med 0-metrics)
+            $fallback_url = self::API_BASE . '/act_' . $account_id . '/ads?' . http_build_query( [
+                'access_token'     => $token,
+                'fields'           => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec{link_data{picture,image_url,child_attachments{picture}},video_data{image_url}}}',
+                'effective_status' => '["ACTIVE","PAUSED"]',
+                'limit'            => 25,
+            ] );
+            $fb_res = wp_remote_get( $fallback_url, [ 'timeout' => 30 ] );
+            if ( ! is_wp_error( $fb_res ) ) {
+                $fb_body = json_decode( wp_remote_retrieve_body( $fb_res ), true );
+                if ( ! empty( $fb_body['data'] ) ) {
+                    $rows = [];
+                    foreach ( $fb_body['data'] as $ad ) {
+                        $creative = $ad['creative'] ?? [];
+                        $spec     = $creative['object_story_spec'] ?? [];
+                        $format   = 'image';
+                        if ( ! empty( $creative['video_id'] ) || isset( $spec['video_data'] ) ) $format = 'video';
+                        elseif ( isset( $spec['link_data']['child_attachments'] ) ) $format = 'carousel';
+                        $img = $spec['link_data']['picture'] ?? ''
+                            ?: ( $spec['link_data']['image_url'] ?? '' )
+                            ?: ( $spec['video_data']['image_url'] ?? '' )
+                            ?: ( $creative['image_url'] ?? '' )
+                            ?: ( $creative['thumbnail_url'] ?? '' );
+                        $rows[] = [
+                            'ad_id'         => $ad['id'],
+                            'ad_name'       => $ad['name'] ?? '',
+                            'status'        => $ad['effective_status'] ?? 'PAUSED',
+                            'creative_id'   => $creative['id'] ?? '',
+                            'thumbnail_url' => $img,
+                            'image_url'     => $img,
+                            'has_video'     => $format === 'video',
+                            'format'        => $format,
+                            'reach'         => 0,
+                            'impressions'   => 0,
+                            'spend'         => 0.0,
+                            'clicks'        => 0,
+                            'cpc'           => 0.0,
+                            'cpm'           => 0.0,
+                            'ctr'           => 0.0,
+                        ];
+                    }
+                    return $rows;
+                }
+            }
+            return [];
+        }
 
         // Byg metrics-map: ad_id → row
         $metrics = [];

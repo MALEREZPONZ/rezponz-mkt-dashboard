@@ -25,15 +25,26 @@ class RZPZ_Henvis {
     // ── Boot ────────────────────────────────────────────────────────────────────
 
     public static function init() {
-        add_action( 'init',               [ __CLASS__, 'maybe_install_db' ] );
-        add_action( 'admin_menu',         [ __CLASS__, 'add_admin_menu' ] );
-        add_shortcode( 'rezponz_henvis_ven', [ __CLASS__, 'shortcode' ] );
-        add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_frontend' ] );
+        add_action( 'init',                    [ __CLASS__, 'maybe_install_db' ] );
+        add_action( 'admin_menu',              [ __CLASS__, 'add_admin_menu' ] );
+        add_action( 'admin_enqueue_scripts',   [ __CLASS__, 'enqueue_admin_css' ] );
+        add_shortcode( 'rezponz_henvis_ven',   [ __CLASS__, 'shortcode' ] );
+        add_action( 'wp_enqueue_scripts',      [ __CLASS__, 'enqueue_frontend' ] );
 
         // Form handlers
         add_action( 'admin_post_rzpz_henvis_save_manager',   [ __CLASS__, 'handle_save_manager' ] );
         add_action( 'admin_post_rzpz_henvis_delete_manager', [ __CLASS__, 'handle_delete_manager' ] );
         add_action( 'admin_post_rzpz_henvis_test_email',     [ __CLASS__, 'handle_test_email' ] );
+    }
+
+    public static function enqueue_admin_css( string $hook ) : void {
+        if ( strpos( $hook, 'rzpz-henvis' ) === false ) return;
+        wp_enqueue_style(
+            'rzpz-henvis-admin',
+            RZPA_URL . 'modules/henvis/assets/henvis-admin.css',
+            [],
+            RZPA_VERSION
+        );
     }
 
     public static function maybe_install_db() {
