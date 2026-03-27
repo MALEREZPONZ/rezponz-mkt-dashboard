@@ -193,6 +193,11 @@ class RZPZ_Crew_DB {
         return (bool) $wpdb->delete( $wpdb->prefix . 'rzpz_crew_members', [ 'id' => $id ] );
     }
 
+    public static function delete_link( int $id ) : bool {
+        global $wpdb;
+        return (bool) $wpdb->delete( $wpdb->prefix . 'rzpz_crew_links', [ 'id' => $id ] );
+    }
+
     private static function unique_crew_id( string $base ) : string {
         global $wpdb;
         $t    = $wpdb->prefix . 'rzpz_crew_members';

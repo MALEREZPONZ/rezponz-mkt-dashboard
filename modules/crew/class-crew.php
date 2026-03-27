@@ -17,6 +17,7 @@ class RZPZ_Crew {
         add_action( 'admin_post_rzpz_crew_update_bonus',     [ __CLASS__, 'handle_update_bonus' ] );
         add_action( 'admin_post_rzpz_crew_update_boost',     [ __CLASS__, 'handle_update_boost' ] );
         add_action( 'admin_post_rzpz_crew_save_settings',    [ __CLASS__, 'handle_save_settings' ] );
+        add_action( 'admin_post_rzpz_crew_delete_link',      [ __CLASS__, 'handle_delete_link' ] );
         add_action( 'rest_api_init',         [ __CLASS__, 'register_rest' ] );
     }
 
@@ -160,6 +161,16 @@ class RZPZ_Crew {
         check_admin_referer( 'rzpz_crew_delete_member' );
         RZPZ_Crew_DB::delete_member( (int) ( $_POST['member_id'] ?? 0 ) );
         wp_redirect( admin_url( 'admin.php?page=rezponz-crew&deleted=1' ) );
+        exit;
+    }
+
+    public static function handle_delete_link() : void {
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
+        check_admin_referer( 'rzpz_crew_delete_link' );
+        $link_id   = (int) ( $_POST['link_id']   ?? 0 );
+        $member_id = (int) ( $_POST['member_id'] ?? 0 );
+        RZPZ_Crew_DB::delete_link( $link_id );
+        wp_redirect( admin_url( 'admin.php?page=rezponz-crew-member&id=' . $member_id . '&link_deleted=1' ) );
         exit;
     }
 

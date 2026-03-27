@@ -79,7 +79,7 @@ $dest_url = $opts['default_destination_url'] ?? 'https://rezponz.dk/jobs/';
   <div class="rzpz-crew-card">
     <div class="rzpz-crew-card-title">Alle trackinglinks (<?php echo count( $links ); ?>)</div>
     <table class="rzpz-crew-table">
-      <thead><tr><th>Kampagne</th><th>Klik</th><th>Oprettet</th><th>Link</th></tr></thead>
+      <thead><tr><th>Kampagne</th><th>Klik</th><th>Oprettet</th><th>Link</th><th></th></tr></thead>
       <tbody>
       <?php foreach ( $links as $lnk ) : ?>
       <tr>
@@ -91,6 +91,15 @@ $dest_url = $opts['default_destination_url'] ?? 'https://rezponz.dk/jobs/';
             <input type="text" class="rzpz-crew-link-input" value="<?php echo esc_attr( $lnk['full_url'] ); ?>" readonly onclick="this.select()" />
             <button class="rzpz-crew-btn rzpz-crew-copy-btn" data-copy="<?php echo esc_attr( $lnk['full_url'] ); ?>">📋 Kopiér</button>
           </div>
+        </td>
+        <td>
+          <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Slet dette trackinglink?')">
+            <input type="hidden" name="action" value="rzpz_crew_delete_link" />
+            <input type="hidden" name="link_id" value="<?php echo (int) $lnk['id']; ?>" />
+            <input type="hidden" name="member_id" value="<?php echo (int) $member['id']; ?>" />
+            <?php wp_nonce_field( 'rzpz_crew_delete_link' ); ?>
+            <button type="submit" class="rzpz-crew-btn" style="background:#ef444420;color:#ef4444;border-color:#ef444440;">🗑 Slet</button>
+          </form>
         </td>
       </tr>
       <?php endforeach; ?>
