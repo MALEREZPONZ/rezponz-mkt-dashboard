@@ -1,31 +1,31 @@
-/* ── Henvis Din Ven – Frontend Styles ─────────────────────────── */
+/* ── Henvis Din Ven – Frontend Styles (lyst tema matching rezponz.dk) ── */
 .rzpz-henvis-wrap {
     max-width: 720px;
     margin: 0 auto;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    color: #e0e0e0;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    color: #1a1a1a;
 }
 
 /* Success state */
 .rzpz-henvis-success {
-    background: #0a2e0a;
-    border: 1px solid #4ade80;
+    background: #f0faf5;
+    border: 1px solid #5d8089;
     border-radius: 14px;
     padding: 40px;
     text-align: center;
     margin: 20px 0;
 }
 .rzpz-success-icon { font-size: 48px; margin-bottom: 12px; }
-.rzpz-henvis-success h2 { color: #4ade80; margin: 0 0 10px; font-size: 24px; }
-.rzpz-henvis-success p  { color: #a0e0a0; margin: 0; font-size: 16px; }
+.rzpz-henvis-success h2 { color: #2d6a4f; margin: 0 0 10px; font-size: 24px; font-weight: 700; }
+.rzpz-henvis-success p  { color: #3d7a5f; margin: 0; font-size: 16px; }
 
 /* Error banner */
 .rzpz-henvis-error {
-    background: #2d0a0a;
+    background: #fff5f5;
     border: 1px solid #f87171;
     border-radius: 8px;
     padding: 12px 16px;
-    color: #f87171;
+    color: #c0392b;
     margin-bottom: 20px;
     display: flex;
     align-items: center;
@@ -35,11 +35,12 @@
 
 /* Form card */
 .rzpz-henvis-form {
-    background: #141414;
-    border: 1px solid #2a2a2a;
-    border-radius: 14px;
+    background: #ffffff;
+    border: 1px solid #e8e8e8;
+    border-radius: 16px;
     padding: 32px;
     margin-top: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.08);
 }
 
 /* CAPTCHA card */
@@ -51,22 +52,22 @@
 .rzpz-captcha-card h3 {
     font-size: 20px;
     font-weight: 700;
-    color: #fff;
+    color: #1a1a1a;
     margin: 0 0 8px;
 }
 .rzpz-captcha-question {
     font-size: 22px;
     font-weight: 700;
-    color: #CCFF00;
+    color: #5d8089;
     margin: 16px 0 20px;
 }
 .rzpz-captcha-input {
     width: 120px;
     padding: 10px 14px;
-    background: #1e1e1e;
-    border: 2px solid #333;
+    background: #fff;
+    border: 2px solid #d0d0d0;
     border-radius: 8px;
-    color: #fff;
+    color: #1a1a1a;
     font-size: 20px;
     text-align: center;
     display: block;
@@ -75,31 +76,33 @@
 }
 .rzpz-captcha-input:focus {
     outline: none;
-    border-color: #CCFF00;
+    border-color: #5d8089;
 }
 .rzpz-captcha-btn {
-    background: #CCFF00;
-    color: #0d0d0d;
+    background: #5d8089;
+    color: #ffffff;
     border: none;
     border-radius: 8px;
     padding: 10px 28px;
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
-    transition: opacity .2s;
+    transition: background .2s;
 }
-.rzpz-captcha-btn:hover { opacity: .85; }
+.rzpz-captcha-btn:hover { background: #4a6870; }
 
-/* Form fields */
+/* Form sections */
 .rzpz-form-section { margin-bottom: 28px; }
 .rzpz-section-title {
     font-size: 16px;
     font-weight: 700;
-    color: #CCFF00;
+    color: #5d8089;
     margin: 0 0 16px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #2a2a2a;
+    border-bottom: 1px solid #e8e8e8;
 }
+
+/* Field grid */
 .rzpz-field-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -108,34 +111,40 @@
 }
 @media (max-width: 580px) {
     .rzpz-field-row { grid-template-columns: 1fr; }
+    .rzpz-henvis-form { padding: 20px 16px; }
 }
+
+/* Labels & inputs */
 .rzpz-field label {
     display: block;
     font-size: 13px;
-    color: #aaa;
+    font-weight: 500;
+    color: #555;
     margin-bottom: 5px;
 }
-.rzpz-field label .req { color: #f87171; }
+.rzpz-field label .req { color: #e74c3c; }
 .rzpz-field input[type=text],
 .rzpz-field input[type=email],
 .rzpz-field input[type=tel],
 .rzpz-field select {
     width: 100%;
     padding: 9px 12px;
-    background: #1e1e1e;
-    border: 1px solid #333;
+    background: #ffffff;
+    border: 1px solid #d0d0d0;
     border-radius: 8px;
-    color: #e0e0e0;
+    color: #1a1a1a;
     font-size: 14px;
     box-sizing: border-box;
-    transition: border-color .2s;
+    transition: border-color .2s, box-shadow .2s;
+    font-family: inherit;
 }
 .rzpz-field input:focus,
 .rzpz-field select:focus {
     outline: none;
-    border-color: #CCFF00;
+    border-color: #5d8089;
+    box-shadow: 0 0 0 3px rgba(93,128,137,.12);
 }
-.rzpz-field select option { background: #1e1e1e; }
+.rzpz-field input::placeholder { color: #aaa; }
 
 /* Consent */
 .rzpz-consent-field { margin: 20px 0; }
@@ -145,11 +154,11 @@
     gap: 10px;
     cursor: pointer;
     font-size: 14px;
-    color: #ccc;
+    color: #444;
 }
 .rzpz-checkbox-label input[type=checkbox] {
     margin-top: 2px;
-    accent-color: #CCFF00;
+    accent-color: #5d8089;
     width: 16px;
     height: 16px;
     flex-shrink: 0;
@@ -158,16 +167,17 @@
 /* Submit */
 .rzpz-submit-row { text-align: center; margin-top: 8px; }
 .rzpz-submit-btn {
-    background: #CCFF00;
-    color: #0d0d0d;
+    background: #5d8089;
+    color: #ffffff;
     border: none;
     border-radius: 10px;
     padding: 13px 40px;
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
-    transition: opacity .2s, transform .15s;
+    transition: background .2s, transform .15s;
     letter-spacing: .3px;
+    font-family: inherit;
 }
-.rzpz-submit-btn:hover { opacity: .88; transform: translateY(-1px); }
+.rzpz-submit-btn:hover { background: #4a6870; transform: translateY(-1px); }
 .rzpz-submit-btn:active { transform: translateY(0); }

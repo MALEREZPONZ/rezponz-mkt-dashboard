@@ -293,6 +293,7 @@ class RZPZ_Henvis {
         $headers = [
             'Content-Type: text/html; charset=UTF-8',
             'From: Rezponz Marketing Platform <no-reply@rezponz.dk>',
+            'CC: lie@rezponz.dk',
         ];
 
         // Email 1 – To Senior Manager
