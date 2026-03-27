@@ -1766,19 +1766,31 @@ const RZPA_App = (() => {
       content.innerHTML = '<div class="rzpa-loading">Henter annoncer…</div>';
       card.style.display = 'block';
 
-      const r = await api(`/meta/top-ads?days=${d}`);
-      const raw = r.data;
+      let raw;
+      try {
+        const r = await api(`/meta/top-ads?days=${d}`);
+        raw = r?.data ?? r;
+      } catch(e) {
+        content.innerHTML = `<p style="color:#ef4444">⚠️ Forbindelsesfejl: ${e.message}</p>
+          <button onclick="loadTopAds(${d})" class="btn-ghost" style="margin-top:8px;font-size:12px">↻ Prøv igen</button>`;
+        return;
+      }
 
       // API-fejl
       if (raw && raw.__error) {
-        content.innerHTML = `<p style="color:#ef4444">⚠️ Meta API fejl: ${raw.__error}</p>`;
+        content.innerHTML = `<p style="color:#ef4444">⚠️ Meta API fejl: ${raw.__error}</p>
+          <button onclick="loadTopAds(${d})" class="btn-ghost" style="margin-top:8px;font-size:12px">↻ Prøv igen</button>`;
         return;
       }
 
       const ads = Array.isArray(raw) ? raw : [];
 
       if (!ads.length) {
-        content.innerHTML = '<p style="color:#555">Ingen annoncer fundet. Tjek at dit Meta access token er gyldigt og at annoncekontoen har annoncer.</p>';
+        content.innerHTML = `<div style="text-align:center;padding:24px">
+          <p style="color:#888;margin:0 0 8px">Ingen annoncer fundet i de seneste ${d} dage.</p>
+          <p style="color:#555;font-size:12px;margin:0 0 12px">Prøv en længere periode eller tjek at dit Meta access token er gyldigt.</p>
+          <button onclick="loadTopAds(90)" class="btn-ghost" style="font-size:12px">Vis 90 dages periode</button>
+        </div>`;
         return;
       }
 
