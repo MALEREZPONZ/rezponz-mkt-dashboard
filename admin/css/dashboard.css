@@ -1017,3 +1017,14 @@ body.wp-admin #wpbody-content { overflow-x: hidden; }
 .cc-ad-name{font-size:12px;color:#ccc;font-weight:600;padding:8px 10px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cc-ad-metrics{display:flex;gap:8px;padding:0 10px 6px;font-size:11px;color:#888;flex-wrap:wrap}
 .cc-ad-card .fmt-badge{margin:0 8px 8px;display:inline-block}
+
+/* ══ GOOGLE ADS ANNONCE-KORT ══════════════════════════════════════════════ */
+.gads-ads-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.gads-ad-card{background:rgba(66,133,244,.04);border:1px solid rgba(66,133,244,.15);border-radius:10px;padding:14px 16px}
+.gads-ad-top{margin-bottom:6px}
+.gads-ad-badge{font-size:10px;color:#4285F4;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.gads-ad-headline{font-size:16px;font-weight:700;color:#4285F4;line-height:1.4;margin-bottom:2px}
+.gads-ad-desc{font-size:12px;color:#aaa;line-height:1.6;margin-bottom:10px}
+.gads-ad-meta{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#888;margin-bottom:8px}
+.gads-ad-meta span{background:rgba(255,255,255,.04);padding:2px 7px;border-radius:5px}
+.gads-ad-campaign{font-size:10px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid rgba(255,255,255,.04);padding-top:6px;margin-top:4px}

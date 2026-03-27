@@ -49,7 +49,7 @@ class RZPA_Google_Ads {
 
     // ── Token ────────────────────────────────────────────────────────────────
 
-    private static function get_access_token( array $opts ) : string {
+    public static function get_access_token( array $opts ) : string {
         $res = wp_remote_post( 'https://oauth2.googleapis.com/token', [
             'body' => [
                 'client_id'     => $opts['google_ads_client_id'] ?? $opts['google_client_id'] ?? '',
@@ -70,7 +70,7 @@ class RZPA_Google_Ads {
         return $body['access_token'];
     }
 
-    private static function headers( string $token, array $opts ) : array {
+    public static function headers( string $token, array $opts ) : array {
         $h = [
             'Authorization'   => 'Bearer ' . $token,
             'developer-token' => $opts['google_ads_developer_token'] ?? '',
@@ -213,6 +213,98 @@ class RZPA_Google_Ads {
         return array_values( $agg );
     }
 
+    // ── Aktive annoncer (RSA/ETA) ─────────────────────────────────────────────
+
+    public static function fetch_ads() : array {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['google_ads_refresh_token'] ) || empty( $opts['google_ads_customer_id'] ) || empty( $opts['google_ads_developer_token'] ) ) {
+            return [];
+        }
+
+        $token = self::get_access_token( $opts );
+        if ( ! $token ) return [ 'error' => self::$last_error ?: 'Token fejl' ];
+
+        $cid = self::customer_id( $opts );
+        $url = self::api_base() . "/customers/{$cid}/googleAds:searchStream";
+
+        $query = "SELECT
+            ad_group_ad.ad.id,
+            ad_group_ad.ad.type,
+            ad_group_ad.ad.name,
+            ad_group_ad.ad.responsive_search_ad.headlines,
+            ad_group_ad.ad.responsive_search_ad.descriptions,
+            ad_group_ad.ad.expanded_text_ad.headline_part1,
+            ad_group_ad.ad.expanded_text_ad.headline_part2,
+            ad_group_ad.ad.expanded_text_ad.description,
+            ad_group_ad.ad.final_urls,
+            ad_group_ad.status,
+            campaign.name,
+            ad_group.name,
+            metrics.impressions,
+            metrics.clicks,
+            metrics.cost_micros,
+            metrics.ctr
+        FROM ad_group_ad
+        WHERE ad_group_ad.status = 'ENABLED'
+          AND campaign.status = 'ENABLED'
+          AND ad_group.status = 'ENABLED'
+          AND segments.date DURING LAST_30_DAYS
+        ORDER BY metrics.impressions DESC
+        LIMIT 50";
+
+        $res = wp_remote_post( $url, [
+            'timeout' => 20,
+            'headers' => self::headers( $token, $opts ),
+            'body'    => wp_json_encode( [ 'query' => $query ] ),
+        ] );
+
+        if ( is_wp_error( $res ) ) return [ 'error' => $res->get_error_message() ];
+        $http = wp_remote_retrieve_response_code( $res );
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
+        if ( $http !== 200 ) return [ 'error' => $body[0]['error']['message'] ?? 'HTTP ' . $http ];
+
+        $ads = [];
+        foreach ( $body as $chunk ) {
+            foreach ( $chunk['results'] ?? [] as $result ) {
+                $ad      = $result['ad_group_ad']['ad'] ?? [];
+                $metrics = $result['metrics'] ?? [];
+                $rsa     = $ad['responsiveSearchAd'] ?? [];
+                $eta     = $ad['expandedTextAd'] ?? [];
+
+                $headlines = array_values( array_filter( array_map(
+                    fn( $h ) => $h['text'] ?? '',
+                    array_slice( $rsa['headlines'] ?? [], 0, 3 )
+                ) ) );
+                if ( empty( $headlines ) ) {
+                    $headlines = array_filter( [ $eta['headlinePart1'] ?? '', $eta['headlinePart2'] ?? '' ] );
+                }
+
+                $descriptions = array_values( array_filter( array_map(
+                    fn( $d ) => $d['text'] ?? '',
+                    array_slice( $rsa['descriptions'] ?? [], 0, 2 )
+                ) ) );
+                if ( empty( $descriptions ) && ! empty( $eta['description'] ) ) {
+                    $descriptions = [ $eta['description'] ];
+                }
+
+                $ads[] = [
+                    'ad_id'        => $ad['id'] ?? '',
+                    'type'         => $ad['type'] ?? 'RESPONSIVE_SEARCH_AD',
+                    'campaign'     => $result['campaign']['name'] ?? '',
+                    'ad_group'     => $result['adGroup']['name'] ?? '',
+                    'headlines'    => array_values( $headlines ),
+                    'descriptions' => array_values( $descriptions ),
+                    'final_url'    => $ad['finalUrls'][0] ?? '',
+                    'impressions'  => (int) ( $metrics['impressions'] ?? 0 ),
+                    'clicks'       => (int) ( $metrics['clicks'] ?? 0 ),
+                    'spend'        => round( (float) ( $metrics['costMicros'] ?? 0 ) / 1_000_000, 2 ),
+                    'ctr'          => round( (float) ( $metrics['ctr'] ?? 0 ) * 100, 2 ),
+                ];
+            }
+        }
+        return $ads;
+    }
+
     // ── Fakturaer / Billing ───────────────────────────────────────────────────
 
     public static function fetch_invoices() : array {
@@ -224,10 +316,13 @@ class RZPA_Google_Ads {
 
         $cid = self::customer_id( $opts );
 
-        // Hent månedlige forbrug som billing-erstatning (invoice API kræver billing setup ID)
+        // Hent månedlige forbrug de seneste 36 måneder op til dags dato
+        $since = gmdate( 'Y-m-d', strtotime( '-36 months' ) );
+        $until = gmdate( 'Y-m-d' );
         $query = "SELECT segments.month, metrics.cost_micros
                   FROM customer
-                  WHERE segments.date DURING LAST_12_MONTHS
+                  WHERE segments.date >= '{$since}'
+                    AND segments.date <= '{$until}'
                   ORDER BY segments.month DESC";
 
         $url = self::api_base() . "/customers/{$cid}/googleAds:searchStream";
@@ -250,11 +345,15 @@ class RZPA_Google_Ads {
             foreach ( $chunk['results'] ?? [] as $r ) {
                 $month = substr( $r['segments']['month'] ?? '', 0, 7 );
                 if ( ! $month ) continue;
+                $end_of_month = gmdate( 'Y-m-d', strtotime( 'last day of ' . $month ) );
                 $rows[$month] = [
-                    'month'    => $month,
-                    'amount'   => round( (float) ( $r['metrics']['costMicros'] ?? 0 ) / 1_000_000, 2 ),
-                    'currency' => 'DKK',
-                    'status'   => 'SETTLED',
+                    'month'       => $month,
+                    'amount'      => round( (float) ( $r['metrics']['costMicros'] ?? 0 ) / 1_000_000, 2 ),
+                    'currency'    => 'DKK',
+                    'impressions' => 0,
+                    'clicks'      => 0,
+                    'status'      => 'SETTLED',
+                    'billing_url' => 'https://ads.google.com/aw/billing/invoices?__e=' . $month . '-01',
                 ];
             }
         }

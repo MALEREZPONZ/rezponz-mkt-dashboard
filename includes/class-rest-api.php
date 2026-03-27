@@ -195,6 +195,20 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        // Meta image proxy (server-side fetch for auth-protected thumbnails)
+        register_rest_route( self::NS, '/meta/image-proxy', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'meta_image_proxy' ],
+            'permission_callback' => $cap,
+        ] );
+
+        // Google Ads – alle aktive annoncer
+        register_rest_route( self::NS, '/google-ads/ads', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'google_ads_ads' ],
+            'permission_callback' => $cap,
+        ] );
+
         // SEO keyword suggestions (AI)
         register_rest_route( self::NS, '/seo/keyword-suggestions', [
             'methods'             => 'POST',
@@ -858,6 +872,76 @@ class RZPA_REST_API {
         $days  = (int) ( $r->get_json_params()['days'] ?? 30 );
         $title = sanitize_text_field( $r->get_json_params()['title'] ?? '' );
         return RZPA_PDF_Generator::generate( $days, $title );
+    }
+
+    /**
+     * Meta image proxy — henter Meta CDN-billeder server-side med access token.
+     * Løser problemet med at thumbnail_url/image_url kræver Facebook-auth.
+     */
+    public static function meta_image_proxy( WP_REST_Request $r ) {
+        $raw_url = $r->get_param( 'url' ) ?? '';
+        $url     = filter_var( $raw_url, FILTER_SANITIZE_URL );
+
+        // Kun Meta/Facebook CDN-urls tilladt
+        if ( ! $url || ! preg_match( '#^https?://([\w-]+\.)?(facebook\.com|fbcdn\.net|scontent\.[a-z0-9-]+\.fna\.fbcdn\.net|cdninstagram\.com)#', $url ) ) {
+            return new WP_Error( 'invalid_url', 'Only Meta CDN URLs allowed', [ 'status' => 400 ] );
+        }
+
+        $cache_key = 'rzpa_img_' . md5( $url );
+        $cached    = get_transient( $cache_key );
+        if ( $cached !== false ) {
+            header( 'Content-Type: ' . sanitize_mime_type( $cached['ct'] ) );
+            header( 'Cache-Control: public, max-age=3600' );
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+            echo base64_decode( $cached['data'] );
+            exit;
+        }
+
+        $opts  = get_option( 'rzpa_settings', [] );
+        $token = $opts['meta_access_token'] ?? '';
+        $img_url = $url;
+        if ( $token && strpos( $url, 'access_token' ) === false ) {
+            $img_url .= ( strpos( $url, '?' ) !== false ? '&' : '?' ) . 'access_token=' . rawurlencode( $token );
+        }
+
+        $res = wp_remote_get( $img_url, [ 'timeout' => 15, 'redirection' => 5 ] );
+        if ( is_wp_error( $res ) ) {
+            return new WP_Error( 'fetch_error', 'Image unavailable', [ 'status' => 502 ] );
+        }
+
+        $body = wp_remote_retrieve_body( $res );
+        $ct   = wp_remote_retrieve_header( $res, 'content-type' ) ?: 'image/jpeg';
+        // Strip charset suffix
+        $ct = preg_replace( '/;.*/', '', $ct );
+
+        if ( strlen( $body ) > 100 ) {
+            set_transient( $cache_key, [ 'ct' => $ct, 'data' => base64_encode( $body ) ], HOUR_IN_SECONDS );
+        }
+
+        header( 'Content-Type: ' . sanitize_mime_type( $ct ) );
+        header( 'Cache-Control: public, max-age=3600' );
+        header( 'Content-Length: ' . strlen( $body ) );
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        echo $body;
+        exit;
+    }
+
+    /**
+     * Google Ads – alle aktive annoncer (RSA / text ads).
+     */
+    public static function google_ads_ads( WP_REST_Request $r ) {
+        $cache_key = 'rzpa_gads_ads';
+        $cached    = get_transient( $cache_key );
+        if ( $cached !== false ) return self::ok( $cached );
+
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['google_ads_refresh_token'] ) || empty( $opts['google_ads_customer_id'] ) ) {
+            return self::ok( [] );
+        }
+
+        $data = RZPA_Google_Ads::fetch_ads();
+        if ( $data ) set_transient( $cache_key, $data, HOUR_IN_SECONDS );
+        return self::ok( $data );
     }
 
     /**

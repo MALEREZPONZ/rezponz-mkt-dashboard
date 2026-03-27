@@ -1322,6 +1322,7 @@ const RZPA_App = (() => {
 
   async function initGoogleAds() {
     let days = 30, gadsAllData = [], gadsSortKey = 'spend', gadsSortDir = 'desc', gadsFilter = 'all';
+    initGadsAds();
 
     function perfClassGads(ctr) { return ctr >= 2 ? 'perf-good' : ctr >= 0.5 ? 'perf-mid' : 'perf-bad'; }
     function perfLabelGads(ctr) { return ctr >= 2 ? 'Godt' : ctr >= 0.5 ? 'Middel' : 'Svagt'; }
@@ -1602,15 +1603,7 @@ const RZPA_App = (() => {
       if(csvBtn) csvBtn.style.display='inline-flex';
       const pdfBtnGads = el('gads-invoices-pdf');
       if(pdfBtnGads) pdfBtnGads.style.display='inline-flex';
-      const total = data.reduce((s,r)=>s+(r.amount||0),0);
-      const mNames=['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
-      content.innerHTML=`<div style="margin-bottom:12px;padding:12px 16px;background:rgba(66,133,244,0.05);border-radius:8px;border:1px solid rgba(66,133,244,0.15);display:flex;gap:24px;flex-wrap:wrap">
-        <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Total (vist periode)</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${fmt(total,2)} DKK</div></div>
-        <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Måneder</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${data.length}</div></div>
-      </div>
-      <div class="rzpa-table-wrap"><table class="rzpa-table"><thead><tr><th>Måned</th><th>Forbrug</th><th>Valuta</th><th>Status</th></tr></thead><tbody>
-      ${data.map(r=>{const[y,m]=r.month.split('-');const mn=mNames[parseInt(m,10)-1]+' '+y;return`<tr><td style="color:#ccc">${mn}</td><td style="font-weight:600;color:#fff">${fmt(r.amount,2)}</td><td style="color:#888">${r.currency}</td><td><span style="color:#4ade80;font-size:11px">✓ Betalt</span></td></tr>`;}).join('')}
-      </tbody></table></div>`;
+      renderInvoiceTable(content, data, 'Google Ads', '#4285F4');
     });
 
     el('gads-invoices-csv')?.addEventListener('click', () => {
@@ -1759,11 +1752,13 @@ const RZPA_App = (() => {
       const fmtBadge = f => f === 'video' ? '<span class="fmt-badge fmt-video">▶ Video</span>'
                           : f === 'carousel' ? '<span class="fmt-badge fmt-carousel">◫ Carousel</span>'
                           : '<span class="fmt-badge fmt-image">🖼 Billede</span>';
+      const proxyBase = (RZPA?.restBase || '/wp-json/rzpa/v1/') + 'meta/image-proxy?url=';
       const thumbHtml = ad => {
-        const src = ad.thumbnail_url || ad.image_url;
-        return src
-          ? `<img src="${src}" class="rzpa-top-ad-thumb" alt="" loading="lazy" onerror="this.parentNode.innerHTML='<div class=rzpa-top-ad-no-thumb>📷</div>'">`
-          : '<div class="rzpa-top-ad-no-thumb">📷</div>';
+        const raw = ad.thumbnail_url || ad.image_url;
+        if (!raw) return '<div class="rzpa-top-ad-no-thumb">📷</div>';
+        // Brug server-side proxy for at håndtere Meta CDN-auth
+        const src = proxyBase + encodeURIComponent(raw) + (RZPA?.nonce ? '&_wpnonce=' + RZPA.nonce : '');
+        return `<img src="${src}" class="rzpa-top-ad-thumb" alt="" loading="lazy" onerror="this.style.display='none';this.parentNode.insertAdjacentHTML('beforeend','<div class=rzpa-top-ad-no-thumb>📷</div>')">`;
       };
 
       // Podium: top 3
@@ -1865,33 +1860,7 @@ const RZPA_App = (() => {
       if (csvBtn) csvBtn.style.display = 'inline-flex';
       const pdfBtnMeta = el('meta-invoices-pdf');
       if (pdfBtnMeta) pdfBtnMeta.style.display = 'inline-flex';
-      const totalAmount = data.reduce((s,r) => s + (r.amount||0), 0);
-      const totalImpr   = data.reduce((s,r) => s + (r.impressions||0), 0);
-      const totalClicks = data.reduce((s,r) => s + (r.clicks||0), 0);
-      const monthName = m => { const [y,mo] = (m||'').split('-'); const names=['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec']; return (names[parseInt(mo,10)-1]||mo)+' '+y; };
-      content.innerHTML = `
-        <div style="margin-bottom:12px;padding:12px 16px;background:rgba(204,255,0,0.05);border-radius:8px;border:1px solid rgba(204,255,0,0.1);display:flex;gap:24px;flex-wrap:wrap">
-          <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Total forbrug</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${fmt(totalAmount,2)} ${data[0]?.currency||'DKK'}</div></div>
-          <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Visninger</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${num(totalImpr)}</div></div>
-          <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Klik</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${num(totalClicks)}</div></div>
-          <div><span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Antal måneder</span><div style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">${data.length}</div></div>
-        </div>
-        <div class="rzpa-table-wrap">
-          <table class="rzpa-table">
-            <thead><tr>
-              <th>Måned</th><th>Forbrug</th><th>Visninger</th><th>Klik</th><th>Valuta</th>
-            </tr></thead>
-            <tbody>
-              ${data.map(r => `<tr>
-                <td style="color:#ccc">${monthName(r.month)}</td>
-                <td style="font-weight:600;color:#fff">${fmt(r.amount,2)}</td>
-                <td style="color:#ccc">${num(r.impressions||0)}</td>
-                <td style="color:#ccc">${num(r.clicks||0)}</td>
-                <td style="color:#888">${r.currency}</td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>`;
+      renderInvoiceTable(content, data, 'Meta', '#1877F2');
     });
 
     el('meta-invoices-csv')?.addEventListener('click', () => {
@@ -2399,6 +2368,141 @@ const RZPA_App = (() => {
         if (topLi) topLi.classList.add('wp-has-current-submenu', 'wp-menu-open');
       }
     });
+  }
+
+  // ══ FÆLLES FAKTURA-RENDERER MED ÅRS-FILTER + BILLING-LINKS ════════════════
+  // Bruges af Meta, Google Ads (og fremtidigt Snap/TikTok).
+  function renderInvoiceTable(container, data, platform, color) {
+    const monthName = m => {
+      if (!m) return '';
+      const [y, mo] = m.split('-');
+      const names = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+      return (names[parseInt(mo, 10) - 1] || mo) + ' ' + y;
+    };
+
+    // Byg årsfilter fra data
+    const years = [...new Set(data.map(r => (r.month || '').split('-')[0]).filter(Boolean))].sort().reverse();
+    const currency = data[0]?.currency || 'DKK';
+
+    function renderRows(filterYear) {
+      const rows = filterYear ? data.filter(r => r.month?.startsWith(filterYear)) : data;
+      const total = rows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+      const totalImpr = rows.reduce((s, r) => s + (r.impressions || 0), 0);
+      const totalClicks = rows.reduce((s, r) => s + (r.clicks || 0), 0);
+
+      container.querySelector('.inv-summary-total').textContent = fmt(total, 2) + ' ' + currency;
+      container.querySelector('.inv-summary-months').textContent = rows.length;
+      if (container.querySelector('.inv-summary-impr')) {
+        container.querySelector('.inv-summary-impr').textContent = num(totalImpr);
+        container.querySelector('.inv-summary-clicks').textContent = num(totalClicks);
+      }
+
+      container.querySelector('tbody').innerHTML = rows.map(r => {
+        const billingHref = r.billing_url || '#';
+        return `<tr>
+          <td style="color:#ccc;font-weight:600">${monthName(r.month)}</td>
+          <td style="font-weight:700;color:#fff">${fmt(parseFloat(r.amount||0), 2)} ${r.currency||currency}</td>
+          ${r.impressions !== undefined ? `<td style="color:#aaa">${num(r.impressions)}</td><td style="color:#aaa">${num(r.clicks)}</td>` : ''}
+          <td><span style="color:#4ade80;font-size:11px;font-weight:600">✓ Betalt</span></td>
+          <td>
+            <a href="${billingHref}" target="_blank" rel="noopener"
+               style="font-size:11px;color:${color};text-decoration:none;padding:3px 8px;border:1px solid ${color}40;border-radius:5px;white-space:nowrap">
+              Se i ${platform} →
+            </a>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    const hasImpr = data.some(r => r.impressions !== undefined && r.impressions > 0);
+    const extraCols = hasImpr ? '<th>Visninger</th><th>Klik</th>' : '';
+
+    container.innerHTML = `
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:#555">Filtrer år:</span>
+          <select id="inv-year-filter" style="background:#111;color:#ccc;border:1px solid #333;border-radius:6px;padding:4px 10px;font-size:12px">
+            <option value="">Alle år</option>
+            ${years.map(y => `<option value="${y}">${y}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:28px;flex-wrap:wrap;padding:12px 16px;background:rgba(${color === '#1877F2' ? '24,119,242' : '66,133,244'},.05);border-radius:8px;border:1px solid rgba(${color === '#1877F2' ? '24,119,242' : '66,133,244'},.12);margin-bottom:14px">
+        <div><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px">Samlet forbrug</div><div class="inv-summary-total" style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">–</div></div>
+        <div><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px">Måneder</div><div class="inv-summary-months" style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">–</div></div>
+        ${hasImpr ? `<div><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px">Visninger</div><div class="inv-summary-impr" style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">–</div></div>
+        <div><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px">Klik</div><div class="inv-summary-clicks" style="font-size:20px;font-weight:700;color:#fff;margin-top:2px">–</div></div>` : ''}
+      </div>
+      <div class="rzpa-table-wrap">
+        <table class="rzpa-table">
+          <thead><tr><th>Måned</th><th>Forbrug</th>${extraCols}<th>Status</th><th>Faktura</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>`;
+
+    // Initial render
+    renderRows('');
+
+    // Årsfilter
+    container.querySelector('#inv-year-filter')?.addEventListener('change', e => {
+      renderRows(e.target.value);
+    });
+
+    // Sæt standard til indeværende år
+    const curYear = new Date().getFullYear().toString();
+    if (years.includes(curYear)) {
+      container.querySelector('#inv-year-filter').value = curYear;
+      renderRows(curYear);
+    }
+  }
+
+  // ══ GOOGLE ADS AKTIVE ANNONCER ═════════════════════════════════════════════
+
+  function initGadsAds() {
+    el('gads-ads-load')?.addEventListener('click', loadGadsAds);
+  }
+
+  async function loadGadsAds() {
+    const btn     = el('gads-ads-load');
+    const content = el('gads-ads-content');
+    if (!content) return;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Henter…'; }
+    content.innerHTML = '<div class="rzpa-loading">Henter aktive Google Ads-annoncer…</div>';
+
+    const res = await api('/google-ads/ads');
+    if (btn) { btn.disabled = false; btn.textContent = '📢 Hent annoncer'; }
+    const d = res.data || [];
+
+    if (d.error) {
+      content.innerHTML = `<span style="color:#ff6b6b">⚠️ ${d.error}</span>`;
+      return;
+    }
+    if (!d.length) {
+      content.innerHTML = '<span style="color:#555">Ingen aktive annoncer fundet. Kontrollér at Google Ads er forbundet og har aktive kampagner.</span>';
+      return;
+    }
+
+    content.innerHTML = `<div class="gads-ads-grid">${d.map(ad => {
+      const hl = ad.headlines || [];
+      const ds = ad.descriptions || [];
+      const displayUrl = ad.final_url ? (new URL(ad.final_url).hostname).replace('www.', '') : '';
+      return `<div class="gads-ad-card">
+        <div class="gads-ad-top">
+          <div class="gads-ad-badge">Annonce · ${displayUrl}</div>
+        </div>
+        <div class="gads-ad-headline">${hl.slice(0,3).join(' | ')}</div>
+        <div class="gads-ad-display-url" style="color:#4ade80;font-size:12px;margin:3px 0">${displayUrl}</div>
+        <div class="gads-ad-desc">${ds.join(' ')}</div>
+        <div class="gads-ad-meta">
+          <span>📢 ${num(ad.impressions)} vis.</span>
+          <span>🖱 ${num(ad.clicks)} klik</span>
+          ${ad.spend > 0 ? `<span>💰 ${fmt(ad.spend,0)} kr</span>` : ''}
+          ${ad.ctr > 0 ? `<span>📊 ${fmt(ad.ctr,2)}% CTR</span>` : ''}
+        </div>
+        <div class="gads-ad-campaign" title="Kampagne: ${ad.campaign}">${ad.campaign}</div>
+        ${ad.final_url ? `<a href="${ad.final_url}" target="_blank" rel="noopener" style="font-size:11px;color:#4285F4;text-decoration:none;margin-top:4px;display:block">Åbn landingsside →</a>` : ''}
+      </div>`;
+    }).join('')}</div>`;
   }
 
   // ══ PDF DOWNLOAD HJÆLPER ══════════════════════════════════════════════════

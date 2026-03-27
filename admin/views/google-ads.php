@@ -167,6 +167,20 @@ $has_openai      = ! empty( $gads_opts['openai_api_key'] );
     </div>
   </div>
 
+  <!-- ══ AKTIVE ANNONCER ═══════════════════════════════════════════════════ -->
+  <div class="rzpa-card" id="gads-ads-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <h2 style="margin:0">📢 Aktive annoncer</h2>
+        <div class="rzpa-card-sub" style="margin:4px 0 0">Dine aktive Google-annoncetekster med performance de seneste 30 dage</div>
+      </div>
+      <button id="gads-ads-load" class="btn-ghost" style="font-size:12px">📢 Hent annoncer</button>
+    </div>
+    <div id="gads-ads-content" style="color:#555;font-size:13px">
+      Klik <strong style="color:#888">"Hent annoncer"</strong> for at se dine aktive Google Ads-annoncer.
+    </div>
+  </div>
+
   <!-- Fakturaer -->
   <div class="rzpa-card" id="gads-invoices-card">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">

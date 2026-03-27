@@ -224,13 +224,16 @@ class RZPA_Meta_Ads {
         $token      = $opts['meta_access_token'];
         $account_id = $opts['meta_ad_account_id'];
 
-        // Hent månedligt forbrug via insights (sidste 12 måneder)
+        // Hent månedligt forbrug via insights — op til 36 måneder bagud og frem til i dag
+        $since = gmdate( 'Y-m-d', strtotime( '-36 months' ) );
+        $until = gmdate( 'Y-m-d' ); // altid dags dato
+
         $url = self::API_BASE . '/act_' . $account_id . '/insights?' . http_build_query( [
-            'access_token'  => $token,
-            'fields'        => 'spend,impressions,clicks,account_currency',
-            'time_increment'=> 'monthly',
-            'date_preset'   => 'last_year',
-            'limit'         => 50,
+            'access_token'   => $token,
+            'fields'         => 'spend,impressions,clicks,account_currency',
+            'time_increment' => 'monthly',
+            'time_range'     => wp_json_encode( [ 'since' => $since, 'until' => $until ] ),
+            'limit'          => 100,
         ] );
 
         $res  = wp_remote_get( $url, [ 'timeout' => 20 ] );
@@ -243,6 +246,11 @@ class RZPA_Meta_Ads {
         foreach ( $body['data'] ?? [] as $t ) {
             $start = $t['date_start'] ?? '';
             $month = substr( $start, 0, 7 ); // YYYY-MM
+            // Link til Meta Business billing-side for den specifikke måned
+            $end_of_month = gmdate( 'Y-m-d', strtotime( 'last day of ' . $month ) );
+            $billing_url  = 'https://business.facebook.com/billing_hub/payment_activity'
+                . '?start_date=' . $month . '-01&end_date=' . $end_of_month;
+
             $rows[] = [
                 'month'       => $month,
                 'date'        => $start,
@@ -251,6 +259,7 @@ class RZPA_Meta_Ads {
                 'impressions' => (int) ( $t['impressions'] ?? 0 ),
                 'clicks'      => (int) ( $t['clicks'] ?? 0 ),
                 'status'      => 'SETTLED',
+                'billing_url' => $billing_url,
             ];
         }
         // Sortér nyeste først
