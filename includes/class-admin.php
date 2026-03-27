@@ -119,6 +119,7 @@ class RZPA_Admin {
             'nonce'           => wp_create_nonce( 'wp_rest' ),
             'preload'         => self::get_page_preload( $hook ),
             'meta_account_id' => sanitize_text_field( get_option( 'rzpa_settings', [] )['meta_ad_account_id'] ?? '' ),
+            'settingsUrl'     => admin_url( 'admin.php?page=rzpa-settings' ),
         ] );
     }
 

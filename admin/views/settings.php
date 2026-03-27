@@ -408,11 +408,16 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
             <small style="color:#555;font-size:11px;display:block;margin-top:4px">Kundekonto-ID — klik på kontoen i Google Ads for at se det</small>
           </div>
           <div class="rzpa-field">
-            <label>Manager Account ID (MCC) <span style="color:#555;font-weight:normal">(valgfrit — kun ved MCC)</span></label>
+            <label>Manager Account ID (MCC) <span style="color:#f59e0b;font-weight:normal">⚠️ Påkrævet ved MCC-adgang</span></label>
             <input type="text" name="google_ads_manager_id"
               value="<?php echo esc_attr( $opts['google_ads_manager_id'] ?? '' ); ?>"
               placeholder="770-011-9764" />
-            <small style="color:#555;font-size:11px;display:block;margin-top:4px">Kun nødvendig hvis du tilgår kundekontoen via en managerkonto (MCC). Ses øverst i Google Ads-headeren.</small>
+            <small style="color:#888;font-size:11px;display:block;margin-top:4px">
+              Kræves hvis du tilgår kundekontoen via en managerkonto (MCC). Ses øverst i Google Ads-headeren.
+              <?php if ( empty( $opts['google_ads_manager_id'] ) ) : ?>
+              <strong style="color:#f59e0b">Du har ikke udfyldt dette felt — dette er årsagen til HTTP 404-fejlen.</strong>
+              <?php endif; ?>
+            </small>
           </div>
           <div class="rzpa-field">
             <label>OAuth Client ID

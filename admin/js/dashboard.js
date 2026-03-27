@@ -1338,7 +1338,18 @@ const RZPA_App = (() => {
           if (!ok && r.data?.error) {
             btn.textContent = '⚠️ Fejl';
             const hBar = el('gads-health-bar');
-            if (hBar) { hBar.style.display='flex'; hBar.className='rzpa-health health-bad'; hBar.innerHTML=`<span class="h-icon">🔴</span><div class="h-text">${r.data.error}</div>`; }
+            if (hBar) {
+              let errMsg = r.data.error;
+              const settingsLink = `<a href="${(RZPA?.settingsUrl||'admin.php?page=rzpa-settings')+'#google-ads'}" style="color:#CCFF00;text-decoration:underline">⚙️ Gå til Indstillinger → Google Ads</a>`;
+              if (errMsg.includes('MCC:mangler')) {
+                errMsg += ` — Manager Account ID mangler (770-011-9764). ${settingsLink} og udfyld feltet "Manager Account ID".`;
+              } else if (errMsg.includes('HTTP:404')) {
+                errMsg += ` — ${settingsLink} og tjek at API-versionen er korrekt.`;
+              }
+              hBar.style.display='flex';
+              hBar.className='rzpa-health health-bad';
+              hBar.innerHTML=`<span class="h-icon">🔴</span><div class="h-text">${errMsg}</div>`;
+            }
           } else {
             btn.textContent = `✓ ${r.data?.count||0} kampagner hentet`;
           }
@@ -1824,14 +1835,15 @@ const RZPA_App = (() => {
       if (!pages.length) return;
 
       card.style.display = '';
-      content.innerHTML = `<div style="font-size:12px;color:#666;margin-bottom:12px">${pages.length} unikke landingssider fundet</div>
+      const activeCount = pages.filter(p => p.active_ads > 0).length;
+      content.innerHTML = `<div style="font-size:12px;color:#666;margin-bottom:12px">${pages.length} unikke landingssider · ${activeCount} med aktive annoncer</div>
         <div class="rzpa-landing-pages">
           ${pages.map(p => `<div class="rzpa-landing-page-row">
             <div class="lp-info">
               <div class="lp-domain">${p.domain}</div>
               <div class="lp-url">${p.url}</div>
             </div>
-            <div class="lp-count">${p.ad_count} annoncer</div>
+            <div class="lp-count">${p.active_ads > 0 ? `<span style="color:#4ade80">● Aktiv</span> · ` : ''}${p.ad_count} ann.</div>
             <a href="${p.url}" target="_blank" class="lp-link">Åbn →</a>
           </div>`).join('')}
         </div>`;
@@ -2689,13 +2701,21 @@ const RZPA_App = (() => {
     const diffColor = diff => diff === 'Lav' ? '#4ade80' : diff === 'Medium' ? '#f59e0b' : '#ef4444';
     const volColor  = vol  => vol  === 'Høj' ? '#4ade80' : vol  === 'Medium' ? '#f59e0b' : '#888';
     const intentMap = { kommerciel: '💼', informativ: '📖', lokal: '📍', rekruttering: '👥' };
+    const posColor  = pos => pos <= 3 ? '#4ade80' : pos <= 10 ? '#f59e0b' : pos <= 30 ? '#f97316' : '#888';
 
+    const ranked = kws.filter(k => k.current_position).length;
     content.innerHTML = `
       <div style="margin-bottom:14px;font-size:12px;color:#666">
-        ${kws.length} søgeordsforslag — sorteret efter prioritet. Grøn = nem at ranke på, Rød = svær konkurrence.
+        ${kws.length} søgeordsforslag — sorteret efter prioritet · ${ranked} ranker du allerede på Google.
+        Grøn = nem at ranke på, Rød = svær konkurrence.
       </div>
       <div class="rzpa-kw-suggestions-grid">
-        ${kws.map((kw, i) => `
+        ${kws.map((kw, i) => {
+          const pos = kw.current_position;
+          const posBadge = pos
+            ? `<span class="rzpa-kw-badge" style="background:${posColor(pos)}20;color:${posColor(pos)};border-color:${posColor(pos)}40">📍 Google pos. ${Math.round(pos)}</span>`
+            : '';
+          return `
           <div class="rzpa-kw-card">
             <div class="rzpa-kw-card-header">
               <div class="rzpa-kw-rank">#${i+1}</div>
@@ -2703,6 +2723,7 @@ const RZPA_App = (() => {
             </div>
             <div class="rzpa-kw-phrase">${kw.keyword||''}</div>
             <div class="rzpa-kw-badges">
+              ${posBadge}
               <span class="rzpa-kw-badge" style="background:${volColor(kw.monthly_searches)}20;color:${volColor(kw.monthly_searches)};border-color:${volColor(kw.monthly_searches)}40">
                 📊 ${kw.monthly_searches||'?'} søgninger
               </span>
@@ -2711,7 +2732,8 @@ const RZPA_App = (() => {
               </span>
             </div>
             <div class="rzpa-kw-action">${kw.action||''}</div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>`;
   }
 

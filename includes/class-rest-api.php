@@ -727,11 +727,14 @@ class RZPA_REST_API {
     }
 
     public static function meta_landing_pages( WP_REST_Request $r ) {
+        $force  = (bool) ( $r->get_param( 'force' ) );
         $key    = 'rzpa_meta_landing_pages';
-        $cached = get_transient( $key );
-        if ( $cached !== false ) return self::ok( $cached );
+        if ( ! $force ) {
+            $cached = get_transient( $key );
+            if ( $cached !== false ) return self::ok( $cached );
+        }
         $data = RZPA_Meta_Ads::fetch_landing_pages();
-        if ( $data ) set_transient( $key, $data, HOUR_IN_SECONDS );
+        if ( $data ) set_transient( $key, $data, 2 * HOUR_IN_SECONDS );
         return self::ok( $data );
     }
 
@@ -999,6 +1002,19 @@ Svar KUN med et JSON-array — ingen tekst rundt om. Hvert element skal have pr�
 
         // Sortér efter priority
         usort( $keywords, fn( $a, $b ) => ( $b['priority'] ?? 5 ) <=> ( $a['priority'] ?? 5 ) );
+
+        // Hent aktuelle GSC-placeringer og tilknyt til hvert søgeord
+        $gsc_raw     = RZPA_Database::get_top_keywords( 90, 200 );
+        $position_map = [];
+        foreach ( $gsc_raw as $row ) {
+            $k = strtolower( trim( $row['keyword'] ?? '' ) );
+            if ( $k ) $position_map[ $k ] = round( (float) ( $row['position'] ?? 0 ), 1 );
+        }
+        foreach ( $keywords as &$kw_item ) {
+            $lookup = strtolower( trim( $kw_item['keyword'] ?? '' ) );
+            $kw_item['current_position'] = $position_map[ $lookup ] ?? null;
+        }
+        unset( $kw_item );
 
         set_transient( $ck, $keywords, 12 * HOUR_IN_SECONDS );
         return self::ok( [ 'keywords' => $keywords ] );

@@ -282,11 +282,11 @@ class RZPA_Meta_Ads {
         $since      = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
         $until      = gmdate( 'Y-m-d' );
 
-        // Hent alle aktive annoncer med creative data + insights
+        // Hent aktive + pauserede annoncer med creative data + insights
         $url = self::API_BASE . '/act_' . $account_id . '/ads?' . http_build_query( [
             'access_token'     => $token,
             'fields'           => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec{link_data{picture,image_url,name,child_attachments{picture}},video_data{image_url},photo_data{images{original{uri}}}}},insights.time_range({"since":"' . $since . '","until":"' . $until . '"}){reach,impressions,spend,clicks,cpc,cpm}',
-            'effective_status' => '["ACTIVE"]',
+            'effective_status' => '["ACTIVE","PAUSED"]',
             'limit'            => 100,
         ] );
 
@@ -367,9 +367,9 @@ class RZPA_Meta_Ads {
 
         $url = self::API_BASE . '/act_' . $account_id . '/ads?' . http_build_query( [
             'access_token'     => $token,
-            'fields'           => 'creative{link_url,object_story_spec{link_data{link}}}',
-            'effective_status' => '["ACTIVE"]',
-            'limit'            => 100,
+            'fields'           => 'creative{link_url,object_story_spec{link_data{link}}},effective_status',
+            'effective_status' => '["ACTIVE","PAUSED","ARCHIVED"]',
+            'limit'            => 200,
         ] );
 
         $res = wp_remote_get( $url, [ 'timeout' => 30 ] );
@@ -378,25 +378,33 @@ class RZPA_Meta_Ads {
         $body = json_decode( wp_remote_retrieve_body( $res ), true );
         if ( ! empty( $body['error'] ) ) return [];
 
-        $url_counts = [];
+        $url_data = [];
         foreach ( $body['data'] ?? [] as $ad ) {
             $creative = $ad['creative'] ?? [];
             $link     = $creative['link_url'] ?? '';
             if ( ! $link ) {
                 $link = $creative['object_story_spec']['link_data']['link'] ?? '';
             }
-            if ( $link ) {
-                $url_counts[ $link ] = ( $url_counts[ $link ] ?? 0 ) + 1;
+            if ( ! $link ) continue;
+            // Strip query params for grouping, but keep the original URL
+            $clean = strtok( $link, '?' );
+            if ( ! isset( $url_data[ $clean ] ) ) {
+                $url_data[ $clean ] = [ 'url' => $clean, 'ad_count' => 0, 'active' => 0 ];
+            }
+            $url_data[ $clean ]['ad_count']++;
+            if ( ( $ad['effective_status'] ?? '' ) === 'ACTIVE' ) {
+                $url_data[ $clean ]['active']++;
             }
         }
 
         $rows = [];
-        foreach ( $url_counts as $link => $count ) {
-            $parsed = wp_parse_url( $link );
+        foreach ( $url_data as $clean => $info ) {
+            $parsed = wp_parse_url( $clean );
             $rows[] = [
-                'url'      => $link,
-                'ad_count' => $count,
-                'domain'   => $parsed['host'] ?? '',
+                'url'        => $clean,
+                'ad_count'   => $info['ad_count'],
+                'active_ads' => $info['active'],
+                'domain'     => $parsed['host'] ?? '',
             ];
         }
 
