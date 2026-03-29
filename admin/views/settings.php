@@ -43,20 +43,47 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
   <div class="rzpa-notice success" style="margin-bottom:20px">🔍 Opdateringstjek gennemført — siden er opdateret herunder.</div>
   <?php endif; ?>
 
+  <?php
+  // Hent GitHub release direkte til debug-visning
+  $github_release_debug = get_transient( 'rzpa_github_release' );
+  $github_latest_ver    = '';
+  if ( $github_release_debug && $github_release_debug !== 'error' && isset( $github_release_debug->tag_name ) ) {
+      $github_latest_ver = ltrim( $github_release_debug->tag_name, 'v' );
+  }
+  $plugin_slug_debug = plugin_basename( RZPA_PLUGIN_FILE );
+  ?>
+
   <?php if ( $update_info ) : ?>
   <div class="rzpa-notice" style="margin-bottom:20px;background:rgba(204,255,0,0.08);border:1px solid rgba(204,255,0,0.3);color:var(--neon);display:flex;align-items:center;justify-content:space-between">
     <span>🔔 Ny version tilgængelig: <strong><?php echo esc_html( $update_info->new_version ); ?></strong></span>
     <a href="<?php echo esc_url( admin_url( 'update-core.php' ) ); ?>" class="btn-primary" style="text-decoration:none">Opdater nu →</a>
   </div>
   <?php else : ?>
-  <div style="margin-bottom:20px;padding:12px 16px;background:var(--bg-200);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:space-between">
-    <span style="font-size:13px;color:#666">✓ Plugin er opdateret &nbsp;·&nbsp; <span style="color:#444">Version <?php echo esc_html( RZPA_VERSION ); ?></span></span>
-    <a href="<?php echo esc_url( wp_nonce_url( add_query_arg( 'rzpa_check_updates', '1' ), 'rzpa_check_updates' ) ); ?>"
-       style="font-size:12px;color:var(--text-muted);text-decoration:none;border:1px solid var(--border);padding:4px 12px;border-radius:6px"
-       onmouseover="this.style.color='var(--neon)';this.style.borderColor='var(--neon)'"
-       onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">
-      ⟳ Tjek for opdateringer
-    </a>
+  <div style="margin-bottom:20px;padding:12px 16px;background:var(--bg-200);border:1px solid var(--border);border-radius:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <span style="font-size:13px;color:#666">
+        Installeret: <strong style="color:#ccc">v<?php echo esc_html( RZPA_VERSION ); ?></strong>
+        <?php if ( $github_latest_ver ) : ?>
+          &nbsp;·&nbsp; GitHub: <strong style="color:<?php echo version_compare($github_latest_ver, RZPA_VERSION, '>') ? '#CCFF00' : '#4ade80'; ?>">v<?php echo esc_html( $github_latest_ver ); ?></strong>
+          <?php if ( version_compare($github_latest_ver, RZPA_VERSION, '>') ) : ?>
+            <span style="color:#CCFF00;font-size:11px;margin-left:6px">← opdatering tilgængelig!</span>
+          <?php endif; ?>
+        <?php else : ?>
+          &nbsp;·&nbsp; <span style="color:#555;font-size:12px">GitHub ikke tjekket endnu</span>
+        <?php endif; ?>
+      </span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <a href="<?php echo esc_url( wp_nonce_url( add_query_arg( 'rzpa_check_updates', '1' ), 'rzpa_check_updates' ) ); ?>"
+           style="font-size:12px;color:var(--neon);text-decoration:none;border:1px solid rgba(204,255,0,.3);padding:4px 12px;border-radius:6px">
+          ⟳ Tjek GitHub nu
+        </a>
+        <a href="<?php echo esc_url( admin_url( 'plugin-install.php?tab=upload' ) ); ?>"
+           style="font-size:12px;color:#888;text-decoration:none;border:1px solid #333;padding:4px 12px;border-radius:6px">
+          📦 Manuel upload
+        </a>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#444">Plugin slug: <code style="color:#555"><?php echo esc_html( $plugin_slug_debug ); ?></code></div>
   </div>
   <?php endif; ?>
 
