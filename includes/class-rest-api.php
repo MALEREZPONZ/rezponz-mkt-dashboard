@@ -160,6 +160,13 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        // Diagnostik – viser rå Meta API-svar (kun admins)
+        register_rest_route( self::NS, '/meta/debug', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'meta_debug' ],
+            'permission_callback' => $cap,
+        ] );
+
         // Landing pages – unikke URLs fra aktive annoncer
         register_rest_route( self::NS, '/meta/landing-pages', [
             'methods'             => 'GET',
@@ -729,6 +736,66 @@ class RZPA_REST_API {
         $html = RZPA_Meta_Ads::fetch_ad_preview( $ad_id );
         if ( $html ) set_transient( $key, $html, 30 * MINUTE_IN_SECONDS );
         return self::ok( [ 'iframe_html' => $html ] );
+    }
+
+    /**
+     * Debug: Returnerer rå Meta API-svar for hurtigt at diagnosticere fejl.
+     * Kalder /insights?level=ad og /{campaign_id}/ads direkte og viser resultatet.
+     */
+    public static function meta_debug( WP_REST_Request $r ) {
+        $opts       = get_option( 'rzpa_settings', [] );
+        $token      = $opts['meta_access_token']   ?? '';
+        $account_id = $opts['meta_ad_account_id']  ?? '';
+
+        if ( ! $token || ! $account_id ) {
+            return self::ok( [ 'error' => 'Token eller konto-ID mangler i indstillinger' ] );
+        }
+
+        $base = 'https://graph.facebook.com/v21.0';
+        $out  = [];
+
+        // Test 1: Token-info
+        $me_res  = wp_remote_get( $base . '/me?access_token=' . $token . '&fields=id,name', [ 'timeout' => 10 ] );
+        $out['token_info'] = is_wp_error( $me_res )
+            ? [ 'error' => $me_res->get_error_message() ]
+            : json_decode( wp_remote_retrieve_body( $me_res ), true );
+
+        // Test 2: Token permissions
+        $perm_res = wp_remote_get( $base . '/me/permissions?access_token=' . $token, [ 'timeout' => 10 ] );
+        $perm_body = is_wp_error( $perm_res ) ? [] : json_decode( wp_remote_retrieve_body( $perm_res ), true );
+        $out['permissions'] = array_column( $perm_body['data'] ?? [], 'status', 'permission' );
+
+        // Test 3: Adgang til kontoen
+        $acc_res  = wp_remote_get( $base . '/act_' . $account_id . '?access_token=' . $token . '&fields=id,name,account_status', [ 'timeout' => 10 ] );
+        $out['account'] = is_wp_error( $acc_res )
+            ? [ 'error' => $acc_res->get_error_message() ]
+            : json_decode( wp_remote_retrieve_body( $acc_res ), true );
+
+        // Test 4: Annoncer med minimal fields
+        $ads_url = $base . '/act_' . $account_id . '/ads?' . http_build_query( [
+            'access_token' => $token,
+            'fields'       => 'id,name,effective_status',
+            'limit'        => 5,
+        ] );
+        $ads_res  = wp_remote_get( $ads_url, [ 'timeout' => 15 ] );
+        $out['ads_simple'] = is_wp_error( $ads_res )
+            ? [ 'error' => $ads_res->get_error_message() ]
+            : json_decode( wp_remote_retrieve_body( $ads_res ), true );
+
+        // Test 5: Insights level=ad
+        $ins_url  = $base . '/act_' . $account_id . '/insights?' . http_build_query( [
+            'access_token' => $token,
+            'level'        => 'ad',
+            'date_preset'  => 'last_30_days',
+            'fields'       => 'ad_id,ad_name,reach,impressions,spend',
+            'limit'        => 5,
+        ] );
+        $ins_res  = wp_remote_get( $ins_url, [ 'timeout' => 20 ] );
+        $out['insights_ad_level'] = is_wp_error( $ins_res )
+            ? [ 'error' => $ins_res->get_error_message() ]
+            : json_decode( wp_remote_retrieve_body( $ins_res ), true );
+
+        return self::ok( $out );
     }
 
     public static function meta_top_ads( WP_REST_Request $r ) {
