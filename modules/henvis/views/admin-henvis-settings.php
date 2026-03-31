@@ -574,15 +574,66 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
 
   <?php if ( $tpl_saved ) : ?><div class="rzpz-notice success">✅ Email skabeloner gemt.</div><?php endif; ?>
 
+  <?php
+  // Build JS defaults object safely – avoids json_encode inside onclick HTML attributes
+  $js_defaults = [];
+  foreach ( $tpl_labels as $k => $_ ) {
+      $d = RZPZ_Henvis::get_default_email_templates()[ $k ] ?? [];
+      $js_defaults[ $k ] = [ 'subject' => $d['subject'] ?? '', 'body' => $d['body'] ?? '' ];
+  }
+  ?>
+  <script>
+  var rzpzTplDefaults = <?php echo wp_json_encode( $js_defaults ); ?>;
+
+  function rzpzResetTpl(key) {
+      var d = rzpzTplDefaults[key];
+      if (!d) return;
+      var subj = document.querySelector('[name="tpl_' + key + '_subject"]');
+      var body = document.querySelector('[name="tpl_' + key + '_body"]');
+      if (subj) subj.value = d.subject;
+      if (body) { body.value = d.body; rzpzUpdatePreview(key, body); }
+  }
+
+  function rzpzUpdatePreview(key, ta) {
+      if (!ta) ta = document.querySelector('[name="tpl_' + key + '_body"]');
+      var pv = document.getElementById('rzpz-tpl-preview-' + key);
+      if (pv && ta) pv.innerHTML = ta.value;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+      <?php foreach ( array_keys($tpl_labels) as $k ) : ?>
+      (function() {
+          var ta = document.querySelector('[name="tpl_<?php echo esc_js($k); ?>_body"]');
+          if (ta) {
+              rzpzUpdatePreview('<?php echo esc_js($k); ?>', ta);
+              ta.addEventListener('input', function() { rzpzUpdatePreview('<?php echo esc_js($k); ?>', this); });
+          }
+      })();
+      <?php endforeach; ?>
+  });
+  </script>
+
+  <style>
+  .rzpz-tpl-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  .rzpz-tpl-preview-wrap { display:flex; flex-direction:column; gap:5px; }
+  .rzpz-tpl-preview-label { font-size:12px; color:#aaa; font-weight:600; }
+  .rzpz-tpl-preview-frame { background:#fff; color:#333; padding:20px 24px; border-radius:8px; font-size:13px; line-height:1.7; min-height:220px; border:1px solid #2a2a2a; overflow:auto; }
+  .rzpz-tpl-preview-frame p  { margin:0 0 10px 0; }
+  .rzpz-tpl-preview-frame ul { padding-left:20px; margin:6px 0 10px; }
+  .rzpz-tpl-preview-frame li { margin-bottom:4px; }
+  .rzpz-tpl-preview-frame a  { color:#5d8089; }
+  @media (max-width:900px) { .rzpz-tpl-grid { grid-template-columns:1fr; } }
+  </style>
+
   <!-- Variables help -->
   <div class="rzpz-hs-card" style="border-color:#CCFF0030">
     <h2>📋 Tilgængelige variabler</h2>
     <p>Indsæt disse i emnelinjen eller brødteksten – de erstattes automatisk med de rigtige værdier:</p>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
       <?php foreach ( $variables as $var => $desc ) : ?>
-        <span onclick="navigator.clipboard.writeText('<?php echo esc_attr($var); ?>')"
-              title="Klik for at kopiere: <?php echo esc_attr($desc); ?>"
-              style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:monospace;color:#CCFF00">
+        <span onclick="navigator.clipboard.writeText('<?php echo esc_attr($var); ?>');this.style.borderColor='#CCFF00';setTimeout(()=>this.style.borderColor='',1500)"
+              title="<?php echo esc_attr($desc); ?>"
+              style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:monospace;color:#CCFF00;transition:border-color .2s">
           <?php echo esc_html($var); ?>
           <span style="color:#555;font-family:sans-serif;font-size:10px;margin-left:4px"><?php echo esc_html($desc); ?></span>
         </span>
@@ -599,6 +650,8 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
     <?php foreach ( $tpl_labels as $key => $meta ) :
       $tpl = $email_templates[ $key ] ?? [];
       $def = RZPZ_Henvis::get_default_email_templates()[ $key ] ?? [];
+      $body_val = $tpl['body'] ?? $def['body'] ?? '';
+      $subj_val = $tpl['subject'] ?? $def['subject'] ?? '';
     ?>
     <div class="rzpz-hs-card">
       <h2><?php echo esc_html( $meta['icon'] . ' ' . $meta['title'] ); ?></h2>
@@ -606,21 +659,27 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
 
       <div class="rzpz-field" style="margin-bottom:14px">
         <label>Emnelinje</label>
-        <input type="text" name="tpl_<?php echo $key; ?>_subject"
-               value="<?php echo esc_attr( $tpl['subject'] ?? $def['subject'] ); ?>"
+        <input type="text" name="tpl_<?php echo esc_attr($key); ?>_subject"
+               value="<?php echo esc_attr( $subj_val ); ?>"
                style="width:100%;box-sizing:border-box"
                placeholder="Emnelinje…">
       </div>
 
-      <div class="rzpz-field">
-        <label>Brødtekst <span style="color:#555;font-weight:400;font-size:11px">(HTML tilladt — brug &lt;p&gt;, &lt;strong&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;a&gt;)</span></label>
-        <textarea name="tpl_<?php echo $key; ?>_body" rows="12"
-                  style="width:100%;box-sizing:border-box;font-family:monospace;font-size:12px;line-height:1.6"><?php echo esc_textarea( $tpl['body'] ?? $def['body'] ); ?></textarea>
+      <div class="rzpz-tpl-grid">
+        <div class="rzpz-field">
+          <label>HTML kode <span style="color:#555;font-weight:400;font-size:11px">(p, strong, ul, li, a)</span></label>
+          <textarea name="tpl_<?php echo esc_attr($key); ?>_body" rows="14"
+                    oninput="rzpzUpdatePreview('<?php echo esc_js($key); ?>', this)"
+                    style="width:100%;box-sizing:border-box;font-family:monospace;font-size:12px;line-height:1.6;resize:vertical"><?php echo esc_textarea( $body_val ); ?></textarea>
+        </div>
+        <div class="rzpz-tpl-preview-wrap">
+          <div class="rzpz-tpl-preview-label">👁 Forhåndsvisning</div>
+          <div id="rzpz-tpl-preview-<?php echo esc_attr($key); ?>" class="rzpz-tpl-preview-frame"></div>
+        </div>
       </div>
 
-      <div style="margin-top:10px">
-        <button type="button" class="rzpz-btn-ghost"
-                onclick="document.querySelector('[name=tpl_<?php echo $key; ?>_subject]').value=<?php echo json_encode( $def['subject'] ); ?>;document.querySelector('[name=tpl_<?php echo $key; ?>_body]').value=<?php echo json_encode( $def['body'] ); ?>">
+      <div style="margin-top:12px">
+        <button type="button" class="rzpz-btn-ghost" onclick="rzpzResetTpl('<?php echo esc_js($key); ?>')">
           ↺ Nulstil til standard
         </button>
       </div>
