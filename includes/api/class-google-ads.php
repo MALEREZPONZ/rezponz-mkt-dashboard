@@ -147,8 +147,34 @@ class RZPA_Google_Ads {
                     ?? $body['error']['message']
                     ?? 'HTTP ' . $http;
             $extra = " [CID:{$cid}" . ($mcc ? " MCC:{$mcc}" : '') . " HTTP:{$http}]";
+
+            // ── Ved 404: hent tilgængelige konti og vis dem i fejlbeskeden ──────
+            if ( $http === 404 ) {
+                delete_transient( 'rzpa_gads_api_version' );
+                $api_ver    = get_transient( 'rzpa_gads_api_version' ) ?: self::API_VERSIONS[0];
+                $list_res   = wp_remote_get(
+                    "https://googleads.googleapis.com/{$api_ver}/customers:listAccessibleCustomers",
+                    [ 'timeout' => 10, 'headers' => [
+                        'Authorization'   => 'Bearer ' . $token,
+                        'developer-token' => $opts['google_ads_developer_token'] ?? '',
+                    ] ]
+                );
+                if ( ! is_wp_error( $list_res ) ) {
+                    $list_body   = json_decode( wp_remote_retrieve_body( $list_res ), true );
+                    $accessible  = array_map(
+                        fn($rn) => preg_replace( '/^customers\//', '', $rn ),
+                        $list_body['resourceNames'] ?? []
+                    );
+                    if ( ! empty( $accessible ) ) {
+                        $extra .= ' | Tilgængelige konti: ' . implode( ', ', $accessible );
+                        $extra .= ' | Prøv at sætte Customer ID til en af disse';
+                    } else {
+                        $extra .= ' | Ingen tilgængelige konti fundet – tjek OAuth scopes';
+                    }
+                }
+            }
+
             self::$last_error = $details . $extra;
-            if ( $http === 404 ) delete_transient( 'rzpa_gads_api_version' );
             return [];
         }
 
