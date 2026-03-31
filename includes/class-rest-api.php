@@ -706,10 +706,15 @@ class RZPA_REST_API {
             return new WP_Error( 'missing_param', 'campaign_id required', [ 'status' => 400 ] );
         }
         $key    = 'rzpa_camp_ads_' . md5( $campaign_id );
+        $force  = (bool) $r->get_param( 'force' );
+        if ( $force ) delete_transient( $key );
         $cached = get_transient( $key );
         if ( $cached !== false ) return self::ok( $cached );
         $ads = RZPA_Meta_Ads::fetch_campaign_ads( $campaign_id );
-        if ( $ads ) set_transient( $key, $ads, HOUR_IN_SECONDS );
+        // Gem kun hvis det er et array uden fejl
+        if ( is_array( $ads ) && ! isset( $ads['__error'] ) && ! empty( $ads ) ) {
+            set_transient( $key, $ads, HOUR_IN_SECONDS );
+        }
         return self::ok( $ads );
     }
 

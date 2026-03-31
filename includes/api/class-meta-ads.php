@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class RZPA_Meta_Ads {
 
-    const API_BASE = 'https://graph.facebook.com/v19.0';
+    const API_BASE = 'https://graph.facebook.com/v21.0';
 
     public static $last_error = null;
 
@@ -139,21 +139,22 @@ class RZPA_Meta_Ads {
 
         $url = self::API_BASE . '/' . $campaign_id . '/ads?' . http_build_query( [
             'access_token' => $token,
-            'fields'       => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,body,title,call_to_action_type,link_url,object_story_spec},insights.summary{reach,impressions,spend,clicks}',
-            'effective_status' => '["ACTIVE"]',
+            'fields'       => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,body,title,call_to_action_type,link_url,object_story_spec},insights.date_preset(last_30d){reach,impressions,spend,clicks}',
             'limit'        => 50,
         ] );
 
         $res = wp_remote_get( $url, [ 'timeout' => 20 ] );
-        if ( is_wp_error( $res ) ) return [];
+        if ( is_wp_error( $res ) ) return [ '__error' => $res->get_error_message() ];
 
         $body = json_decode( wp_remote_retrieve_body( $res ), true );
-        if ( ! empty( $body['error'] ) ) return [];
+        if ( ! empty( $body['error'] ) ) {
+            return [ '__error' => $body['error']['message'] ?? 'Meta API fejl' ];
+        }
 
         $ads = [];
         foreach ( $body['data'] ?? [] as $ad ) {
             $creative = $ad['creative'] ?? [];
-            $insights = $ad['insights']['summary'] ?? [];
+            $insights = $ad['insights']['data'][0] ?? ( $ad['insights']['summary'] ?? [] );
 
             // Detect ad format
             $format = 'image';

@@ -53,9 +53,16 @@ const RZPA_App = (() => {
     }
 
     // ③ Rigtig REST-kald (kun når data mangler eller er forældet)
-    const { headers: extraHdr, ...restOpts } = opts;
-    const res  = await fetch(API + path, { headers: { ...HDR, ...(extraHdr||{}) }, ...restOpts });
-    const data = await res.json();
+    const { headers: extraHdr, timeout: reqTimeout, ...restOpts } = opts;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), (reqTimeout || 45) * 1000);
+    let res, data;
+    try {
+      res  = await fetch(API + path, { headers: { ...HDR, ...(extraHdr||{}) }, signal: ctrl.signal, ...restOpts });
+      data = await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (isGet) {
       try { sessionStorage.setItem(cacheKey, JSON.stringify({ data, ts: Date.now() })); }
@@ -1012,11 +1019,17 @@ const RZPA_App = (() => {
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 
-    api(`/meta/campaign-ads?campaign_id=${encodeURIComponent(campaignId)}`).then(r => {
-      const ads = r.data || [];
+    api(`/meta/campaign-ads?campaign_id=${encodeURIComponent(campaignId)}`, { timeout: 40 }).then(r => {
+      const raw = r?.data ?? r;
+      const ads = Array.isArray(raw) ? raw : [];
       if (!cards) return;
+      // Vis API-fejl hvis returneret
+      if (raw && raw.__error) {
+        cards.innerHTML = `<p style="color:#ef4444;text-align:center;padding:32px 24px">⚠️ Meta API fejl:<br><small>${raw.__error}</small></p>`;
+        return;
+      }
       if (!ads.length) {
-        cards.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:48px 24px">Ingen annoncer fundet for denne kampagne.<br><small>Det kan skyldes at kampagnen er ny, eller at din token mangler ads-tilladelse.</small></p>';
+        cards.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:48px 24px">Ingen annoncer fundet for denne kampagne.<br><small>Kampagnen kan have annoncer med paused/draft status — prøv at tjekke direkte i Meta Ads Manager.</small></p>';
         return;
       }
       const acctId = (RZPA.meta_account_id || '').replace(/^act_/, '');
