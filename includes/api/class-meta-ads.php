@@ -331,21 +331,23 @@ class RZPA_Meta_Ads {
 
         $token      = $opts['meta_access_token'];
         $account_id = $opts['meta_ad_account_id'];
-        $since      = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
-        $until      = gmdate( 'Y-m-d' );
+
+        // Brug date_preset – Meta accepterer denne format pålideligt.
+        // time_range med JSON-encoded streng URL-encodes forkert af http_build_query.
+        $preset_map = [ 7 => 'last_7_days', 30 => 'last_30_days', 90 => 'last_90_days' ];
+        $date_preset = $preset_map[ $days ] ?? 'last_30_days';
 
         // ── Trin 1: Hent performance-metrics via /insights endpoint ──────────
-        // Bruger dedikeret insights-endpoint i stedet for field expansion (mere pålidelig)
         $insights_url = self::API_BASE . '/act_' . $account_id . '/insights?' . http_build_query( [
             'access_token' => $token,
             'level'        => 'ad',
-            'time_range'   => wp_json_encode( [ 'since' => $since, 'until' => $until ] ),
+            'date_preset'  => $date_preset,
             'fields'       => 'ad_id,ad_name,reach,impressions,spend,clicks,cpc,cpm',
             'sort'         => 'reach_descending',
             'limit'        => 25,
         ] );
 
-        $res = wp_remote_get( $insights_url, [ 'timeout' => 30 ] );
+        $res = wp_remote_get( $insights_url, [ 'timeout' => 20 ] );
         if ( is_wp_error( $res ) ) {
             self::$last_error = $res->get_error_message();
             return [];
@@ -362,12 +364,11 @@ class RZPA_Meta_Ads {
         if ( empty( $body['data'] ) ) {
             // Fallback: Hent annoncer direkte fra /ads endpoint (viser paused/arkiverede med 0-metrics)
             $fallback_url = self::API_BASE . '/act_' . $account_id . '/ads?' . http_build_query( [
-                'access_token'     => $token,
-                'fields'           => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec{link_data{picture,image_url,child_attachments{picture}},video_data{image_url}}}',
-                'effective_status' => '["ACTIVE","PAUSED"]',
-                'limit'            => 25,
+                'access_token' => $token,
+                'fields'       => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec{link_data{picture,image_url,child_attachments{picture}},video_data{image_url}}}',
+                'limit'        => 25,
             ] );
-            $fb_res = wp_remote_get( $fallback_url, [ 'timeout' => 30 ] );
+            $fb_res = wp_remote_get( $fallback_url, [ 'timeout' => 15 ] );
             if ( ! is_wp_error( $fb_res ) ) {
                 $fb_body = json_decode( wp_remote_retrieve_body( $fb_res ), true );
                 if ( ! empty( $fb_body['data'] ) ) {
@@ -425,7 +426,7 @@ class RZPA_Meta_Ads {
             'fields'       => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec{link_data{picture,image_url,child_attachments{picture}},video_data{image_url},photo_data{images{original{uri}}}}}',
         ] );
 
-        $res2 = wp_remote_get( $batch_url, [ 'timeout' => 30 ] );
+        $res2 = wp_remote_get( $batch_url, [ 'timeout' => 15 ] );
         if ( ! is_wp_error( $res2 ) ) {
             $body2 = json_decode( wp_remote_retrieve_body( $res2 ), true );
             if ( ! empty( $body2 ) && empty( $body2['error'] ) ) {
