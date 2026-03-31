@@ -37,12 +37,12 @@ if ( $search ) {
     $params[] = '%' . $wpdb->esc_like( $search ) . '%';
 }
 
-$query    = "SELECT * FROM {$table} WHERE {$where} ORDER BY submitted_at DESC";
+$query     = "SELECT * FROM {$table} WHERE {$where} ORDER BY submitted_at DESC";
 $referrals = $params
     ? $wpdb->get_results( $wpdb->prepare( $query, ...$params ) )
     : $wpdb->get_results( $query );
 
-$total = count( $referrals );
+$total    = count( $referrals );
 $managers = RZPZ_Henvis::get_managers();
 
 $status_labels = [
@@ -61,7 +61,7 @@ $this_month = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE submitt
 #wpbody-content { background:#0d0d0d !important; }
 #wpcontent { background:#0d0d0d !important; }
 .rzpz-henvis-page { padding:20px; background:#0d0d0d; min-height:100vh; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:#e0e0e0; }
-.rzpz-ha-header { display:flex; align-items:center; gap:12px; margin-bottom:24px; }
+.rzpz-ha-header { display:flex; align-items:center; gap:12px; margin-bottom:24px; flex-wrap:wrap; }
 .rzpz-ha-title  { font-size:22px; font-weight:700; margin:0; color:#fff; }
 .rzpz-ha-badge  { background:#CCFF00; color:#0d0d0d; border-radius:20px; padding:2px 12px; font-size:13px; font-weight:700; }
 .rzpz-ha-kpi-row { display:flex; gap:14px; margin-bottom:24px; flex-wrap:wrap; }
@@ -81,7 +81,7 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
 .rzpz-ha-table th { background:#111; color:#aaa; font-size:12px; text-transform:uppercase; padding:10px 14px; text-align:left; border-bottom:1px solid #2a2a2a; }
 .rzpz-ha-table td { padding:10px 14px; border-bottom:1px solid #1f1f1f; color:#e0e0e0; font-size:13px; vertical-align:middle; }
 .rzpz-ha-table tr:last-child td { border-bottom:none; }
-.rzpz-ha-table tr:hover td { background:#222; }
+.rzpz-ha-table tr.rzpz-data-row:hover td { background:#222; }
 .rzpz-status { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
 .rzpz-status.pending   { background:#2d2d00; color:#f59e0b; }
 .rzpz-status.hired     { background:#0a2e0a; color:#4ade80; }
@@ -90,10 +90,35 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
 .rzpz-ha-form-inline select { background:#1e1e1e; border:1px solid #333; color:#e0e0e0; border-radius:4px; padding:3px 6px; font-size:12px; }
 .rzpz-ha-form-inline button { background:#CCFF00; color:#0d0d0d; border:none; border-radius:4px; padding:3px 8px; font-size:12px; cursor:pointer; font-weight:600; }
 .rzpz-ha-empty { text-align:center; padding:40px; color:#666; }
-.rzpz-tab-nav { display:flex; gap:4px; margin-bottom:24px; border-bottom:1px solid #2a2a2a; padding-bottom:0; }
-.rzpz-tab-nav a { padding:8px 18px; font-size:13px; font-weight:600; color:#888; text-decoration:none; border-radius:6px 6px 0 0; }
-.rzpz-tab-nav a.active { background:#1a1a1a; color:#CCFF00; border:1px solid #2a2a2a; border-bottom:1px solid #1a1a1a; }
-.rzpz-tab-nav a:hover { color:#fff; }
+/* Action buttons per row */
+.rzpz-row-actions { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.rzpz-btn-xs { background:transparent; border:1px solid #333; color:#aaa; border-radius:4px; padding:3px 8px; font-size:11px; cursor:pointer; white-space:nowrap; }
+.rzpz-btn-xs:hover { border-color:#555; color:#e0e0e0; }
+.rzpz-btn-xs.active { border-color:#CCFF00; color:#CCFF00; }
+/* Email log accordion */
+.rzpz-email-log-row { display:none; background:#0d0d0d; }
+.rzpz-email-log-row.open { display:table-row; }
+.rzpz-email-log-row td { padding:0 !important; border-bottom:2px solid #CCFF0030 !important; }
+.rzpz-email-log-inner { padding:16px 20px; display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+.rzpz-email-entry { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:8px; padding:12px 14px; font-size:12px; }
+.rzpz-email-entry .ee-label { font-size:10px; text-transform:uppercase; color:#555; letter-spacing:.5px; margin-bottom:4px; }
+.rzpz-email-entry .ee-to { color:#e0e0e0; font-weight:600; margin-bottom:3px; word-break:break-all; }
+.rzpz-email-entry .ee-time { color:#555; font-size:11px; }
+.rzpz-email-entry .ee-status { display:inline-block; margin-top:4px; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+.rzpz-email-entry .ee-status.ok  { background:#0a2e0a; color:#4ade80; }
+.rzpz-email-entry .ee-status.err { background:#2d0a0a; color:#f87171; }
+.rzpz-email-entry .ee-status.cc  { background:#0a1a2e; color:#60a5fa; }
+/* Note row */
+.rzpz-note-row { display:none; background:#0d0d0d; }
+.rzpz-note-row.open { display:table-row; }
+.rzpz-note-row td { padding:0 !important; border-bottom:2px solid #60a5fa30 !important; }
+.rzpz-note-inner { padding:14px 20px; }
+.rzpz-note-inner textarea { width:100%; background:#111; border:1px solid #333; color:#e0e0e0; border-radius:6px; padding:8px 12px; font-size:13px; resize:vertical; min-height:60px; box-sizing:border-box; font-family:inherit; }
+.rzpz-note-inner textarea:focus { outline:none; border-color:#60a5fa; }
+.rzpz-note-inner .note-actions { display:flex; gap:8px; margin-top:8px; align-items:center; }
+.rzpz-note-inner .note-save { background:#CCFF00; color:#0d0d0d; border:none; border-radius:4px; padding:5px 14px; font-size:12px; cursor:pointer; font-weight:700; }
+.rzpz-note-inner .note-cancel { background:transparent; border:1px solid #333; color:#888; border-radius:4px; padding:5px 12px; font-size:12px; cursor:pointer; }
+.rzpz-note-preview { font-size:11px; color:#60a5fa; max-width:160px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 </style>
 
 <div class="rzpz-henvis-page">
@@ -101,14 +126,24 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
   <div class="rzpz-ha-header">
     <h1 class="rzpz-ha-title">🤝 Henvisninger</h1>
     <span class="rzpz-ha-badge"><?php echo $total_all; ?> total</span>
-    <a href="<?php echo esc_url( admin_url('admin.php?page=rzpz-henvis-settings') ); ?>" style="margin-left:auto;background:#1e1e1e;border:1px solid #333;color:#aaa;padding:6px 14px;border-radius:6px;font-size:12px;text-decoration:none;">⚙️ Indstillinger & Managers</a>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <a href="<?php echo esc_url( admin_url( 'admin-post.php?action=rzpz_henvis_export_csv&_wpnonce=' . wp_create_nonce('rzpz_henvis_export_csv') . ( $filter_mgr ? '&mgr=' . urlencode($filter_mgr) : '' ) . ( $filter_status ? '&status=' . urlencode($filter_status) : '' ) . ( $search ? '&s=' . urlencode($search) : '' ) ) ); ?>"
+         style="background:#1e1e1e;border:1px solid #333;color:#aaa;padding:6px 14px;border-radius:6px;font-size:12px;text-decoration:none;">⬇ Eksportér CSV</a>
+      <a href="<?php echo esc_url( admin_url('admin.php?page=rzpz-henvis-settings') ); ?>"
+         style="background:#1e1e1e;border:1px solid #333;color:#aaa;padding:6px 14px;border-radius:6px;font-size:12px;text-decoration:none;">⚙️ Indstillinger</a>
+    </div>
   </div>
 
   <!-- Shortcode info -->
   <div class="rzpz-ha-shortcode-box">
     <div>
       <div class="lbl" style="margin-bottom:6px;">📋 Indsæt formularen på en side med denne shortcode:</div>
-      <code>[rezponz_henvis_ven]</code>
+      <code onclick="navigator.clipboard.writeText('[rezponz_henvis_ven]');this.textContent='✅ Kopieret!';setTimeout(()=>this.textContent='[rezponz_henvis_ven]',2000)" style="cursor:pointer">[rezponz_henvis_ven]</code>
+    </div>
+    <div style="margin-left:auto;font-size:12px;color:#555;text-align:right;line-height:1.8">
+      <a href="<?php echo esc_url( admin_url('admin.php?page=rzpz-henvis-settings&tab=form') ); ?>" style="color:#CCFF00;text-decoration:none;display:block">📝 Tilpas formular-felter</a>
+      <a href="<?php echo esc_url( admin_url('admin.php?page=rzpz-henvis-settings&tab=emails') ); ?>" style="color:#CCFF00;text-decoration:none;display:block">📧 Email-modtagere</a>
+      <a href="<?php echo esc_url( admin_url('admin.php?page=rzpz-henvis-settings&tab=qr') ); ?>" style="color:#CCFF00;text-decoration:none;display:block">📱 QR Kode</a>
     </div>
   </div>
 
@@ -146,36 +181,46 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
   <table class="rzpz-ha-table">
     <thead>
       <tr>
-        <th>#</th><th>Dato</th><th>Fra (medarbejder)</th><th>Til (ven)</th><th>Manager</th><th>Status</th><th>Skift status</th>
+        <th>#</th>
+        <th>Dato</th>
+        <th>Fra (medarbejder)</th>
+        <th>Til (ven)</th>
+        <th>Manager</th>
+        <th>Status</th>
+        <th>Handlinger</th>
       </tr>
     </thead>
     <tbody>
     <?php if ( empty( $referrals ) ) : ?>
       <tr><td colspan="7" class="rzpz-ha-empty">Ingen henvisninger fundet.</td></tr>
     <?php else : foreach ( $referrals as $r ) :
-      $mgr   = $managers[ $r->manager_key ] ?? null;
-      $label = $status_labels[ $r->status ] ?? $r->status;
-      $cls   = esc_attr( $r->status );
+      $mgr        = $managers[ $r->manager_key ] ?? null;
+      $label      = $status_labels[ $r->status ] ?? $r->status;
+      $cls        = esc_attr( $r->status );
+      $elog       = json_decode( $r->emails_log ?: '{}', true );
+      $has_log    = ! empty( $elog['sent_at'] ) || ! empty( $elog['manager'] );
+      $has_note   = ! empty( $r->notes );
+      $row_id     = (int) $r->id;
     ?>
-      <tr>
-        <td><?php echo $r->id; ?></td>
-        <td><?php echo esc_html( wp_date( 'd/m/Y H:i', strtotime( $r->submitted_at ) ) ); ?></td>
+      <!-- Data row -->
+      <tr class="rzpz-data-row">
+        <td><?php echo $row_id; ?></td>
+        <td style="white-space:nowrap"><?php echo esc_html( wp_date( 'd/m/Y H:i', strtotime( $r->submitted_at ) ) ); ?></td>
         <td>
           <strong><?php echo esc_html( $r->referrer_name ); ?></strong><br>
-          <small style="color:#888"><?php echo esc_html( $r->referrer_email ); ?></small><br>
-          <small style="color:#666"><?php echo esc_html( $r->referrer_phone ); ?></small>
+          <small style="color:#888"><?php echo esc_html( $r->referrer_email ); ?></small>
+          <?php if ( $r->referrer_phone ) : ?><br><small style="color:#666"><?php echo esc_html( $r->referrer_phone ); ?></small><?php endif; ?>
         </td>
         <td>
           <strong><?php echo esc_html( $r->friend_name ); ?></strong><br>
-          <small style="color:#888"><?php echo esc_html( $r->friend_email ); ?></small><br>
-          <small style="color:#666"><?php echo esc_html( $r->friend_phone ); ?></small>
+          <small style="color:#888"><?php echo esc_html( $r->friend_email ); ?></small>
+          <?php if ( $r->friend_phone ) : ?><br><small style="color:#666"><?php echo esc_html( $r->friend_phone ); ?></small><?php endif; ?>
         </td>
         <td><?php echo $mgr ? esc_html( $mgr['label'] ) : esc_html( $r->manager_key ); ?></td>
-        <td><span class="rzpz-status <?php echo $cls; ?>"><?php echo esc_html( $label ); ?></span></td>
         <td>
           <form method="post" class="rzpz-ha-form-inline" style="display:flex;gap:4px;align-items:center;">
             <?php wp_nonce_field( 'rzpz_henvis_status', 'rzpz_henvis_status_nonce' ); ?>
-            <input type="hidden" name="referral_id" value="<?php echo $r->id; ?>">
+            <input type="hidden" name="referral_id" value="<?php echo $row_id; ?>">
             <select name="new_status">
               <?php foreach ( $status_labels as $k => $l ) : ?>
                 <option value="<?php echo esc_attr($k); ?>" <?php selected($r->status,$k); ?>><?php echo esc_html($l); ?></option>
@@ -184,9 +229,130 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
             <button type="submit">Gem</button>
           </form>
         </td>
+        <td>
+          <div class="rzpz-row-actions">
+            <?php if ( $has_log ) : ?>
+              <button class="rzpz-btn-xs" onclick="rzpzToggleRow('email-<?php echo $row_id; ?>', this)">📧 Emails</button>
+            <?php else : ?>
+              <span style="font-size:11px;color:#444">📧 —</span>
+            <?php endif; ?>
+            <button class="rzpz-btn-xs<?php echo $has_note ? ' active' : ''; ?>" onclick="rzpzToggleRow('note-<?php echo $row_id; ?>', this)">
+              📝 <?php echo $has_note ? 'Note' : 'Tilføj note'; ?>
+            </button>
+          </div>
+          <?php if ( $has_note ) : ?>
+            <div class="rzpz-note-preview" style="margin-top:4px" title="<?php echo esc_attr( $r->notes ); ?>"><?php echo esc_html( $r->notes ); ?></div>
+          <?php endif; ?>
+        </td>
       </tr>
+
+      <!-- Email log accordion -->
+      <?php if ( $has_log ) : ?>
+      <tr class="rzpz-email-log-row" id="email-<?php echo $row_id; ?>">
+        <td colspan="7">
+          <div class="rzpz-email-log-inner">
+            <?php
+            // Manager email
+            $em = $elog['manager'] ?? null;
+            if ( $em ) :
+            ?>
+            <div class="rzpz-email-entry">
+              <div class="ee-label">Manager</div>
+              <div class="ee-to"><?php echo esc_html( $em['name'] ?? '' ); ?><br><?php echo esc_html( $em['to'] ?? '' ); ?></div>
+              <?php if ( ! empty( $em['time'] ) ) : ?><div class="ee-time">⏰ <?php echo esc_html( $elog['sent_at'] ?? '' ); ?> – <?php echo esc_html( $em['time'] ); ?></div><?php endif; ?>
+              <div class="ee-status <?php echo empty($em['sent']) ? 'err' : 'ok'; ?>">
+                <?php echo empty($em['sent']) ? '❌ Ikke sendt' : '✅ Sendt'; ?>
+              </div>
+            </div>
+            <?php endif; ?>
+
+            <?php
+            // Referrer email
+            $er = $elog['referrer'] ?? null;
+            if ( $er ) :
+            ?>
+            <div class="rzpz-email-entry">
+              <div class="ee-label">Medarbejder (afsender)</div>
+              <div class="ee-to"><?php echo esc_html( $er['name'] ?? '' ); ?><br><?php echo esc_html( $er['to'] ?? '' ); ?></div>
+              <?php if ( ! empty( $er['time'] ) ) : ?><div class="ee-time">⏰ <?php echo esc_html( $er['time'] ); ?></div><?php endif; ?>
+              <div class="ee-status <?php echo empty($er['sent']) ? 'err' : 'ok'; ?>">
+                <?php echo empty($er['sent']) ? '❌ Ikke sendt' : '✅ Sendt'; ?>
+              </div>
+            </div>
+            <?php endif; ?>
+
+            <?php
+            // Friend email
+            $ef = $elog['friend'] ?? null;
+            if ( $ef ) :
+            ?>
+            <div class="rzpz-email-entry">
+              <div class="ee-label">Ven (modtager)</div>
+              <div class="ee-to"><?php echo esc_html( $ef['name'] ?? '' ); ?><br><?php echo esc_html( $ef['to'] ?? '' ); ?></div>
+              <?php if ( ! empty( $ef['time'] ) ) : ?><div class="ee-time">⏰ <?php echo esc_html( $ef['time'] ); ?></div><?php endif; ?>
+              <div class="ee-status <?php echo empty($ef['sent']) ? 'err' : 'ok'; ?>">
+                <?php echo empty($ef['sent']) ? '❌ Ikke sendt' : '✅ Sendt'; ?>
+              </div>
+            </div>
+            <?php endif; ?>
+
+            <?php
+            // CC recipients
+            $cc_list = $elog['extra'] ?? [];
+            if ( ! empty( $cc_list ) ) :
+            ?>
+            <div class="rzpz-email-entry">
+              <div class="ee-label">CC Modtagere</div>
+              <?php foreach ( $cc_list as $cc ) : ?>
+                <div class="ee-to" style="margin-bottom:4px">
+                  <?php echo esc_html( $cc['name'] ?? '' ); ?><br>
+                  <span style="font-weight:400;color:#888"><?php echo esc_html( $cc['email'] ?? '' ); ?></span>
+                </div>
+              <?php endforeach; ?>
+              <div class="ee-status cc">CC – alle mails</div>
+            </div>
+            <?php endif; ?>
+
+          </div>
+        </td>
+      </tr>
+      <?php endif; ?>
+
+      <!-- Note row -->
+      <tr class="rzpz-note-row" id="note-<?php echo $row_id; ?>">
+        <td colspan="7">
+          <div class="rzpz-note-inner">
+            <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
+              <input type="hidden" name="action"      value="rzpz_henvis_save_note">
+              <input type="hidden" name="referral_id" value="<?php echo $row_id; ?>">
+              <?php wp_nonce_field( 'rzpz_henvis_save_note' ); ?>
+              <textarea name="note" placeholder="Skriv en intern note om denne henvisning…"><?php echo esc_textarea( $r->notes ); ?></textarea>
+              <div class="note-actions">
+                <button type="submit" class="note-save">💾 Gem note</button>
+                <button type="button" class="note-cancel" onclick="rzpzToggleRow('note-<?php echo $row_id; ?>', null, true)">Annuller</button>
+              </div>
+            </form>
+          </div>
+        </td>
+      </tr>
+
     <?php endforeach; endif; ?>
     </tbody>
   </table>
 
 </div>
+
+<script>
+function rzpzToggleRow(id, btn, forceClose) {
+    const row = document.getElementById(id);
+    if (!row) return;
+    const isOpen = row.classList.contains('open');
+    if (forceClose || isOpen) {
+        row.classList.remove('open');
+        if (btn) btn.classList.remove('active');
+    } else {
+        row.classList.add('open');
+        if (btn) btn.classList.add('active');
+    }
+}
+</script>
