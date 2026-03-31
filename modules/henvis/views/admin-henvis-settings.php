@@ -1,15 +1,20 @@
 <?php if ( ! defined( 'ABSPATH' ) ) exit;
 
-$managers    = RZPZ_Henvis::get_managers();
-$form_config = RZPZ_Henvis::get_form_config();
-$extra_recip = RZPZ_Henvis::get_extra_recipients();
-$smtp        = RZPZ_Henvis::get_smtp();
-$tab         = sanitize_key( $_GET['tab'] ?? 'managers' );
+$managers        = RZPZ_Henvis::get_managers();
+$form_config     = RZPZ_Henvis::get_form_config();
+$extra_recip     = RZPZ_Henvis::get_extra_recipients();
+$smtp            = RZPZ_Henvis::get_smtp();
+$email_templates = RZPZ_Henvis::get_email_templates();
+$custom_fields   = RZPZ_Henvis::get_custom_fields();
+$tab             = sanitize_key( $_GET['tab'] ?? 'managers' );
 
 // Notice flags
 $saved       = ! empty( $_GET['saved'] );
 $deleted     = ! empty( $_GET['deleted'] );
 $smtp_saved  = ! empty( $_GET['smtp_saved'] );
+$tpl_saved   = ! empty( $_GET['tpl_saved'] );
+$cf_saved    = ! empty( $_GET['cf_saved'] );
+$cf_deleted  = ! empty( $_GET['cf_deleted'] );
 $recip_saved = ! empty( $_GET['recip_saved'] );
 $recip_del   = ! empty( $_GET['recip_deleted'] );
 $test_sent   = isset( $_GET['test_sent'] ) ? intval( $_GET['test_sent'] ) : null;
@@ -98,10 +103,11 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
 
   <!-- Tabs -->
   <div class="rzpz-tabs">
-    <a href="<?php echo esc_url( $base_url . '&tab=managers' ); ?>" class="<?php echo $tab === 'managers' ? 'active' : ''; ?>">👥 Managers</a>
-    <a href="<?php echo esc_url( $base_url . '&tab=emails' ); ?>"   class="<?php echo $tab === 'emails'   ? 'active' : ''; ?>">📧 Email</a>
-    <a href="<?php echo esc_url( $base_url . '&tab=form' ); ?>"     class="<?php echo $tab === 'form'     ? 'active' : ''; ?>">📝 Formular</a>
-    <a href="<?php echo esc_url( $base_url . '&tab=qr' ); ?>"       class="<?php echo $tab === 'qr'       ? 'active' : ''; ?>">📱 QR Kode</a>
+    <a href="<?php echo esc_url( $base_url . '&tab=managers' ); ?>"   class="<?php echo $tab === 'managers'   ? 'active' : ''; ?>">👥 Managers</a>
+    <a href="<?php echo esc_url( $base_url . '&tab=emails' ); ?>"     class="<?php echo $tab === 'emails'     ? 'active' : ''; ?>">📧 Email</a>
+    <a href="<?php echo esc_url( $base_url . '&tab=skabeloner' ); ?>" class="<?php echo $tab === 'skabeloner' ? 'active' : ''; ?>">✉️ Email skabeloner</a>
+    <a href="<?php echo esc_url( $base_url . '&tab=form' ); ?>"       class="<?php echo $tab === 'form'       ? 'active' : ''; ?>">📝 Formular</a>
+    <a href="<?php echo esc_url( $base_url . '&tab=qr' ); ?>"         class="<?php echo $tab === 'qr'         ? 'active' : ''; ?>">📱 QR Kode</a>
   </div>
 
   <?php
@@ -447,6 +453,182 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
     <div style="display:flex;gap:12px;align-items:center">
       <button type="submit" class="rzpz-btn-primary">💾 Gem formular-indstillinger</button>
       <a href="<?php echo esc_url( $base_url . '&tab=form' ); ?>" class="rzpz-btn-ghost">Annuller</a>
+    </div>
+  </form>
+
+  <!-- Custom fields -->
+  <div class="rzpz-hs-card" style="margin-top:24px">
+    <h2>➕ Ekstra felter</h2>
+    <p>Tilføj egne felter til formularen. De vises under enten "Dine oplysninger" eller "Din ven" sektionen.</p>
+
+    <?php if ( $cf_saved )   : ?><div class="rzpz-notice success">✅ Felt tilføjet.</div><?php endif; ?>
+    <?php if ( $cf_deleted ) : ?><div class="rzpz-notice success">🗑 Felt slettet.</div><?php endif; ?>
+    <?php if ( ! empty( $_GET['cf_error'] ) ) : ?><div class="rzpz-notice error">❌ Ugyldigt felt – angiv som minimum en label.</div><?php endif; ?>
+
+    <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
+      <input type="hidden" name="action" value="rzpz_henvis_add_custom_field">
+      <?php wp_nonce_field( 'rzpz_henvis_add_custom_field' ); ?>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr 2fr 1fr 1fr auto;gap:10px;align-items:end;flex-wrap:wrap">
+        <div class="rzpz-field">
+          <label>Label (feltnavn) *</label>
+          <input type="text" name="cf_label" placeholder="Fx Jobtype, Alder, Beskæftigelse…" required>
+        </div>
+        <div class="rzpz-field">
+          <label>Felttype</label>
+          <select name="cf_type" id="cf-type-sel" onchange="document.getElementById('cf-options-row').style.display=this.value==='select'?'block':'none'">
+            <option value="text">Tekst</option>
+            <option value="tel">Telefon</option>
+            <option value="email">Email</option>
+            <option value="number">Tal</option>
+            <option value="textarea">Lang tekst</option>
+            <option value="select">Dropdown</option>
+            <option value="checkbox">Afkrydsning</option>
+          </select>
+        </div>
+        <div class="rzpz-field">
+          <label>Placeholder</label>
+          <input type="text" name="cf_placeholder" placeholder="Fx Vælg jobtype…">
+        </div>
+        <div class="rzpz-field">
+          <label>Sektion</label>
+          <select name="cf_section">
+            <option value="referrer">Medarbejder</option>
+            <option value="friend">Ven</option>
+          </select>
+        </div>
+        <div class="rzpz-field" style="min-width:90px">
+          <label>Påkrævet</label>
+          <div style="padding:8px 0"><input type="checkbox" name="cf_required" value="1" style="accent-color:#CCFF00;width:16px;height:16px"> Ja</div>
+        </div>
+        <div>
+          <button type="submit" class="rzpz-btn-primary">+ Tilføj</button>
+        </div>
+      </div>
+
+      <div id="cf-options-row" style="display:none;margin-top:12px">
+        <div class="rzpz-field" style="max-width:400px">
+          <label>Dropdown valgmuligheder <span style="color:#555;font-weight:400">(én per linje)</span></label>
+          <textarea name="cf_options" rows="4" placeholder="Fuldtid&#10;Deltid&#10;Freelance&#10;Praktikant"></textarea>
+        </div>
+      </div>
+    </form>
+
+    <?php if ( empty($custom_fields) ) : ?>
+      <p style="color:#555;text-align:center;padding:20px 0;margin-top:16px">Ingen ekstra felter endnu. Tilføj et ovenfor.</p>
+    <?php else : ?>
+    <table class="rzpz-mgr-table" style="margin-top:20px">
+      <thead><tr><th>Label</th><th>Type</th><th>Sektion</th><th>Påkrævet</th><th>Placeholder</th><th></th></tr></thead>
+      <tbody>
+      <?php
+      $type_labels = [ 'text'=>'Tekst','tel'=>'Telefon','email'=>'Email','number'=>'Tal','textarea'=>'Lang tekst','select'=>'Dropdown','checkbox'=>'Afkrydsning' ];
+      $section_labels = [ 'referrer' => 'Medarbejder', 'friend' => 'Ven' ];
+      foreach ( $custom_fields as $cf ) : ?>
+        <tr>
+          <td><strong><?php echo esc_html( $cf['label'] ); ?></strong></td>
+          <td><?php echo esc_html( $type_labels[ $cf['type'] ] ?? $cf['type'] ); ?>
+            <?php if ( $cf['type'] === 'select' && ! empty( $cf['options'] ) ) : ?>
+              <br><span style="font-size:11px;color:#555"><?php echo esc_html( implode(', ', array_slice($cf['options'],0,3)) . (count($cf['options'])>3?' …':'') ); ?></span>
+            <?php endif; ?>
+          </td>
+          <td><?php echo esc_html( $section_labels[ $cf['section'] ] ?? $cf['section'] ); ?></td>
+          <td><?php echo ! empty($cf['required']) ? '<span style="color:#4ade80">✓ Ja</span>' : '<span style="color:#555">Nej</span>'; ?></td>
+          <td style="color:#666"><?php echo esc_html( $cf['placeholder'] ?? '' ); ?></td>
+          <td>
+            <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" onsubmit="return confirm('Slet dette felt?')">
+              <input type="hidden" name="action" value="rzpz_henvis_delete_custom_field">
+              <input type="hidden" name="cf_id"  value="<?php echo esc_attr( $cf['id'] ); ?>">
+              <?php wp_nonce_field( 'rzpz_henvis_delete_custom_field' ); ?>
+              <button type="submit" class="rzpz-btn-danger">🗑 Slet</button>
+            </form>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+    <?php endif; ?>
+  </div>
+
+  <?php
+  // ── TAB: EMAIL SKABELONER ─────────────────────────────────────────────────
+  elseif ( $tab === 'skabeloner' ) :
+    $tpl_labels = [
+        'manager'     => [ 'icon' => '👔', 'title' => 'Email til Manager',     'desc' => 'Sendes til Senior Manageren når en medarbejder sender en ny henvisning.' ],
+        'ven'         => [ 'icon' => '👋', 'title' => 'Email til Ven',          'desc' => 'Invitations-email sendt til vennen/kandidaten.' ],
+        'medarbejder' => [ 'icon' => '✅', 'title' => 'Email til Medarbejder',  'desc' => 'Bekræftelse sendt til den medarbejder der sendte henvisningen.' ],
+    ];
+    $variables = [
+        '{{medarbejder_navn}}'  => 'Medarbejderens navn',
+        '{{medarbejder_email}}' => 'Medarbejderens email',
+        '{{medarbejder_tlf}}'   => 'Medarbejderens telefon',
+        '{{ven_navn}}'          => 'Vennens navn',
+        '{{ven_email}}'         => 'Vennens email',
+        '{{ven_tlf}}'           => 'Vennens telefon',
+        '{{manager_navn}}'      => 'Managerens navn',
+        '{{manager_email}}'     => 'Managerens email',
+        '{{karriere_link}}'     => 'Link til karrieresiden',
+        '{{dato}}'              => 'Dato og tidspunkt',
+        '{{ekstra_felter}}'     => 'Alle ekstra felter (HTML liste)',
+    ];
+  ?>
+
+  <?php if ( $tpl_saved ) : ?><div class="rzpz-notice success">✅ Email skabeloner gemt.</div><?php endif; ?>
+
+  <!-- Variables help -->
+  <div class="rzpz-hs-card" style="border-color:#CCFF0030">
+    <h2>📋 Tilgængelige variabler</h2>
+    <p>Indsæt disse i emnelinjen eller brødteksten – de erstattes automatisk med de rigtige værdier:</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+      <?php foreach ( $variables as $var => $desc ) : ?>
+        <span onclick="navigator.clipboard.writeText('<?php echo esc_attr($var); ?>')"
+              title="Klik for at kopiere: <?php echo esc_attr($desc); ?>"
+              style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:monospace;color:#CCFF00">
+          <?php echo esc_html($var); ?>
+          <span style="color:#555;font-family:sans-serif;font-size:10px;margin-left:4px"><?php echo esc_html($desc); ?></span>
+        </span>
+      <?php endforeach; ?>
+    </div>
+    <p style="margin-top:10px;color:#555;font-size:12px">Klik på en variabel for at kopiere den til udklipsholderen.</p>
+  </div>
+
+  <!-- Template forms -->
+  <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
+    <input type="hidden" name="action" value="rzpz_henvis_save_email_templates">
+    <?php wp_nonce_field( 'rzpz_henvis_save_email_templates' ); ?>
+
+    <?php foreach ( $tpl_labels as $key => $meta ) :
+      $tpl = $email_templates[ $key ] ?? [];
+      $def = RZPZ_Henvis::get_default_email_templates()[ $key ] ?? [];
+    ?>
+    <div class="rzpz-hs-card">
+      <h2><?php echo esc_html( $meta['icon'] . ' ' . $meta['title'] ); ?></h2>
+      <p><?php echo esc_html( $meta['desc'] ); ?></p>
+
+      <div class="rzpz-field" style="margin-bottom:14px">
+        <label>Emnelinje</label>
+        <input type="text" name="tpl_<?php echo $key; ?>_subject"
+               value="<?php echo esc_attr( $tpl['subject'] ?? $def['subject'] ); ?>"
+               style="width:100%;box-sizing:border-box"
+               placeholder="Emnelinje…">
+      </div>
+
+      <div class="rzpz-field">
+        <label>Brødtekst <span style="color:#555;font-weight:400;font-size:11px">(HTML tilladt — brug &lt;p&gt;, &lt;strong&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;a&gt;)</span></label>
+        <textarea name="tpl_<?php echo $key; ?>_body" rows="12"
+                  style="width:100%;box-sizing:border-box;font-family:monospace;font-size:12px;line-height:1.6"><?php echo esc_textarea( $tpl['body'] ?? $def['body'] ); ?></textarea>
+      </div>
+
+      <div style="margin-top:10px">
+        <button type="button" class="rzpz-btn-ghost"
+                onclick="document.querySelector('[name=tpl_<?php echo $key; ?>_subject]').value=<?php echo json_encode( $def['subject'] ); ?>;document.querySelector('[name=tpl_<?php echo $key; ?>_body]').value=<?php echo json_encode( $def['body'] ); ?>">
+          ↺ Nulstil til standard
+        </button>
+      </div>
+    </div>
+    <?php endforeach; ?>
+
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:32px">
+      <button type="submit" class="rzpz-btn-primary">💾 Gem alle email skabeloner</button>
     </div>
   </form>
 

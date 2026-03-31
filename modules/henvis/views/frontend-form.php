@@ -1,12 +1,53 @@
-<?php if ( ! defined( 'ABSPATH' ) ) exit; ?>
+<?php if ( ! defined( 'ABSPATH' ) ) exit;
+
+$custom_fields_all = RZPZ_Henvis::get_custom_fields();
+$cf_referrer       = array_filter( $custom_fields_all, fn($f) => ($f['section']??'referrer') === 'referrer' );
+$cf_friend         = array_filter( $custom_fields_all, fn($f) => ($f['section']??'referrer') === 'friend' );
+
+/**
+ * Render a single custom field input.
+ */
+function rzpz_render_custom_field( array $cf, array $post ) : void {
+    $id    = esc_attr( $cf['id'] );
+    $label = esc_html( $cf['label'] );
+    $ph    = esc_attr( $cf['placeholder'] ?? '' );
+    $req   = ! empty( $cf['required'] );
+    $val   = esc_attr( $post[ $cf['id'] ] ?? '' );
+    echo '<div class="rzpz-field">';
+    echo '<label for="' . $id . '">' . $label . ( $req ? ' <span class="req">*</span>' : '' ) . '</label>';
+    switch ( $cf['type'] ?? 'text' ) {
+        case 'textarea':
+            echo '<textarea name="' . $id . '" id="' . $id . '" placeholder="' . $ph . '"' . ( $req ? ' required' : '' ) . '>' . $val . '</textarea>';
+            break;
+        case 'select':
+            echo '<select name="' . $id . '" id="' . $id . '"' . ( $req ? ' required' : '' ) . '>';
+            echo '<option value="">' . esc_html( $cf['placeholder'] ?: '– Vælg –' ) . '</option>';
+            foreach ( $cf['options'] ?? [] as $opt ) {
+                $o = esc_html( $opt );
+                $s = ( $post[ $cf['id'] ] ?? '' ) === $opt ? ' selected' : '';
+                echo '<option value="' . $o . '"' . $s . '>' . $o . '</option>';
+            }
+            echo '</select>';
+            break;
+        case 'checkbox':
+            $checked = ! empty( $post[ $cf['id'] ] ) ? ' checked' : '';
+            echo '<label class="rzpz-checkbox-label" style="font-weight:400"><input type="checkbox" name="' . $id . '" value="1"' . $checked . ( $req ? ' required' : '' ) . '> ' . $label . '</label>';
+            break;
+        default:
+            $type = in_array( $cf['type'], ['text','tel','email','number'], true ) ? $cf['type'] : 'text';
+            echo '<input type="' . $type . '" name="' . $id . '" id="' . $id . '" placeholder="' . $ph . '" value="' . $val . '"' . ( $req ? ' required' : '' ) . '>';
+    }
+    echo '</div>';
+}
+?>
 <div class="rzpz-henvis-wrap">
 
 <?php if ( ! empty( $result['success'] ) ) : ?>
 
     <div class="rzpz-henvis-success">
         <div class="rzpz-success-icon">🎉</div>
-        <h2><?php _e( 'Tak for din henvisning!', 'rezponz-analytics' ); ?></h2>
-        <p><?php _e( 'Vi har sendt en bekræftelse til dig og din ven, og notificeret din Senior Manager. Godt gået!', 'rezponz-analytics' ); ?></p>
+        <h2><?php echo esc_html( $cfg['success_title'] ); ?></h2>
+        <p><?php echo esc_html( $cfg['success_message'] ); ?></p>
     </div>
 
 <?php else : ?>
@@ -24,110 +65,130 @@
     <input type="hidden" name="rzpz_captcha_hash"     value="<?php echo esc_attr( $hash ); ?>">
 
     <!-- ── CAPTCHA ──────────────────────────────────────────────────────────── -->
+    <?php if ( $cfg['show_captcha'] ) : ?>
     <div class="rzpz-captcha-card" id="rzpz-captcha-step">
         <div class="rzpz-captcha-icon">🛡️</div>
         <h3><?php _e( 'Bekræft at du er et menneske', 'rezponz-analytics' ); ?></h3>
         <p class="rzpz-captcha-question">
             <?php printf( __( 'Hvad er %d + %d?', 'rezponz-analytics' ), $a, $b ); ?>
         </p>
-        <input
-            type="number"
-            name="rzpz_captcha_answer"
-            id="rzpz_captcha_answer"
-            class="rzpz-captcha-input"
-            placeholder="Dit svar…"
-            autocomplete="off"
-            <?php if ( ! empty( $result['error'] ) && strpos( $result['error'], 'menneskeverifikation' ) !== false ) : ?>
-                autofocus
-            <?php endif; ?>
-        >
+        <input type="number" name="rzpz_captcha_answer" id="rzpz_captcha_answer"
+               class="rzpz-captcha-input" placeholder="Dit svar…" autocomplete="off"
+               <?php if ( ! empty( $result['error'] ) && strpos( $result['error'], 'menneskeverifikation' ) !== false ) : ?>autofocus<?php endif; ?>>
         <button type="button" class="rzpz-captcha-btn" id="rzpz-captcha-confirm">
             ✅ <?php _e( 'Bekræft', 'rezponz-analytics' ); ?>
         </button>
     </div>
+    <?php endif; ?>
 
-    <!-- ── Referral form (hidden until CAPTCHA passed) ──────────────────────── -->
-    <div class="rzpz-form-fields" id="rzpz-form-fields" style="display:none;">
+    <!-- ── Form fields ─────────────────────────────────────────────────────── -->
+    <div class="rzpz-form-fields" id="rzpz-form-fields" <?php echo $cfg['show_captcha'] ? 'style="display:none;"' : ''; ?>>
 
+        <!-- Section: Referrer -->
         <div class="rzpz-form-section">
-            <h3 class="rzpz-section-title">👤 <?php _e( 'Dine oplysninger', 'rezponz-analytics' ); ?></h3>
+            <h3 class="rzpz-section-title"><?php echo esc_html( $cfg['section_referrer'] ); ?></h3>
 
+            <?php
+            $f = $cfg['fields'];
+            // Row: name + phone
+            $show_phone = ! empty( $f['referrer_phone']['enabled'] );
+            ?>
             <div class="rzpz-field-row">
                 <div class="rzpz-field">
-                    <label for="referrer_name"><?php _e( 'Dit navn', 'rezponz-analytics' ); ?> <span class="req">*</span></label>
+                    <label for="referrer_name"><?php echo esc_html( $f['referrer_name']['label'] ); ?> <span class="req">*</span></label>
                     <input type="text" name="referrer_name" id="referrer_name" required
                         value="<?php echo esc_attr( $_POST['referrer_name'] ?? '' ); ?>"
-                        placeholder="<?php esc_attr_e( 'Dit fulde navn', 'rezponz-analytics' ); ?>">
+                        placeholder="<?php echo esc_attr( $f['referrer_name']['placeholder'] ); ?>">
                 </div>
+                <?php if ( $show_phone ) : ?>
                 <div class="rzpz-field">
-                    <label for="referrer_phone"><?php _e( 'Telefon', 'rezponz-analytics' ); ?> <span class="req">*</span></label>
-                    <input type="tel" name="referrer_phone" id="referrer_phone" required
+                    <label for="referrer_phone"><?php echo esc_html( $f['referrer_phone']['label'] ); ?><?php echo ! empty($f['referrer_phone']['required']) ? ' <span class="req">*</span>' : ''; ?></label>
+                    <input type="tel" name="referrer_phone" id="referrer_phone"
+                        <?php echo ! empty($f['referrer_phone']['required']) ? 'required' : ''; ?>
                         value="<?php echo esc_attr( $_POST['referrer_phone'] ?? '' ); ?>"
-                        placeholder="+45 12 34 56 78">
+                        placeholder="<?php echo esc_attr( $f['referrer_phone']['placeholder'] ); ?>">
                 </div>
+                <?php endif; ?>
             </div>
 
             <div class="rzpz-field-row">
                 <div class="rzpz-field">
-                    <label for="referrer_email"><?php _e( 'Email', 'rezponz-analytics' ); ?> <span class="req">*</span></label>
+                    <label for="referrer_email"><?php echo esc_html( $f['referrer_email']['label'] ); ?> <span class="req">*</span></label>
                     <input type="email" name="referrer_email" id="referrer_email" required
                         value="<?php echo esc_attr( $_POST['referrer_email'] ?? '' ); ?>"
-                        placeholder="din@email.dk">
+                        placeholder="<?php echo esc_attr( $f['referrer_email']['placeholder'] ); ?>">
                 </div>
                 <div class="rzpz-field">
-                    <label for="manager_key"><?php _e( 'Hvilken Senior Manager arbejder du for?', 'rezponz-analytics' ); ?> <span class="req">*</span></label>
+                    <label for="manager_key"><?php echo esc_html( $cfg['manager_label'] ); ?> <span class="req">*</span></label>
                     <select name="manager_key" id="manager_key" required>
-                        <option value=""><?php _e( '– Vælg Senior Manager –', 'rezponz-analytics' ); ?></option>
+                        <option value=""><?php echo esc_html( $cfg['manager_placeholder'] ); ?></option>
                         <?php foreach ( RZPZ_Henvis::get_managers() as $key => $mgr ) : ?>
-                            <option value="<?php echo esc_attr( $key ); ?>"
-                                <?php selected( $_POST['manager_key'] ?? '', $key ); ?>>
+                            <option value="<?php echo esc_attr( $key ); ?>" <?php selected( $_POST['manager_key'] ?? '', $key ); ?>>
                                 <?php echo esc_html( $mgr['label'] ); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
             </div>
+
+            <?php if ( ! empty( $cf_referrer ) ) : ?>
+            <div class="rzpz-field-row rzpz-cf-row">
+                <?php foreach ( $cf_referrer as $cf ) : rzpz_render_custom_field( $cf, $_POST ); endforeach; ?>
+            </div>
+            <?php endif; ?>
         </div>
 
+        <!-- Section: Friend -->
         <div class="rzpz-form-section">
-            <h3 class="rzpz-section-title">🤝 <?php _e( 'Din ven', 'rezponz-analytics' ); ?></h3>
+            <h3 class="rzpz-section-title"><?php echo esc_html( $cfg['section_friend'] ); ?></h3>
 
+            <?php $show_fphone = ! empty( $f['friend_phone']['enabled'] ); ?>
             <div class="rzpz-field-row">
                 <div class="rzpz-field">
-                    <label for="friend_name"><?php _e( 'Vennens navn', 'rezponz-analytics' ); ?> <span class="req">*</span></label>
+                    <label for="friend_name"><?php echo esc_html( $f['friend_name']['label'] ); ?> <span class="req">*</span></label>
                     <input type="text" name="friend_name" id="friend_name" required
                         value="<?php echo esc_attr( $_POST['friend_name'] ?? '' ); ?>"
-                        placeholder="<?php esc_attr_e( 'Vennens fulde navn', 'rezponz-analytics' ); ?>">
+                        placeholder="<?php echo esc_attr( $f['friend_name']['placeholder'] ); ?>">
                 </div>
+                <?php if ( $show_fphone ) : ?>
                 <div class="rzpz-field">
-                    <label for="friend_phone"><?php _e( 'Telefon', 'rezponz-analytics' ); ?> <span class="req">*</span></label>
-                    <input type="tel" name="friend_phone" id="friend_phone" required
+                    <label for="friend_phone"><?php echo esc_html( $f['friend_phone']['label'] ); ?><?php echo ! empty($f['friend_phone']['required']) ? ' <span class="req">*</span>' : ''; ?></label>
+                    <input type="tel" name="friend_phone" id="friend_phone"
+                        <?php echo ! empty($f['friend_phone']['required']) ? 'required' : ''; ?>
                         value="<?php echo esc_attr( $_POST['friend_phone'] ?? '' ); ?>"
-                        placeholder="+45 12 34 56 78">
+                        placeholder="<?php echo esc_attr( $f['friend_phone']['placeholder'] ); ?>">
                 </div>
+                <?php endif; ?>
             </div>
 
             <div class="rzpz-field-row">
                 <div class="rzpz-field">
-                    <label for="friend_email"><?php _e( 'Email', 'rezponz-analytics' ); ?> <span class="req">*</span></label>
+                    <label for="friend_email"><?php echo esc_html( $f['friend_email']['label'] ); ?> <span class="req">*</span></label>
                     <input type="email" name="friend_email" id="friend_email" required
                         value="<?php echo esc_attr( $_POST['friend_email'] ?? '' ); ?>"
-                        placeholder="vennens@email.dk">
+                        placeholder="<?php echo esc_attr( $f['friend_email']['placeholder'] ); ?>">
                 </div>
             </div>
+
+            <?php if ( ! empty( $cf_friend ) ) : ?>
+            <div class="rzpz-field-row rzpz-cf-row">
+                <?php foreach ( $cf_friend as $cf ) : rzpz_render_custom_field( $cf, $_POST ); endforeach; ?>
+            </div>
+            <?php endif; ?>
         </div>
 
+        <!-- Consent -->
         <div class="rzpz-field rzpz-consent-field">
             <label class="rzpz-checkbox-label">
                 <input type="checkbox" name="rzpz_consent" value="1"
                     <?php checked( ! empty( $_POST['rzpz_consent'] ) ); ?> required>
-                <span><?php _e( 'Jeg bekræfter at min ven er okay med at blive kontaktet af Rezponz.', 'rezponz-analytics' ); ?></span>
+                <span><?php echo esc_html( $cfg['consent_text'] ); ?></span>
             </label>
         </div>
 
         <div class="rzpz-submit-row">
             <button type="submit" name="rzpz_henvis_submit" value="1" class="rzpz-submit-btn">
-                🚀 <?php _e( 'Send henvisning', 'rezponz-analytics' ); ?>
+                <?php echo esc_html( $cfg['submit_text'] ); ?>
             </button>
         </div>
 
