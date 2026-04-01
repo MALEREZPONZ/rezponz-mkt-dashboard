@@ -353,16 +353,27 @@ class RZPA_REST_API {
         return self::ok( RZPA_Database::get_ai_summary( self::days( $r ) ) );
     }
     public static function ai_keyword_status() {
-        $keywords = RZPA_Database::get_ai_keyword_status();
-        $opts      = get_option( 'rzpa_settings', [] );
+        $all_kw   = RZPA_Database::get_ai_keyword_status();
+        $opts     = get_option( 'rzpa_settings', [] );
+
         $configured_kw = array_values( array_filter(
             array_map( 'trim', explode( "\n", $opts['serp_tracked_keywords'] ?? '' ) ),
             fn( $k ) => $k !== ''
         ) );
+
+        // Filtrer til kun aktuelt sporede søgeord – fjerner gamle CRM-nøgleord fra visningen
+        if ( ! empty( $configured_kw ) ) {
+            $tracked_lower = array_map( 'mb_strtolower', $configured_kw );
+            $all_kw = array_values( array_filter(
+                $all_kw,
+                fn( $row ) => in_array( mb_strtolower( $row['keyword'] ), $tracked_lower, true )
+            ) );
+        }
+
         return self::ok( [
-            'keywords'       => $keywords,
-            'tracked'        => $configured_kw,
-            'has_api_key'    => ! empty( $opts['serp_api_key'] ),
+            'keywords'    => $all_kw,
+            'tracked'     => $configured_kw,
+            'has_api_key' => ! empty( $opts['serp_api_key'] ),
         ] );
     }
     public static function ai_manual_logs_get( $r ) {
@@ -393,6 +404,9 @@ class RZPA_REST_API {
         if ( empty( $keywords ) ) {
             $keywords = [ 'rezponz', 'kundeservice software', 'marketing dashboard', 'lead generation', 'crm software' ];
         }
+
+        // Ryd gamle søgeord fra DB der ikke længere er i den aktuelle liste (fx CRM-nøgleord)
+        RZPA_Database::purge_old_ai_keywords( $keywords );
 
         $rows     = [];
         $has_key  = ! empty( $opts['serp_api_key'] );

@@ -333,7 +333,9 @@ class RZPA_Database {
         ), ARRAY_A );
     }
 
-    /** Seneste status pr. søgeord — bruges til keyword-statusoversigt. */
+    /** Seneste status pr. søgeord — bruges til keyword-statusoversigt.
+     *  Bruger MAX(id) pr. keyword, så hvert søgeord kun vises én gang
+     *  (ingen dubletter selv hvis samme dato er syncet to gange). */
     public static function get_ai_keyword_status() : array {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpa_ai_overview';
@@ -342,13 +344,25 @@ class RZPA_Database {
                     k.ai_overview_text, k.date, k.source
              FROM $t k
              INNER JOIN (
-                 SELECT keyword, MAX(date) AS max_date
-                 FROM $t
-                 GROUP BY keyword
-             ) latest ON k.keyword = latest.keyword AND k.date = latest.max_date
+                 SELECT MAX(id) AS max_id FROM $t GROUP BY keyword
+             ) latest ON k.id = latest.max_id
              ORDER BY k.keyword ASC",
             ARRAY_A
-        );
+        ) ?: [];
+    }
+
+    /** Slet alle AI-overview rækker for søgeord der IKKE er i $current_keywords-listen.
+     *  Bruges ved sync for at rydde op i gamle/fjernede søgeord (fx CRM-nøgleord). */
+    public static function purge_old_ai_keywords( array $current_keywords ) : void {
+        global $wpdb;
+        if ( empty( $current_keywords ) ) return;
+        $t            = $wpdb->prefix . 'rzpa_ai_overview';
+        $placeholders = implode( ',', array_fill( 0, count( $current_keywords ), '%s' ) );
+        // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder
+        $wpdb->query( $wpdb->prepare(
+            "DELETE FROM `{$t}` WHERE keyword NOT IN ($placeholders)",
+            $current_keywords
+        ) );
     }
 
     public static function get_ai_summary( int $days = 30 ) : array {
