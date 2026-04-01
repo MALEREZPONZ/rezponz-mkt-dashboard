@@ -913,7 +913,14 @@ const RZPA_App = (() => {
         const r = await api('/ai/sync', { method: 'POST', timeout: 120 });
         const d = r?.data ?? r;
         if (d?.errors?.length) {
-          alert('SerpAPI fejl: ' + d.errors[0] + '\n\nTjek at din API-nøgle er korrekt under Indstillinger.');
+          // Filtrer "no results" fejl fra — dem håndteres stille i PHP
+          const realErrors = d.errors.filter(e => !/no results|hasn't returned/i.test(e));
+          if (realErrors.length) {
+            alert('SerpAPI API-fejl: ' + realErrors[0] + '\n\nTjek at din API-nøgle er korrekt under Indstillinger → SerpAPI.');
+          } else if (btn) {
+            btn.textContent = `✓ ${d?.count ?? 0} søgeord synkroniseret`;
+            setTimeout(() => { btn.disabled = false; btn.textContent = 'Sync SerpAPI'; }, 3000);
+          }
         } else if (btn) {
           btn.textContent = `✓ ${d?.count ?? 0} søgeord synkroniseret`;
           setTimeout(() => { btn.disabled = false; btn.textContent = 'Sync SerpAPI'; }, 3000);

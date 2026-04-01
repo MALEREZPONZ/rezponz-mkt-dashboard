@@ -411,33 +411,50 @@ class RZPA_REST_API {
                 if ( ! is_wp_error( $res ) && wp_remote_retrieve_response_code( $res ) === 200 ) {
                     $data = json_decode( wp_remote_retrieve_body( $res ), true );
                     if ( ! empty( $data['error'] ) ) {
-                        $errors[] = $data['error'];
-                    } else {
-                        $rows[] = [
-                            'date'                 => gmdate( 'Y-m-d' ),
-                            'keyword'              => $kw,
-                            'has_ai_overview'      => ! empty( $data['ai_overview'] ) ? 1 : 0,
-                            'has_featured_snippet' => ! empty( $data['answer_box'] ) ? 1 : 0,
-                            'has_paa'              => ! empty( $data['related_questions'] ) ? 1 : 0,
-                            'ai_overview_text'     => $data['ai_overview']['text_blocks'][0]['snippet'] ?? '',
-                            'source'               => 'serpapi',
-                        ];
+                        $err_msg = $data['error'];
+                        // "No results" er ikke en API-fejl – gem søgeordet med 0-værdier
+                        if ( stripos( $err_msg, 'no results' ) !== false || stripos( $err_msg, "hasn't returned" ) !== false ) {
+                            $rows[] = [
+                                'date'                 => gmdate( 'Y-m-d' ),
+                                'keyword'              => $kw,
+                                'has_ai_overview'      => 0,
+                                'has_featured_snippet' => 0,
+                                'has_paa'              => 0,
+                                'ai_overview_text'     => '',
+                                'source'               => 'serpapi',
+                            ];
+                        } else {
+                            // Reel API-fejl (ugyldig nøgle, kvote overskredet osv.)
+                            $errors[] = $err_msg;
+                        }
                         continue;
                     }
+                    $rows[] = [
+                        'date'                 => gmdate( 'Y-m-d' ),
+                        'keyword'              => $kw,
+                        'has_ai_overview'      => ! empty( $data['ai_overview'] ) ? 1 : 0,
+                        'has_featured_snippet' => ! empty( $data['answer_box'] ) ? 1 : 0,
+                        'has_paa'              => ! empty( $data['related_questions'] ) ? 1 : 0,
+                        'ai_overview_text'     => $data['ai_overview']['text_blocks'][0]['snippet'] ?? '',
+                        'source'               => 'serpapi',
+                    ];
+                    continue;
                 } else {
                     $errors[] = is_wp_error( $res ) ? $res->get_error_message() : 'HTTP ' . wp_remote_retrieve_response_code( $res );
                 }
             }
-            // Ingen API-nøgle eller fejl → mock
-            $rows[] = [
-                'date'                 => gmdate( 'Y-m-d' ),
-                'keyword'              => $kw,
-                'has_ai_overview'      => wp_rand( 0, 9 ) > 5 ? 1 : 0,
-                'has_featured_snippet' => wp_rand( 0, 9 ) > 6 ? 1 : 0,
-                'has_paa'              => wp_rand( 0, 9 ) > 4 ? 1 : 0,
-                'ai_overview_text'     => '',
-                'source'               => 'mock',
-            ];
+            // Ingen API-nøgle → mock (spring over hvis der allerede er en API-fejl)
+            if ( ! $has_key ) {
+                $rows[] = [
+                    'date'                 => gmdate( 'Y-m-d' ),
+                    'keyword'              => $kw,
+                    'has_ai_overview'      => wp_rand( 0, 9 ) > 5 ? 1 : 0,
+                    'has_featured_snippet' => wp_rand( 0, 9 ) > 6 ? 1 : 0,
+                    'has_paa'              => wp_rand( 0, 9 ) > 4 ? 1 : 0,
+                    'ai_overview_text'     => '',
+                    'source'               => 'mock',
+                ];
+            }
         }
 
         if ( $rows ) RZPA_Database::insert_ai_overview_rows( $rows );
