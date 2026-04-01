@@ -1880,27 +1880,34 @@ const RZPA_App = (() => {
     });
 
     // ── Top Annoncer ──────────────────────────────────
+    // Eksponér loadTopAds globalt så inline onclick="rzpaLoadTopAds(...)" virker
     async function loadTopAds(d) {
       const card = el('meta-top-ads-card');
       const content = el('meta-top-ads-content');
       if (!card || !content) return;
-      content.innerHTML = '<div class="rzpa-loading">Henter annoncer…</div>';
+
+      // Ryd sessionStorage-cache så vi altid henter frisk
+      try { sessionStorage.removeItem('rzpa||/meta/top-ads?days=' + d); } catch(e) {}
+
+      content.innerHTML = '<div class="rzpa-loading">Henter annoncer… (kan tage op til 15 sek.)</div>';
       card.style.display = 'block';
 
       let raw;
       try {
-        const r = await api(`/meta/top-ads?days=${d}`);
+        // 20s timeout – PHP har max 12s+8s = 20s til Meta API-kald
+        const r = await api(`/meta/top-ads?days=${d}&force=1`, { timeout: 20 });
         raw = r?.data ?? r;
       } catch(e) {
-        content.innerHTML = `<p style="color:#ef4444">⚠️ Forbindelsesfejl: ${e.message}</p>
-          <button onclick="loadTopAds(${d})" class="btn-ghost" style="margin-top:8px;font-size:12px">↻ Prøv igen</button>`;
+        const retry = `rzpaLoadTopAds(${d})`;
+        content.innerHTML = `<p style="color:#ef4444;margin:0 0 8px">⚠️ Timeout – Meta API svarer langsomt.</p>
+          <button onclick="${retry}" class="btn-ghost" style="font-size:12px">↻ Prøv igen</button>`;
         return;
       }
 
       // API-fejl
       if (raw && raw.__error) {
-        content.innerHTML = `<p style="color:#ef4444">⚠️ Meta API fejl: ${raw.__error}</p>
-          <button onclick="loadTopAds(${d})" class="btn-ghost" style="margin-top:8px;font-size:12px">↻ Prøv igen</button>`;
+        content.innerHTML = `<p style="color:#ef4444;margin:0 0 8px">⚠️ Meta API fejl: ${raw.__error}</p>
+          <button onclick="rzpaLoadTopAds(${d})" class="btn-ghost" style="font-size:12px">↻ Prøv igen</button>`;
         return;
       }
 
@@ -1910,7 +1917,7 @@ const RZPA_App = (() => {
         content.innerHTML = `<div style="text-align:center;padding:24px">
           <p style="color:#888;margin:0 0 8px">Ingen annoncer fundet i de seneste ${d} dage.</p>
           <p style="color:#555;font-size:12px;margin:0 0 12px">Prøv en længere periode eller tjek at dit Meta access token er gyldigt.</p>
-          <button onclick="loadTopAds(90)" class="btn-ghost" style="font-size:12px">Vis 90 dages periode</button>
+          <button onclick="rzpaLoadTopAds(90)" class="btn-ghost" style="font-size:12px">Vis 90 dages periode</button>
         </div>`;
         return;
       }
@@ -1979,6 +1986,8 @@ const RZPA_App = (() => {
       content.innerHTML = html;
     }
 
+    // Eksponér globalt så inline onclick-knapper virker fra genereret HTML
+    window.rzpaLoadTopAds = d => loadTopAds(d);
     el('meta-top-ads-load')?.addEventListener('click', () => loadTopAds(days));
 
     // ── Landing Pages ──────────────────────────────────

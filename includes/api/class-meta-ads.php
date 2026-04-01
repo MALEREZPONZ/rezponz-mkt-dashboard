@@ -332,6 +332,9 @@ class RZPA_Meta_Ads {
      * Bruges til "Top annoncer" og "Alle aktive annoncer" sektionerne.
      */
     public static function fetch_top_ads( int $days = 30 ) : array {
+        // Udvid PHP-timeout så de to API-kald kan nå at gennemføres
+        @set_time_limit( 60 );
+
         $opts = get_option( 'rzpa_settings', [] );
         if ( empty( $opts['meta_access_token'] ) || empty( $opts['meta_ad_account_id'] ) ) {
             self::$last_error = 'Meta Ads er ikke konfigureret (mangler access token eller konto-ID)';
@@ -356,7 +359,7 @@ class RZPA_Meta_Ads {
             'limit'        => 25,
         ] );
 
-        $res = wp_remote_get( $insights_url, [ 'timeout' => 20 ] );
+        $res = wp_remote_get( $insights_url, [ 'timeout' => 12 ] );
         if ( is_wp_error( $res ) ) {
             self::$last_error = $res->get_error_message();
             return [];
@@ -377,7 +380,7 @@ class RZPA_Meta_Ads {
                 'fields'       => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec{link_data{picture,image_url,child_attachments{picture}},video_data{image_url}}}',
                 'limit'        => 25,
             ] );
-            $fb_res = wp_remote_get( $fallback_url, [ 'timeout' => 15 ] );
+            $fb_res = wp_remote_get( $fallback_url, [ 'timeout' => 10 ] );
             if ( ! is_wp_error( $fb_res ) ) {
                 $fb_body = json_decode( wp_remote_retrieve_body( $fb_res ), true );
                 if ( ! empty( $fb_body['data'] ) ) {
@@ -435,7 +438,7 @@ class RZPA_Meta_Ads {
             'fields'       => 'id,name,effective_status,created_time,creative{id,name,thumbnail_url,image_url,video_id,body,title,object_story_spec{link_data{picture,image_url,message,child_attachments{picture}},video_data{image_url,message},photo_data{images{original{uri}},caption}}}',
         ] );
 
-        $res2 = wp_remote_get( $batch_url, [ 'timeout' => 15 ] );
+        $res2 = wp_remote_get( $batch_url, [ 'timeout' => 8 ] );
         if ( ! is_wp_error( $res2 ) ) {
             $body2 = json_decode( wp_remote_retrieve_body( $res2 ), true );
             if ( ! empty( $body2 ) && empty( $body2['error'] ) ) {
