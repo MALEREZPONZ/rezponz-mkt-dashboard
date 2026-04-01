@@ -334,8 +334,8 @@ class RZPA_Meta_Ads {
 
         // Brug date_preset – Meta accepterer denne format pålideligt.
         // time_range med JSON-encoded streng URL-encodes forkert af http_build_query.
-        $preset_map = [ 7 => 'last_7_days', 30 => 'last_30_days', 90 => 'last_90_days' ];
-        $date_preset = $preset_map[ $days ] ?? 'last_30_days';
+        $preset_map = [ 7 => 'last_7d', 30 => 'last_30d', 90 => 'last_90d' ];
+        $date_preset = $preset_map[ $days ] ?? 'last_30d';
 
         // ── Trin 1: Hent performance-metrics via /insights endpoint ──────────
         $insights_url = self::API_BASE . '/act_' . $account_id . '/insights?' . http_build_query( [
