@@ -799,9 +799,18 @@ class RZPA_REST_API {
     }
 
     public static function meta_top_ads( WP_REST_Request $r ) {
-        $days   = self::days( $r );
-        $force  = (bool) $r->get_param( 'force' );
-        $key    = 'rzpa_meta_top_ads_' . $days;
+        $days  = self::days( $r );
+        $force = (bool) $r->get_param( 'force' );
+        $check = (bool) $r->get_param( 'check' ); // Kun tjek om cache findes
+        $key   = 'rzpa_meta_top_ads_' . $days;
+
+        // check=1 returnerer hurtigt uden at kalde Meta API
+        if ( $check ) {
+            $cached = get_transient( $key );
+            if ( $cached !== false ) return self::ok( $cached ); // Har cache → returner den
+            return self::ok( [ '__no_cache' => true ] );         // Ingen cache → JS viser Hent-prompt
+        }
+
         if ( ! $force ) {
             $cached = get_transient( $key );
             if ( $cached !== false ) return self::ok( $cached );

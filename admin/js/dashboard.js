@@ -1881,33 +1881,64 @@ const RZPA_App = (() => {
 
     // ── Top Annoncer ──────────────────────────────────
     // Eksponér loadTopAds globalt så inline onclick="rzpaLoadTopAds(...)" virker
-    async function loadTopAds(d) {
+    async function loadTopAds(d, forceLoad = false) {
       const card = el('meta-top-ads-card');
       const content = el('meta-top-ads-content');
       if (!card || !content) return;
 
-      // Ryd sessionStorage-cache så vi altid henter frisk
-      try { sessionStorage.removeItem('rzpa||/meta/top-ads?days=' + d); } catch(e) {}
-
-      content.innerHTML = '<div class="rzpa-loading">Henter annoncer… (kan tage op til 15 sek.)</div>';
       card.style.display = 'block';
 
+      // Ryd sessionStorage så vi ikke serverer stale data
+      try {
+        sessionStorage.removeItem('rzpa||/meta/top-ads?days=' + d);
+        sessionStorage.removeItem('rzpa||/meta/top-ads?days=' + d + '&check=1');
+        sessionStorage.removeItem('rzpa||/meta/top-ads?days=' + d + '&force=1');
+      } catch(e) {}
+
+      // Uden forceLoad: tjek cache hurtigt – undgå langsom Meta API-request ved pageload
+      if (!forceLoad) {
+        content.innerHTML = '<div class="rzpa-loading">Tjekker annoncer…</div>';
+        let checkRaw;
+        try {
+          const cr = await api(`/meta/top-ads?days=${d}&check=1`, { timeout: 8 });
+          checkRaw = cr?.data ?? cr;
+        } catch(e) {
+          checkRaw = { __no_cache: true };
+        }
+        // Ingen cache – vis prompt i stedet for at hænge i baggrunden
+        if (checkRaw?.__no_cache) {
+          content.innerHTML = `<div style="text-align:center;padding:20px 0">
+            <p style="color:#888;margin:0 0 10px;font-size:13px">Annoncer ikke hentet endnu — klik for at hente fra Meta.</p>
+            <button onclick="rzpaLoadTopAds(${d},true)" class="btn-ghost" style="font-size:13px">📊 Hent top annoncer</button>
+          </div>`;
+          return;
+        }
+        if (checkRaw?.__error) {
+          content.innerHTML = `<p style="color:#ef4444;margin:0 0 8px">⚠️ Meta API fejl: ${checkRaw.__error}</p>
+            <button onclick="rzpaLoadTopAds(${d},true)" class="btn-ghost" style="font-size:12px">↻ Prøv igen</button>`;
+          return;
+        }
+        // Cache fundet → render direkte
+        renderTopAds(content, checkRaw, d);
+        return;
+      }
+
+      // forceLoad=true – fuldt Meta API-kald
+      content.innerHTML = '<div class="rzpa-loading">Henter annoncer fra Meta… (kan tage op til 20 sek.)</div>';
       let raw;
       try {
-        // 20s timeout – PHP har max 12s+8s = 20s til Meta API-kald
-        const r = await api(`/meta/top-ads?days=${d}&force=1`, { timeout: 20 });
+        const r = await api(`/meta/top-ads?days=${d}&force=1`, { timeout: 25 });
         raw = r?.data ?? r;
       } catch(e) {
-        const retry = `rzpaLoadTopAds(${d})`;
-        content.innerHTML = `<p style="color:#ef4444;margin:0 0 8px">⚠️ Timeout – Meta API svarer langsomt.</p>
-          <button onclick="${retry}" class="btn-ghost" style="font-size:12px">↻ Prøv igen</button>`;
+        content.innerHTML = `<p style="color:#ef4444;margin:0 0 8px">⚠️ Timeout – Meta API svarer langsomt (${e.message}).</p>
+          <button onclick="rzpaLoadTopAds(${d},true)" class="btn-ghost" style="font-size:12px">↻ Prøv igen</button>`;
         return;
       }
 
       // API-fejl
       if (raw && raw.__error) {
         content.innerHTML = `<p style="color:#ef4444;margin:0 0 8px">⚠️ Meta API fejl: ${raw.__error}</p>
-          <button onclick="rzpaLoadTopAds(${d})" class="btn-ghost" style="font-size:12px">↻ Prøv igen</button>`;
+          <button onclick="rzpaLoadTopAds(${d},true)" class="btn-ghost" style="font-size:12px">↻ Prøv igen</button>`;
         return;
       }
 
@@ -1917,10 +1948,16 @@ const RZPA_App = (() => {
         content.innerHTML = `<div style="text-align:center;padding:24px">
           <p style="color:#888;margin:0 0 8px">Ingen annoncer fundet i de seneste ${d} dage.</p>
           <p style="color:#555;font-size:12px;margin:0 0 12px">Prøv en længere periode eller tjek at dit Meta access token er gyldigt.</p>
-          <button onclick="rzpaLoadTopAds(90)" class="btn-ghost" style="font-size:12px">Vis 90 dages periode</button>
+          <button onclick="rzpaLoadTopAds(90,true)" class="btn-ghost" style="font-size:12px">Vis 90 dages periode</button>
         </div>`;
         return;
       }
+
+      renderTopAds(content, ads, d);
+    }
+
+    function renderTopAds(content, ads, d) {
+      if (!Array.isArray(ads) || !ads.length) return;
 
       const proxyBase = (RZPA?.restBase || '/wp-json/rzpa/v1/') + 'meta/image-proxy?url=';
       const thumbSrc = ad => {
@@ -1929,32 +1966,13 @@ const RZPA_App = (() => {
         return proxyBase + encodeURIComponent(raw) + (RZPA?.nonce ? '&_wpnonce=' + RZPA.nonce : '');
       };
 
-      // Sorter en kopi efter days_active for "Længste løbetid" kort
       const byDays  = [...ads].sort((a, b) => (b.days_active || 0) - (a.days_active || 0));
       const bySpend = [...ads].sort((a, b) => b.spend - a.spend);
 
       const spotlight = [
-        {
-          ad: ads[0],
-          icon: '👑',
-          label: 'Højeste Reach',
-          metric_label: 'Reach',
-          metric_value: num(ads[0]?.reach),
-        },
-        {
-          ad: byDays[0],
-          icon: '⏱',
-          label: 'Længste Løbetid',
-          metric_label: 'Aktiv i',
-          metric_value: `${byDays[0]?.days_active ?? '–'} dage`,
-        },
-        {
-          ad: bySpend[0],
-          icon: '📈',
-          label: 'Højeste Annonceforbrug',
-          metric_label: 'Est. Månedligt Spend',
-          metric_value: `${fmt(bySpend[0]?.spend, 0)} kr.`,
-        },
+        { ad: ads[0],     icon: '👑', label: 'Højeste Reach',          metric_label: 'Reach',                metric_value: num(ads[0]?.reach) },
+        { ad: byDays[0],  icon: '⏱', label: 'Længste Løbetid',         metric_label: 'Aktiv i',              metric_value: `${byDays[0]?.days_active ?? '–'} dage` },
+        { ad: bySpend[0], icon: '📈', label: 'Højeste Annonceforbrug',  metric_label: 'Est. Månedligt Spend', metric_value: `${fmt(bySpend[0]?.spend, 0)} kr.` },
       ];
 
       let html = '<div class="tap-grid">';
@@ -1962,19 +1980,13 @@ const RZPA_App = (() => {
         if (!ad) return;
         const src  = thumbSrc(ad);
         const copy = (ad.body_copy || ad.ad_name || '').substring(0, 160);
-        const noThumb = '<div class="tap-no-thumb">📷</div>';
         const imgHtml = src
-          ? `<img src="${src}" class="tap-img" alt="" loading="lazy" onerror="this.replaceWith(document.createElement('div'));this.className='tap-no-thumb';this.textContent='📷'">`
-          : noThumb;
+          ? `<img src="${src}" class="tap-img" alt="" loading="lazy" onerror="this.style.display='none'">`
+          : '<div class="tap-no-thumb">📷</div>';
         html += `
           <div class="tap-card">
-            <div class="tap-thumb">
-              ${imgHtml}
-              <span class="tap-badge">${icon} ${label}</span>
-            </div>
-            <div class="tap-body">
-              <p class="tap-copy">${copy}</p>
-            </div>
+            <div class="tap-thumb">${imgHtml}<span class="tap-badge">${icon} ${label}</span></div>
+            <div class="tap-body"><p class="tap-copy">${copy}</p></div>
             <div class="tap-foot">
               <span class="tap-foot-label">${metric_label}</span>
               <strong class="tap-foot-val">${metric_value}</strong>
@@ -1982,13 +1994,12 @@ const RZPA_App = (() => {
           </div>`;
       });
       html += '</div>';
-
       content.innerHTML = html;
     }
 
     // Eksponér globalt så inline onclick-knapper virker fra genereret HTML
-    window.rzpaLoadTopAds = d => loadTopAds(d);
-    el('meta-top-ads-load')?.addEventListener('click', () => loadTopAds(days));
+    window.rzpaLoadTopAds = (d, force) => loadTopAds(d, !!force);
+    el('meta-top-ads-load')?.addEventListener('click', () => loadTopAds(days, true));
 
     // ── Landing Pages ──────────────────────────────────
     async function loadLandingPages(d) {
