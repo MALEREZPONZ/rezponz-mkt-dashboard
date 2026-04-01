@@ -181,8 +181,24 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
   <?php if ( $smtp_saved )  : ?><div class="rzpz-notice success">✅ SMTP-indstillinger gemt.</div><?php endif; ?>
   <?php if ( $recip_saved ) : ?><div class="rzpz-notice success">✅ Email-modtager tilføjet.</div><?php endif; ?>
   <?php if ( $recip_del )   : ?><div class="rzpz-notice success">🗑 Email-modtager slettet.</div><?php endif; ?>
-  <?php if ( $test_sent === 1 ) : ?><div class="rzpz-notice success">📬 Test-email sendt! Tjek din indbakke.</div><?php endif; ?>
-  <?php if ( $test_sent === 0 ) : ?><div class="rzpz-notice error">❌ Test-email fejlede. Tjek SMTP-indstillingerne nedenfor og prøv igen.</div><?php endif; ?>
+  <?php if ( $test_sent === 1 ) : ?>
+    <div class="rzpz-notice success">📬 Test-email sendt! Tjek din indbakke (og spam-mappen).</div>
+  <?php endif; ?>
+  <?php if ( $test_sent === 0 ) :
+    $mail_err = sanitize_text_field( urldecode( $_GET['mail_error'] ?? '' ) );
+  ?>
+    <div class="rzpz-notice error">
+      ❌ Test-email fejlede.
+      <?php if ( $mail_err ) : ?>
+        <br><strong>Fejl:</strong> <?php echo esc_html( $mail_err ); ?>
+      <?php else : ?>
+        Ingen fejlbesked returneret fra WordPress mailer.
+      <?php endif; ?>
+      <?php if ( ! ( $smtp['enabled'] ?? false ) ) : ?>
+        <br>⚠️ <strong>SMTP er ikke aktiveret</strong> — sæt flueben i "Aktivér SMTP" og gem inden du sender test.
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
   <?php if ( $error === 'recip' ) : ?><div class="rzpz-notice error">❌ Ugyldigt navn eller email-adresse.</div><?php endif; ?>
 
   <!-- SMTP Configuration -->

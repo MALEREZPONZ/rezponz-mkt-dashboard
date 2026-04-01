@@ -428,8 +428,23 @@ class RZPZ_Henvis {
             'From: ' . ( $smtp['from_name'] ?: 'Rezponz' ) . ' <' . ( $smtp['from_email'] ?: 'no-reply@rezponz.dk' ) . '>',
         ];
 
+        // Fang præcis fejlbesked fra WordPress mailer
+        $mail_error = '';
+        $mail_error_handler = function( WP_Error $err ) use ( &$mail_error ) {
+            $mail_error = $err->get_error_message();
+        };
+        add_action( 'wp_mail_failed', $mail_error_handler );
+
         $sent = wp_mail( $to, $subject, $body, $headers );
-        wp_redirect( admin_url( 'admin.php?page=rzpz-henvis-settings&tab=emails&test_sent=' . ( $sent ? '1' : '0' ) ) );
+
+        remove_action( 'wp_mail_failed', $mail_error_handler );
+
+        if ( $sent ) {
+            wp_redirect( admin_url( 'admin.php?page=rzpz-henvis-settings&tab=emails&test_sent=1' ) );
+        } else {
+            $err_param = $mail_error ? '&mail_error=' . urlencode( $mail_error ) : '';
+            wp_redirect( admin_url( 'admin.php?page=rzpz-henvis-settings&tab=emails&test_sent=0' . $err_param ) );
+        }
         exit;
     }
 
