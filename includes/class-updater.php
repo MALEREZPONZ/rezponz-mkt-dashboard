@@ -65,6 +65,33 @@ class RZPA_Updater {
         if ( $this->github_token ) {
             add_filter( 'http_request_args', [ $this, 'add_auth_to_github_requests' ], 10, 2 );
         }
+
+        // Omdøb GitHub zipball-mappen (fx MALEREZPONZ-rezponz-mkt-dashboard-abc1234)
+        // til det korrekte plugin-mappenavn (rezponz-mkt-dashboard)
+        add_filter( 'upgrader_source_selection', [ $this, 'fix_source_dir' ], 10, 4 );
+    }
+
+    /** Omdøb udpakket GitHub-zipball-mappe til plugin-basemappe. */
+    public function fix_source_dir( string $source, string $remote_source, $upgrader, array $hook_extra ) : string {
+        global $wp_filesystem;
+
+        // Kun relevant for dette plugin
+        $plugin = $hook_extra['plugin'] ?? '';
+        if ( $plugin !== $this->plugin_slug && $plugin !== '' ) {
+            // Tjek om vi er i gang med at opdatere dette plugin (via pakke-URL match)
+            $package = $upgrader->skin->options['package'] ?? '';
+            if ( strpos( $package, $this->github_repo ) === false ) {
+                return $source;
+            }
+        }
+
+        $correct = trailingslashit( $remote_source ) . $this->plugin_basename . '/';
+        if ( $source !== $correct && $wp_filesystem->is_dir( $source ) ) {
+            if ( $wp_filesystem->move( $source, $correct ) ) {
+                return $correct;
+            }
+        }
+        return $source;
     }
 
     /** Inject Authorization-header på alle GitHub API + download-kald. */
