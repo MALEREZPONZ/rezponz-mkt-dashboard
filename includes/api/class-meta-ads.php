@@ -139,7 +139,7 @@ class RZPA_Meta_Ads {
 
         $url = self::API_BASE . '/' . $campaign_id . '/ads?' . http_build_query( [
             'access_token' => $token,
-            'fields'       => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,body,title,call_to_action_type,link_url,object_story_spec},insights.date_preset(last_30d){reach,impressions,spend,clicks}',
+            'fields'       => 'id,name,effective_status,created_time,creative{id,name,thumbnail_url,image_url,video_id,body,title,call_to_action_type,link_url,object_story_spec},insights.date_preset(last_30d){reach,impressions,spend,clicks}',
             'limit'        => 50,
         ] );
 
@@ -169,9 +169,18 @@ class RZPA_Meta_Ads {
                 $link_url = $creative['object_story_spec']['link_data']['link'] ?? '';
             }
 
+            // Beregn antal dage annoncen har kørt
+            $days_active = 0;
+            if ( ! empty( $ad['created_time'] ) ) {
+                $created = strtotime( $ad['created_time'] );
+                $days_active = $created ? (int) floor( ( time() - $created ) / DAY_IN_SECONDS ) : 0;
+            }
+
             $ads[] = [
                 'ad_id'         => $ad['id'],
                 'ad_name'       => $ad['name'] ?? '',
+                'status'        => $ad['effective_status'] ?? 'UNKNOWN',
+                'days_active'   => $days_active,
                 'creative_id'   => $creative['id'] ?? '',
                 'title'         => $creative['title'] ?? '',
                 'body'          => $creative['body'] ?? '',

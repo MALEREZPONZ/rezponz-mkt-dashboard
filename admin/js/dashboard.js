@@ -1033,61 +1033,97 @@ const RZPA_App = (() => {
         return;
       }
       const acctId = (RZPA.meta_account_id || '').replace(/^act_/, '');
-      cards.innerHTML = ads.map(ad => {
+
+      // Sorter: aktive først, derefter efter reach
+      const sorted = [...ads].sort((a, b) => {
+        const aActive = a.status === 'ACTIVE' ? 1 : 0;
+        const bActive = b.status === 'ACTIVE' ? 1 : 0;
+        if (aActive !== bActive) return bActive - aActive;
+        return (b.reach || 0) - (a.reach || 0);
+      });
+
+      cards.innerHTML = sorted.map((ad, i) => {
         const thumb = ad.thumbnail_url || ad.image_url;
+        const isActive = ad.status === 'ACTIVE';
         const metaUrl = acctId
-          ? `https://adsmanager.facebook.com/adsmanager/manage/ads?act=${acctId}&selected_campaign_ids=${campaignId}`
+          ? `https://adsmanager.facebook.com/adsmanager/manage/ads?act=${acctId}`
           : '';
-        const mediaHtml = thumb
-          ? (metaUrl
-              ? `<a href="${metaUrl}" target="_blank" title="Se annonce i Meta Ads Manager"><img src="${thumb}" class="rzpa-ad-thumb" alt="Annonce preview" style="cursor:pointer"></a>`
-              : `<img src="${thumb}" class="rzpa-ad-thumb" alt="Annonce preview">`)
-          : `<div class="rzpa-ad-no-thumb">📷 Ingen preview tilgængeligt</div>`;
-        const playBtn = ad.has_video
-          ? `<button class="rzpa-play-btn" data-adid="${ad.ad_id}" title="Afspil annonce">▶</button>`
-          : '';
+
+        // Format badge
+        const fmtLabel = ad.format === 'video' ? '▶ Video'
+                       : ad.format === 'carousel' ? '⊞ Carousel'
+                       : '🖼 Billede';
+
+        // Tier
+        const r = ad.reach || 0;
+        const tier = r >= 5000 ? { label: '🏆 Winner', cls: 'cam-tier-winner' }
+                   : r >= 1000 ? { label: '✅ Solid',  cls: 'cam-tier-solid' }
+                   : r > 0     ? { label: '🧪 Testing', cls: 'cam-tier-testing' }
+                   : null;
+
+        // Status
+        const statusMap = {
+          ACTIVE:   { label: 'Aktiv',     cls: 'cam-status-active' },
+          PAUSED:   { label: 'Paused',    cls: 'cam-status-paused' },
+          ARCHIVED: { label: 'Arkiveret', cls: 'cam-status-archived' },
+          DELETED:  { label: 'Slettet',   cls: 'cam-status-archived' },
+        };
+        const statusInfo = statusMap[ad.status] || { label: ad.status || '?', cls: 'cam-status-archived' };
+
+        // Metrics
         const cta = fmtCTA(ad.cta);
-        const metaLink = metaUrl
-          ? `<a href="${metaUrl}" target="_blank" style="font-size:11px;color:#1877F2;text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-top:6px">🔗 Se annonce i Meta →</a>`
-          : '';
         const hasText = ad.title || ad.body;
         const aiBtn = hasText
-          ? `<button class="rzpa-ai-copy-btn btn-ghost" data-adid="${ad.ad_id}" data-title="${encodeURIComponent(ad.title||'')}" data-body="${encodeURIComponent(ad.body||'')}" data-cta="${encodeURIComponent(cta||'')}" style="font-size:11px;margin-top:8px;padding:4px 10px">✨ Forbedre tekst</button>`
+          ? `<button class="rzpa-ai-copy-btn btn-ghost cam-ai-btn" data-adid="${ad.ad_id}" data-title="${encodeURIComponent(ad.title||'')}" data-body="${encodeURIComponent(ad.body||'')}" data-cta="${encodeURIComponent(cta||'')}">✨ Forbedre tekst</button>`
           : '';
-        // Format badge
-        let formatBadge = '<span class="rzpa-fmt-badge fmt-image">🖼 Billede</span>';
-        if (ad.has_video || ad.format === 'video') formatBadge = '<span class="rzpa-fmt-badge fmt-video">▶ Video</span>';
-        else if (ad.format === 'carousel') formatBadge = '<span class="rzpa-fmt-badge fmt-carousel">◫ Carousel</span>';
-        // Per-ad metrics
-        const hasMetrics = ad.reach > 0 || ad.spend > 0;
-        const metricsHtml = hasMetrics ? `<div class="rzpa-ad-modal-metrics">
-          ${ad.reach > 0 ? `<span>👁 ${(ad.reach).toLocaleString('da-DK')}</span>` : ''}
-          ${ad.spend > 0 ? `<span>💰 ${parseFloat(ad.spend).toLocaleString('da-DK',{maximumFractionDigits:0})} kr</span>` : ''}
-          ${ad.clicks > 0 ? `<span>🖱 ${(ad.clicks).toLocaleString('da-DK')} klik</span>` : ''}
-        </div>` : '';
-        // Performance tier
-        let tierHtml = '';
-        if (ad.reach > 0) {
-          const r = ad.reach;
-          if (r >= 5000) tierHtml = '<span class="rzpa-tier-badge tier-winner">🏆 Winner</span>';
-          else if (r >= 1000) tierHtml = '<span class="rzpa-tier-badge tier-solid">✅ Solid</span>';
-          else tierHtml = '<span class="rzpa-tier-badge tier-testing">🧪 Testing</span>';
-        }
-        return `<div class="rzpa-ad-card">
-          <div class="rzpa-ad-preview-wrap" id="adprev-${ad.ad_id}">
-            ${mediaHtml}${playBtn}
+
+        return `<div class="cam-card ${isActive ? 'cam-card--active' : 'cam-card--paused'}">
+
+          <!-- Thumbnail area -->
+          <div class="cam-thumb" id="adprev-${ad.ad_id}">
+            ${thumb
+              ? `<img src="${thumb}" alt="" loading="lazy" onerror="this.style.display='none';this.parentNode.classList.add('cam-thumb--empty')">`
+              : '<div class="cam-thumb-empty">📷</div>'}
+            ${ad.has_video ? `<button class="rzpa-play-btn cam-play" data-adid="${ad.ad_id}">▶</button>` : ''}
+            <span class="cam-rank">#${i+1}</span>
+            <span class="cam-fmt-badge">${fmtLabel}</span>
+            <span class="cam-status-badge ${statusInfo.cls}">${statusInfo.label}</span>
           </div>
-          <div class="rzpa-ad-info">
-            <div class="rzpa-ad-name">${ad.ad_name||'Unavngivet'}</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0">${formatBadge}${tierHtml}</div>
-            ${metricsHtml}
-            ${ad.title ? `<div class="rzpa-ad-title">${ad.title}</div>` : ''}
-            ${ad.body  ? `<div class="rzpa-ad-body">${ad.body.substring(0,160)}${ad.body.length>160?'…':''}</div>` : ''}
-            ${cta      ? `<div class="rzpa-ad-cta">${cta}</div>` : ''}
-            ${metaLink}
-            ${aiBtn}
-            <div class="rzpa-ai-copy-result" id="aicopy-${ad.ad_id}" style="display:none"></div>
+
+          <!-- Body -->
+          <div class="cam-body">
+            ${tier ? `<span class="cam-tier ${tier.cls}">${tier.label}</span>` : ''}
+            ${ad.title ? `<div class="cam-title">${ad.title}</div>` : `<div class="cam-title cam-title--name">${ad.ad_name || 'Unavngivet'}</div>`}
+            ${ad.body  ? `<div class="cam-copy">${ad.body.substring(0,120)}${ad.body.length>120?'…':''}</div>` : ''}
+            ${cta      ? `<span class="cam-cta-pill">${cta}</span>` : ''}
           </div>
+
+          <!-- Metrics -->
+          ${r > 0 || ad.spend > 0 ? `
+          <div class="cam-metrics">
+            <div class="cam-metric">
+              <span class="cam-metric-label">👁 Reach</span>
+              <strong>${r.toLocaleString('da-DK')}</strong>
+            </div>
+            ${ad.spend > 0 ? `<div class="cam-metric">
+              <span class="cam-metric-label">💰 Forbrug</span>
+              <strong class="cam-metric-spend">${parseFloat(ad.spend).toLocaleString('da-DK',{maximumFractionDigits:0})} kr.</strong>
+            </div>` : ''}
+            ${ad.clicks > 0 ? `<div class="cam-metric">
+              <span class="cam-metric-label">🖱 Klik</span>
+              <strong>${ad.clicks.toLocaleString('da-DK')}</strong>
+            </div>` : ''}
+          </div>` : ''}
+
+          <!-- Footer -->
+          <div class="cam-footer">
+            ${ad.days_active > 0 ? `<span class="cam-days">📅 Aktiv i ${ad.days_active} dage</span>` : ''}
+            <div class="cam-footer-actions">
+              ${metaUrl ? `<a href="${metaUrl}" target="_blank" class="cam-meta-link">Se i Meta →</a>` : ''}
+              ${aiBtn}
+            </div>
+          </div>
+          <div class="rzpa-ai-copy-result" id="aicopy-${ad.ad_id}" style="display:none"></div>
         </div>`;
       }).join('');
 

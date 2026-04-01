@@ -708,9 +708,116 @@ body.wp-admin #wpbody-content { overflow-x: hidden; }
 /* Ad cards grid */
 .rzpa-ad-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 16px;
 }
+
+/* ── Campaign ad cards (redesign) ──────────────────────── */
+.cam-card {
+  background: var(--bg-200);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform .15s, box-shadow .15s, border-color .15s;
+}
+.cam-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,.4); border-color: rgba(204,255,0,.25); }
+.cam-card--paused { opacity: .7; }
+.cam-card--paused:hover { opacity: 1; }
+
+/* Thumbnail */
+.cam-thumb {
+  position: relative;
+  height: 190px;
+  background: var(--bg-300);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cam-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cam-thumb--empty, .cam-thumb-empty { color: #555; font-size: 28px; }
+
+/* Overlays on thumbnail */
+.cam-rank {
+  position: absolute; top: 10px; left: 10px;
+  background: rgba(0,0,0,.8); color: #fff;
+  font-size: 11px; font-weight: 800;
+  padding: 3px 8px; border-radius: 20px;
+}
+.cam-fmt-badge {
+  position: absolute; top: 10px; right: 10px;
+  background: rgba(255,255,255,.9); color: #111;
+  font-size: 10px; font-weight: 700;
+  padding: 3px 8px; border-radius: 20px;
+}
+.cam-status-badge {
+  position: absolute; bottom: 10px; left: 10px;
+  font-size: 10px; font-weight: 700;
+  padding: 3px 9px; border-radius: 20px;
+}
+.cam-status-active   { background: #16a34a; color: #fff; }
+.cam-status-paused   { background: #d97706; color: #fff; }
+.cam-status-archived { background: #555; color: #ccc; }
+.cam-play {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,.4);
+  color: #fff; font-size: 36px;
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .2s;
+}
+.cam-play:hover { background: rgba(0,0,0,.6); }
+
+/* Body */
+.cam-body { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.cam-tier { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; align-self: flex-start; }
+.cam-tier-winner  { background: rgba(204,255,0,.12); color: #CCFF00; border: 1px solid rgba(204,255,0,.25); }
+.cam-tier-solid   { background: rgba(74,222,128,.1);  color: #4ade80; border: 1px solid rgba(74,222,128,.2); }
+.cam-tier-testing { background: rgba(251,146,60,.1);  color: #fb923c; border: 1px solid rgba(251,146,60,.2); }
+.cam-title { font-size: 14px; font-weight: 700; color: #fff; line-height: 1.35; }
+.cam-title--name { color: var(--text-muted); font-size: 13px; }
+.cam-copy { font-size: 12px; color: #888; line-height: 1.55; }
+.cam-cta-pill {
+  display: inline-block; align-self: flex-start; margin-top: 2px;
+  padding: 4px 12px; border-radius: 20px;
+  background: rgba(24,119,242,.12); color: #60a5fa;
+  font-size: 11px; font-weight: 600;
+}
+
+/* Metrics */
+.cam-metrics {
+  display: flex; flex-wrap: wrap; gap: 0;
+  border-top: 1px solid var(--border);
+  margin: 0;
+}
+.cam-metric {
+  flex: 1; min-width: 80px;
+  padding: 10px 16px;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 3px;
+}
+.cam-metric:last-child { border-right: none; }
+.cam-metric-label { font-size: 10px; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.cam-metric strong { font-size: 15px; color: #fff; font-weight: 700; }
+.cam-metric-spend { color: #4ade80; }
+
+/* Footer */
+.cam-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  gap: 8px; flex-wrap: wrap;
+}
+.cam-days { font-size: 11px; color: #555; }
+.cam-footer-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cam-meta-link {
+  font-size: 11px; color: #60a5fa; text-decoration: none;
+  font-weight: 600;
+}
+.cam-meta-link:hover { color: #93c5fd; }
+.cam-ai-btn { font-size: 11px; padding: 3px 10px; }
 .rzpa-ad-card {
   background: var(--bg-200); border: 1px solid var(--border);
   border-radius: 10px; overflow: hidden; display: flex; flex-direction: column;
