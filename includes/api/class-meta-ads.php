@@ -432,7 +432,7 @@ class RZPA_Meta_Ads {
         $batch_url = self::API_BASE . '?' . http_build_query( [
             'access_token' => $token,
             'ids'          => implode( ',', $ad_ids ),
-            'fields'       => 'id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id,object_story_spec{link_data{picture,image_url,child_attachments{picture}},video_data{image_url},photo_data{images{original{uri}}}}}',
+            'fields'       => 'id,name,effective_status,created_time,creative{id,name,thumbnail_url,image_url,video_id,body,title,object_story_spec{link_data{picture,image_url,message,child_attachments{picture}},video_data{image_url,message},photo_data{images{original{uri}},caption}}}',
         ] );
 
         $res2 = wp_remote_get( $batch_url, [ 'timeout' => 15 ] );
@@ -465,10 +465,22 @@ class RZPA_Meta_Ads {
                 ?: ( $creative['image_url']                       ?? '' )
                 ?: ( $creative['thumbnail_url']                   ?? '' );
 
+            // Ad body copy (til kortbeskrivelse)
+            $body_copy = $spec['link_data']['message']   ?? ''
+                      ?: ( $spec['video_data']['message']    ?? '' )
+                      ?: ( $spec['photo_data']['caption']    ?? '' )
+                      ?: ( $creative['body']                 ?? '' );
+
             $reach       = (int)   ( $m['reach']       ?? 0 );
             $impressions = (int)   ( $m['impressions'] ?? 0 );
             $clicks      = (int)   ( $m['clicks']      ?? 0 );
             $spend       = round( (float) ( $m['spend'] ?? 0 ), 2 );
+
+            $days_active = 0;
+            if ( ! empty( $ad['created_time'] ) ) {
+                $created = strtotime( $ad['created_time'] );
+                $days_active = $created ? (int) floor( ( time() - $created ) / DAY_IN_SECONDS ) : 0;
+            }
 
             $rows[] = [
                 'ad_id'         => $ad_id,
@@ -479,6 +491,8 @@ class RZPA_Meta_Ads {
                 'image_url'     => $img,
                 'has_video'     => $format === 'video',
                 'format'        => $format,
+                'body_copy'     => $body_copy,
+                'days_active'   => $days_active,
                 'reach'         => $reach,
                 'impressions'   => $impressions,
                 'spend'         => $spend,

@@ -1915,67 +1915,66 @@ const RZPA_App = (() => {
         return;
       }
 
-      const maxReach = ads[0]?.reach || 1;
-      const tier = reach => reach >= maxReach * 0.5 ? 'winner' : reach >= maxReach * 0.15 ? 'solid' : 'testing';
-      const tierLabel = t => t === 'winner' ? '🏆 Winner' : t === 'solid' ? '✅ Solid' : '🧪 Testing';
-      const fmtBadge = f => f === 'video' ? '<span class="fmt-badge fmt-video">▶ Video</span>'
-                          : f === 'carousel' ? '<span class="fmt-badge fmt-carousel">◫ Carousel</span>'
-                          : '<span class="fmt-badge fmt-image">🖼 Billede</span>';
       const proxyBase = (RZPA?.restBase || '/wp-json/rzpa/v1/') + 'meta/image-proxy?url=';
-      const thumbHtml = ad => {
+      const thumbSrc = ad => {
         const raw = ad.thumbnail_url || ad.image_url;
-        if (!raw) return '<div class="rzpa-top-ad-no-thumb">📷</div>';
-        // Brug server-side proxy for at håndtere Meta CDN-auth
-        const src = proxyBase + encodeURIComponent(raw) + (RZPA?.nonce ? '&_wpnonce=' + RZPA.nonce : '');
-        return `<img src="${src}" class="rzpa-top-ad-thumb" alt="" loading="lazy" onerror="this.style.display='none';this.parentNode.insertAdjacentHTML('beforeend','<div class=rzpa-top-ad-no-thumb>📷</div>')">`;
+        if (!raw) return '';
+        return proxyBase + encodeURIComponent(raw) + (RZPA?.nonce ? '&_wpnonce=' + RZPA.nonce : '');
       };
 
-      // Podium: top 3
-      const podiumLabels = ['🏆 Højest rækkevidde', '🥈 Næsthøjest rækkevidde', '🥉 Tredjehøjest rækkevidde'];
-      const podiumColors = ['#CCFF00', '#60a5fa', '#f59e0b'];
-      const top3 = ads.slice(0, 3);
-      let html = '<div class="rzpa-top-ads-podium">';
-      top3.forEach((ad, i) => {
-        const t = tier(ad.reach);
+      // Sorter en kopi efter days_active for "Længste løbetid" kort
+      const byDays  = [...ads].sort((a, b) => (b.days_active || 0) - (a.days_active || 0));
+      const bySpend = [...ads].sort((a, b) => b.spend - a.spend);
+
+      const spotlight = [
+        {
+          ad: ads[0],
+          icon: '👑',
+          label: 'Højeste Reach',
+          metric_label: 'Reach',
+          metric_value: num(ads[0]?.reach),
+        },
+        {
+          ad: byDays[0],
+          icon: '⏱',
+          label: 'Længste Løbetid',
+          metric_label: 'Aktiv i',
+          metric_value: `${byDays[0]?.days_active ?? '–'} dage`,
+        },
+        {
+          ad: bySpend[0],
+          icon: '📈',
+          label: 'Højeste Annonceforbrug',
+          metric_label: 'Est. Månedligt Spend',
+          metric_value: `${fmt(bySpend[0]?.spend, 0)} kr.`,
+        },
+      ];
+
+      let html = '<div class="tap-grid">';
+      spotlight.forEach(({ ad, icon, label, metric_label, metric_value }) => {
+        if (!ad) return;
+        const src  = thumbSrc(ad);
+        const copy = (ad.body_copy || ad.ad_name || '').substring(0, 160);
+        const noThumb = '<div class="tap-no-thumb">📷</div>';
+        const imgHtml = src
+          ? `<img src="${src}" class="tap-img" alt="" loading="lazy" onerror="this.replaceWith(document.createElement('div'));this.className='tap-no-thumb';this.textContent='📷'">`
+          : noThumb;
         html += `
-          <div class="rzpa-podium-card">
-            <div class="rzpa-podium-badge" style="background:${podiumColors[i]}20;color:${podiumColors[i]};border:1px solid ${podiumColors[i]}40">${podiumLabels[i]}</div>
-            <div class="rzpa-podium-thumb">${thumbHtml(ad)}</div>
-            <div class="rzpa-podium-name">${ad.ad_name}</div>
-            <div class="rzpa-podium-metrics">
-              <div><span class="rzpa-podium-label">👁 Rækkevidde</span><strong>${num(ad.reach)}</strong></div>
-              <div><span class="rzpa-podium-label">💰 Forbrug</span><strong>${fmt(ad.spend,0)} kr</strong></div>
-              <div><span class="rzpa-podium-label">🖱 Klik</span><strong>${num(ad.clicks)}</strong></div>
+          <div class="tap-card">
+            <div class="tap-thumb">
+              ${imgHtml}
+              <span class="tap-badge">${icon} ${label}</span>
             </div>
-            <div class="rzpa-podium-badges">${fmtBadge(ad.format)} <span class="tier-badge tier-${t}">${tierLabel(t)}</span></div>
+            <div class="tap-body">
+              <p class="tap-copy">${copy}</p>
+            </div>
+            <div class="tap-foot">
+              <span class="tap-foot-label">${metric_label}</span>
+              <strong class="tap-foot-val">${metric_value}</strong>
+            </div>
           </div>`;
       });
       html += '</div>';
-
-      // Alle annoncer grid
-      if (ads.length > 0) {
-        html += `<h3 style="margin:24px 0 12px;font-size:15px;color:#ccc">📋 Alle aktive annoncer (${ads.length})</h3>`;
-        html += '<div class="rzpa-ads-grid">';
-        ads.forEach((ad, i) => {
-          const t = tier(ad.reach);
-          html += `
-            <div class="rzpa-ad-card">
-              <div class="rzpa-ad-card-thumb">${thumbHtml(ad)}</div>
-              <div class="rzpa-ad-card-body">
-                <div class="rzpa-ad-card-rank">#${i+1}</div>
-                <div class="rzpa-ad-card-name" title="${ad.ad_name}">${ad.ad_name}</div>
-                <div class="rzpa-ad-card-metrics">
-                  <span>👁 ${num(ad.reach)}</span>
-                  <span>💰 ${fmt(ad.spend,0)} kr</span>
-                  <span>🖱 ${num(ad.clicks)}</span>
-                  ${ad.ctr > 0 ? `<span>📊 ${fmt(ad.ctr,2)}%</span>` : ''}
-                </div>
-                <div class="rzpa-ad-card-badges">${fmtBadge(ad.format)} <span class="tier-badge tier-${t}">${tierLabel(t)}</span></div>
-              </div>
-            </div>`;
-        });
-        html += '</div>';
-      }
 
       content.innerHTML = html;
     }
