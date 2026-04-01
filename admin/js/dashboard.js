@@ -2047,7 +2047,9 @@ const RZPA_App = (() => {
           return;
         }
         // Cache fundet → render direkte
-        renderTopAds(content, checkRaw, d);
+        try { renderTopAds(content, checkRaw, d); } catch(re) {
+          content.innerHTML = `<p style="color:#ef4444;margin:0">⚠️ Render fejl: ${re.message}</p>`;
+        }
         return;
       }
 
@@ -2081,7 +2083,9 @@ const RZPA_App = (() => {
         return;
       }
 
-      renderTopAds(content, ads, d);
+      try { renderTopAds(content, ads, d); } catch(re) {
+        content.innerHTML = `<p style="color:#ef4444;margin:0">⚠️ Render fejl: ${re.message}</p>`;
+      }
     }
 
     function renderTopAds(content, ads, d) {
@@ -2098,7 +2102,7 @@ const RZPA_App = (() => {
       const bySpend = [...ads].sort((a, b) => b.spend - a.spend);
 
       const spotlight = [
-        { ad: ads[0],     icon: '👑', label: 'Højeste Reach',          metric_label: 'Reach',                metric_value: num(ads[0]?.reach) },
+        { ad: ads[0],     icon: '👑', label: 'Højeste Reach',          metric_label: 'Reach',                metric_value: fmt(ads[0]?.reach) },
         { ad: byDays[0],  icon: '⏱', label: 'Længste Løbetid',         metric_label: 'Aktiv i',              metric_value: `${byDays[0]?.days_active ?? '–'} dage` },
         { ad: bySpend[0], icon: '📈', label: 'Højeste Annonceforbrug',  metric_label: 'Est. Månedligt Spend', metric_value: `${fmt(bySpend[0]?.spend, 0)} kr.` },
       ];
