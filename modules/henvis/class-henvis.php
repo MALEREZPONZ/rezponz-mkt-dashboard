@@ -96,6 +96,15 @@ class RZPZ_Henvis {
         $phpmailer->From       = $smtp['from_email'] ?: 'no-reply@rezponz.dk';
         $phpmailer->FromName   = $smtp['from_name']  ?: 'Rezponz Marketing Platform';
         $phpmailer->SMTPDebug  = 0;
+
+        // Tillad self-signed SSL-certifikater (almindeligt på delte hostings)
+        $phpmailer->SMTPOptions = [
+            'ssl' => [
+                'verify_peer'       => false,
+                'verify_peer_name'  => false,
+                'allow_self_signed' => true,
+            ],
+        ];
     }
 
     // ── Form config ─────────────────────────────────────────────────────────────
