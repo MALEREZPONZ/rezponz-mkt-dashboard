@@ -49,12 +49,13 @@ class RZPA_REST_API {
 
         // AI
         foreach ( [
-            [ 'ai/overview',     'GET',    'ai_overview' ],
-            [ 'ai/summary',      'GET',    'ai_summary' ],
-            [ 'ai/manual-logs',  'GET',    'ai_manual_logs_get' ],
-            [ 'ai/manual-logs',  'POST',   'ai_manual_logs_post' ],
+            [ 'ai/overview',        'GET',    'ai_overview' ],
+            [ 'ai/summary',         'GET',    'ai_summary' ],
+            [ 'ai/keyword-status',  'GET',    'ai_keyword_status' ],
+            [ 'ai/manual-logs',     'GET',    'ai_manual_logs_get' ],
+            [ 'ai/manual-logs',     'POST',   'ai_manual_logs_post' ],
             [ 'ai/manual-logs/(?P<id>\d+)', 'DELETE', 'ai_manual_log_delete' ],
-            [ 'ai/sync',         'POST',   'ai_sync' ],
+            [ 'ai/sync',            'POST',   'ai_sync' ],
         ] as [ $path, $method, $cb ] ) {
             register_rest_route( self::NS, '/' . $path, [
                 'methods'             => $method,
@@ -350,6 +351,19 @@ class RZPA_REST_API {
     }
     public static function ai_summary( $r ) {
         return self::ok( RZPA_Database::get_ai_summary( self::days( $r ) ) );
+    }
+    public static function ai_keyword_status() {
+        $keywords = RZPA_Database::get_ai_keyword_status();
+        $opts      = get_option( 'rzpa_settings', [] );
+        $configured_kw = array_values( array_filter(
+            array_map( 'trim', explode( "\n", $opts['serp_tracked_keywords'] ?? '' ) ),
+            fn( $k ) => $k !== ''
+        ) );
+        return self::ok( [
+            'keywords'       => $keywords,
+            'tracked'        => $configured_kw,
+            'has_api_key'    => ! empty( $opts['serp_api_key'] ),
+        ] );
     }
     public static function ai_manual_logs_get( $r ) {
         return self::ok( RZPA_Database::get_ai_manual_logs( self::days( $r ) ) );

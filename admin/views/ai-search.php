@@ -9,7 +9,7 @@
   <div class="rzpa-header">
     <div>
       <h1>AI-søgemaskine Synlighed</h1>
-      <p class="page-sub">Google AI Overviews + manuel ChatGPT/Perplexity tracking</p>
+      <p class="page-sub">Tracking af Google AI Overviews, Featured Snippets og ChatGPT/Perplexity nævnelser</p>
     </div>
     <div class="rzpa-header-right">
       <div id="rzpa-date-filter" class="rzpa-date-filter">
@@ -22,31 +22,87 @@
   </div>
 
   <div class="rzpa-kpi-grid">
-    <div class="rzpa-kpi"><div class="rzpa-kpi-label">AI Overview visninger</div><div class="rzpa-kpi-value" id="kpi_ai_ov">–</div></div>
-    <div class="rzpa-kpi"><div class="rzpa-kpi-label">Featured Snippets</div><div class="rzpa-kpi-value color-blue" id="kpi_snippets">–</div></div>
-    <div class="rzpa-kpi"><div class="rzpa-kpi-label">People Also Ask</div><div class="rzpa-kpi-value color-purple" id="kpi_paa">–</div></div>
-    <div class="rzpa-kpi"><div class="rzpa-kpi-label">Nævnt i AI-svar</div><div class="rzpa-kpi-value color-orange" id="kpi_mentioned">–</div><div class="rzpa-kpi-sub" id="kpi_mentioned_sub"></div></div>
+    <div class="rzpa-kpi">
+      <div class="rzpa-kpi-label">AI Overview synlighed</div>
+      <div class="rzpa-kpi-value" id="kpi_ai_ov">–</div>
+      <div class="rzpa-kpi-sub">søgeord med AI Overview</div>
+    </div>
+    <div class="rzpa-kpi">
+      <div class="rzpa-kpi-label">Featured Snippets</div>
+      <div class="rzpa-kpi-value color-blue" id="kpi_snippets">–</div>
+      <div class="rzpa-kpi-sub">søgeord med snippet</div>
+    </div>
+    <div class="rzpa-kpi">
+      <div class="rzpa-kpi-label">People Also Ask</div>
+      <div class="rzpa-kpi-value color-purple" id="kpi_paa">–</div>
+      <div class="rzpa-kpi-sub">søgeord med PAA</div>
+    </div>
+    <div class="rzpa-kpi">
+      <div class="rzpa-kpi-label">Nævnt i AI-svar</div>
+      <div class="rzpa-kpi-value color-orange" id="kpi_mentioned">–</div>
+      <div class="rzpa-kpi-sub" id="kpi_mentioned_sub">af loggede forespørgsler</div>
+    </div>
   </div>
 
-  <div class="rzpa-chart-grid">
-    <div class="rzpa-chart-wrap">
-      <div class="rzpa-chart-title">AI Overview detektioner over tid</div>
-      <div style="height:200px"><canvas id="chart_ai_ov"></canvas></div>
-    </div>
-    <div class="rzpa-chart-wrap">
-      <div class="rzpa-chart-title">Om AI-søgemaskine tracking</div>
-      <div class="rzpa-chart-sub" style="margin-top:8px;line-height:1.7;font-size:13px;color:#777">
-        Data hentes dagligt via SerpAPI for Rezponz' vigtigste søgeord.<br><br>
-        <strong style="color:#aaa">Platforme der monitoreres:</strong><br>
-        Google AI Overviews, Featured Snippets, People Also Ask<br><br>
-        <strong style="color:#aaa">Manuel tracking:</strong><br>
-        Log hvornår Rezponz nævnes i ChatGPT, Perplexity, Gemini m.fl.
+  <div class="ai-main-grid">
+
+    <div class="rzpa-card" style="padding:0;overflow:hidden">
+      <div style="padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <h2 style="margin:0;font-size:15px">Søgeord status</h2>
+          <div class="rzpa-card-sub" style="margin-top:2px">Seneste check pr. søgeord</div>
+        </div>
+        <span id="ai-kw-count" style="font-size:12px;color:#555"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="rzpa-table" style="margin:0">
+          <thead><tr>
+            <th style="padding-left:20px">Søgeord</th>
+            <th style="text-align:center">AI Overview</th>
+            <th style="text-align:center">Snippet</th>
+            <th style="text-align:center">PAA</th>
+            <th>Seneste tjek</th>
+            <th>Kilde</th>
+          </tr></thead>
+          <tbody id="ai-kw-tbody">
+            <tr><td colspan="6" class="rzpa-loading" style="padding:24px 20px">Indlæser søgeord…</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+
+      <div class="rzpa-card" style="text-align:center">
+        <h2 style="margin:0 0 4px;font-size:13px;color:#666;font-weight:500;text-transform:uppercase;letter-spacing:.05em">AI-synlighedsscore</h2>
+        <div id="ai-score-value" style="font-size:56px;font-weight:800;line-height:1;margin:10px 0 2px;color:var(--neon)">–</div>
+        <div id="ai-score-label" style="font-size:12px;color:#555;margin-bottom:14px">af dine søgeord har AI-synlighed</div>
+        <div style="height:8px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden">
+          <div id="ai-score-bar" style="height:100%;border-radius:4px;background:var(--neon);transition:width .6s;width:0%"></div>
+        </div>
+      </div>
+
+      <div class="rzpa-card" style="flex:1">
+        <h2 style="margin:0 0 14px;font-size:14px">💡 Optimeringsindsatser</h2>
+        <div id="ai-tips" style="display:flex;flex-direction:column;gap:10px">
+          <div class="rzpa-loading" style="font-size:13px">Beregner…</div>
+        </div>
+      </div>
+
+    </div>
   </div>
 
-  <!-- Manual log form -->
-  <div class="rzpa-card">
+  <div class="rzpa-card" style="margin-top:16px">
+    <div class="rzpa-chart-title">AI Overview detektioner over tid</div>
+    <div style="height:180px"><canvas id="chart_ai_ov"></canvas></div>
+  </div>
+
+  <div class="rzpa-card" id="ai-overview-texts" style="display:none;margin-top:16px">
+    <h2 style="margin:0 0 14px;font-size:15px">📄 AI Overview tekst</h2>
+    <div id="ai-overview-texts-inner" style="display:flex;flex-direction:column;gap:12px"></div>
+  </div>
+
+  <div class="rzpa-card" style="margin-top:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div>
         <h2 style="margin:0">Manuel AI-svar log</h2>
@@ -54,7 +110,6 @@
       </div>
       <button id="rzpa-log-toggle" class="btn-primary">+ Tilføj log</button>
     </div>
-
     <div id="rzpa-log-form" class="rzpa-form" style="display:none">
       <div class="rzpa-form-grid">
         <div class="rzpa-field">
@@ -87,7 +142,6 @@
         <button onclick="document.getElementById('rzpa-log-form').style.display='none'" class="btn-ghost">Annuller</button>
       </div>
     </div>
-
     <div class="rzpa-table-wrap">
       <table class="rzpa-table">
         <thead><tr>

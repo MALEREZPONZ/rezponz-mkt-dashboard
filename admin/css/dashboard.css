@@ -4,6 +4,15 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* ── AI-synlighed main grid ─────────────────────────── */
+.ai-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  margin-bottom: 0;
+}
+@media (max-width: 960px) { .ai-main-grid { grid-template-columns: 1fr; } }
+
 /* ── Content type badges (Side / Blog) ──────────────────────── */
 .rzpa-type-badge {
   display:inline-block; font-size:10px; font-weight:700; padding:2px 8px;

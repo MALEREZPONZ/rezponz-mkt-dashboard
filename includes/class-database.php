@@ -333,6 +333,24 @@ class RZPA_Database {
         ), ARRAY_A );
     }
 
+    /** Seneste status pr. søgeord — bruges til keyword-statusoversigt. */
+    public static function get_ai_keyword_status() : array {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_ai_overview';
+        return $wpdb->get_results(
+            "SELECT k.keyword, k.has_ai_overview, k.has_featured_snippet, k.has_paa,
+                    k.ai_overview_text, k.date, k.source
+             FROM $t k
+             INNER JOIN (
+                 SELECT keyword, MAX(date) AS max_date
+                 FROM $t
+                 GROUP BY keyword
+             ) latest ON k.keyword = latest.keyword AND k.date = latest.max_date
+             ORDER BY k.keyword ASC",
+            ARRAY_A
+        );
+    }
+
     public static function get_ai_summary( int $days = 30 ) : array {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpa_ai_overview';
