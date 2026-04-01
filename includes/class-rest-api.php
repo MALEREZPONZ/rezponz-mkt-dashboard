@@ -368,34 +368,53 @@ class RZPA_REST_API {
         return self::ok( true );
     }
     public static function ai_sync() {
-        $keywords = [ 'rezponz', 'marketing automation platform', 'lead generation software',
-                      'crm tool for agencies', 'digital marketing dashboard' ];
-        $rows = [];
         $opts = get_option( 'rzpa_settings', [] );
 
+        // Brug brugerens egne søgeord fra indstillinger – fald tilbage på Rezponz-defaults
+        $raw_kw = $opts['serp_tracked_keywords'] ?? '';
+        $keywords = array_values( array_filter(
+            array_map( 'trim', explode( "\n", $raw_kw ) ),
+            fn( $k ) => $k !== ''
+        ) );
+        if ( empty( $keywords ) ) {
+            $keywords = [ 'rezponz', 'kundeservice software', 'marketing dashboard', 'lead generation', 'crm software' ];
+        }
+
+        $rows     = [];
+        $has_key  = ! empty( $opts['serp_api_key'] );
+        $errors   = [];
+
         foreach ( $keywords as $kw ) {
-            if ( ! empty( $opts['serp_api_key'] ) ) {
+            if ( $has_key ) {
                 $res = wp_remote_get( 'https://serpapi.com/search.json?' . http_build_query( [
                     'q'       => $kw,
                     'api_key' => $opts['serp_api_key'],
                     'gl'      => 'dk',
                     'hl'      => 'da',
+                    'num'     => 10,
                 ] ), [ 'timeout' => 15 ] );
-                if ( ! is_wp_error( $res ) ) {
+
+                if ( ! is_wp_error( $res ) && wp_remote_retrieve_response_code( $res ) === 200 ) {
                     $data = json_decode( wp_remote_retrieve_body( $res ), true );
-                    $rows[] = [
-                        'date'                 => gmdate( 'Y-m-d' ),
-                        'keyword'              => $kw,
-                        'has_ai_overview'      => ! empty( $data['ai_overview'] ) ? 1 : 0,
-                        'has_featured_snippet' => ! empty( $data['answer_box'] ) ? 1 : 0,
-                        'has_paa'              => ! empty( $data['related_questions'] ) ? 1 : 0,
-                        'ai_overview_text'     => $data['ai_overview']['text_blocks'][0]['snippet'] ?? '',
-                        'source'               => 'serpapi',
-                    ];
-                    continue;
+                    if ( ! empty( $data['error'] ) ) {
+                        $errors[] = $data['error'];
+                    } else {
+                        $rows[] = [
+                            'date'                 => gmdate( 'Y-m-d' ),
+                            'keyword'              => $kw,
+                            'has_ai_overview'      => ! empty( $data['ai_overview'] ) ? 1 : 0,
+                            'has_featured_snippet' => ! empty( $data['answer_box'] ) ? 1 : 0,
+                            'has_paa'              => ! empty( $data['related_questions'] ) ? 1 : 0,
+                            'ai_overview_text'     => $data['ai_overview']['text_blocks'][0]['snippet'] ?? '',
+                            'source'               => 'serpapi',
+                        ];
+                        continue;
+                    }
+                } else {
+                    $errors[] = is_wp_error( $res ) ? $res->get_error_message() : 'HTTP ' . wp_remote_retrieve_response_code( $res );
                 }
             }
-            // Mock
+            // Ingen API-nøgle eller fejl → mock
             $rows[] = [
                 'date'                 => gmdate( 'Y-m-d' ),
                 'keyword'              => $kw,
@@ -409,7 +428,10 @@ class RZPA_REST_API {
 
         if ( $rows ) RZPA_Database::insert_ai_overview_rows( $rows );
         RZPA_Database::log_sync( 'ai_overview', 'success', count( $rows ) . ' keywords' );
-        return self::ok( [ 'count' => count( $rows ) ] );
+
+        $resp = [ 'count' => count( $rows ), 'has_api_key' => $has_key ];
+        if ( $errors ) $resp['errors'] = array_unique( $errors );
+        return self::ok( $resp );
     }
 
     // Meta

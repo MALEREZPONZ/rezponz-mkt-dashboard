@@ -296,6 +296,13 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
                  placeholder="Din SerpAPI nøgle" />
         </div>
       </div>
+      <div class="rzpa-field" style="margin-top:16px">
+        <label>Søgeord der trackes <span style="font-weight:400;color:#555">(ét pr. linje)</span></label>
+        <textarea name="serp_tracked_keywords" rows="6"
+                  placeholder="rezponz&#10;kundeservice software&#10;marketing automation&#10;lead generation"
+                  style="width:100%;background:var(--bg-200);border:1px solid var(--border);border-radius:8px;color:#ccc;padding:10px;font-size:13px;resize:vertical"><?php echo esc_textarea( $opts['serp_tracked_keywords'] ?? '' ); ?></textarea>
+        <p style="font-size:12px;color:#555;margin-top:6px">Disse søgeord tjekkes dagligt for AI Overviews, Featured Snippets og People Also Ask.</p>
+      </div>
       <p style="font-size:12px;color:#444;margin-top:8px">
         Opret konto på <a href="https://serpapi.com" target="_blank" style="color:var(--neon)">serpapi.com</a> for at tracke Google AI Overviews.
       </p>

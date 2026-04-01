@@ -907,7 +907,22 @@ const RZPA_App = (() => {
     loadAI(days);
 
     el('rzpa-ai-sync')?.addEventListener('click', async () => {
-      await api('/ai/sync', { method: 'POST' });
+      const btn = el('rzpa-ai-sync');
+      if (btn) { btn.disabled = true; btn.textContent = 'Synkroniserer…'; }
+      try {
+        const r = await api('/ai/sync', { method: 'POST', timeout: 120 });
+        const d = r?.data ?? r;
+        if (d?.errors?.length) {
+          alert('SerpAPI fejl: ' + d.errors[0] + '\n\nTjek at din API-nøgle er korrekt under Indstillinger.');
+        } else if (btn) {
+          btn.textContent = `✓ ${d?.count ?? 0} søgeord synkroniseret`;
+          setTimeout(() => { btn.disabled = false; btn.textContent = 'Sync SerpAPI'; }, 3000);
+        }
+      } catch(e) {
+        alert('Fejl ved sync: ' + e.message);
+      } finally {
+        if (btn) { btn.disabled = false; }
+      }
       loadAI(days);
     });
 

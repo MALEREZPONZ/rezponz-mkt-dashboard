@@ -207,10 +207,16 @@ class RZPA_Admin {
             'google_ads_client_id', 'google_ads_client_secret',
         ];
 
+        // Textarea-felter der kræver sanitize_textarea_field
+        $textarea_fields = [ 'serp_tracked_keywords' ];
+
         // Start med eksisterende indstillinger så OAuth-tokens (refresh tokens) bevares
         $opts = get_option( 'rzpa_settings', [] );
         foreach ( $form_fields as $f ) {
-            $opts[ $f ] = sanitize_text_field( $_POST[ $f ] ?? '' );
+            $opts[ $f ] = sanitize_text_field( wp_unslash( $_POST[ $f ] ?? '' ) );
+        }
+        foreach ( $textarea_fields as $f ) {
+            $opts[ $f ] = sanitize_textarea_field( wp_unslash( $_POST[ $f ] ?? '' ) );
         }
         update_option( 'rzpa_settings', $opts );
 
