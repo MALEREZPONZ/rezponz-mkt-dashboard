@@ -2184,13 +2184,23 @@ const RZPA_App = (() => {
       const pdfBtn = el('meta-invoices-pdf');
       if (csvBtn) csvBtn.style.display = 'inline-flex';
       if (pdfBtn) pdfBtn.style.display = 'inline-flex';
-      renderMetaTransactions(content, data);
+      const isFallback = data[0]?._source === 'spend_fallback';
+      renderMetaTransactions(content, data, isFallback);
     }
 
-    function renderMetaTransactions(container, data) {
+    function renderMetaTransactions(container, data, isFallback = false) {
       const total = data.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
       const currency = data[0]?.currency || 'DKK';
       const hasIds   = data.some(r => r.transaction_id);
+
+      const fallbackBanner = isFallback ? `
+        <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#f59e0b;display:flex;gap:8px;align-items:flex-start">
+          <span style="flex-shrink:0">⚠️</span>
+          <div>
+            <strong>Viser månedligt annonceforbrug — ikke faktiske betalinger</strong><br>
+            <span style="color:#aaa">Meta's fakturerings-API returnerede ingen data. Beløbene nedenfor er hvad du brugte på annoncer pr. måned (fra Meta Insights), <em>ikke</em> hvad der faktisk blev trukket på dit betalingskort. Faktiske betalinger sker ved faktureringstærskler og kan afvige. Se præcise opkrævninger direkte på <a href="https://business.facebook.com/billing_hub/payment_activity" target="_blank" style="color:#1877F2">Meta Betalingsaktivitet</a>.</span>
+          </div>
+        </div>` : '';
 
       const statusBadge = s => {
         const map = { SETTLED:'#4ade80', PAID:'#4ade80', COMPLETED:'#4ade80', FAILED:'#ef4444', PENDING:'#f59e0b', VOID:'#888' };
@@ -2213,11 +2223,11 @@ const RZPA_App = (() => {
         return id.slice(-16);
       };
 
-      container.innerHTML = `
+      container.innerHTML = fallbackBanner + `
         <div style="display:flex;gap:24px;flex-wrap:wrap;padding:14px 18px;background:rgba(24,119,242,.06);border-radius:10px;border:1px solid rgba(24,119,242,.15);margin-bottom:16px">
-          <div><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Samlet forbrug</div>
+          <div><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">${isFallback ? 'Månedligt forbrug' : 'Samlet forbrug'}</div>
                <div style="font-size:22px;font-weight:700;color:#fff">${fmt(total,2)} ${currency}</div></div>
-          <div><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Transaktioner</div>
+          <div><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">${isFallback ? 'Måneder' : 'Transaktioner'}</div>
                <div style="font-size:22px;font-weight:700;color:#fff">${data.length}</div></div>
         </div>
         <div style="overflow-x:auto">

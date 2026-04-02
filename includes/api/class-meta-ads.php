@@ -247,12 +247,13 @@ class RZPA_Meta_Ads {
         if ( ! $until ) $until = gmdate( 'Y-m-d' );
 
         // ── Trin 1: Hent transaktioner fra /transactions endpoint ─────────────
-        $url = self::API_BASE . '/act_' . $account_id . '/transactions?' . http_build_query( [
-            'access_token' => $token,
-            'fields'       => 'id,created_time,amount,currency,status,vat_invoice_id,payment_option,billing_reason',
-            'time_range'   => wp_json_encode( [ 'since' => $since, 'until' => $until ] ),
-            'limit'        => 200,
-        ] );
+        // Bygger URL manuelt for time_range – http_build_query double-encodes JSON
+        $base_params = 'access_token=' . rawurlencode( $token )
+            . '&fields=id,created_time,amount,currency,status,vat_invoice_id,payment_option,billing_reason'
+            . '&time_range=' . rawurlencode( wp_json_encode( [ 'since' => $since, 'until' => $until ] ) )
+            . '&limit=200';
+
+        $url = self::API_BASE . '/act_' . $account_id . '/transactions?' . $base_params;
 
         $res  = wp_remote_get( $url, [ 'timeout' => 20 ] );
         if ( is_wp_error( $res ) ) return [ 'error' => $res->get_error_message() ];
@@ -260,8 +261,15 @@ class RZPA_Meta_Ads {
         $body = json_decode( wp_remote_retrieve_body( $res ), true );
 
         // Fallback: hvis transactions-endpoint ikke returnerer data, brug insights
+        // (markér tydeligt at det er annonceforbrugsdata, ikke faktiske opkrævninger)
         if ( ! empty( $body['error'] ) || empty( $body['data'] ) ) {
-            return self::fetch_invoices_from_insights( $token, $account_id, $since, $until );
+            $rows = self::fetch_invoices_from_insights( $token, $account_id, $since, $until );
+            // Tilføj kilde-markering på hvert element så UI kan vise advarsel
+            if ( is_array( $rows ) && ! isset( $rows['error'] ) ) {
+                foreach ( $rows as &$row ) { $row['_source'] = 'spend_fallback'; }
+                unset( $row );
+            }
+            return $rows;
         }
 
         $rows = [];
