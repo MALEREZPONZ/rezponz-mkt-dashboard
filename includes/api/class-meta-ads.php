@@ -440,17 +440,55 @@ class RZPA_Meta_Ads {
         // ── Trin 2: Hent creative-data for disse annoncer ────────────────────
         $ad_ids    = array_keys( $metrics );
         $ads_data  = [];
+        // Inkluder adlabels og picture til video-thumbnails
         $batch_url = self::API_BASE . '?' . http_build_query( [
             'access_token' => $token,
             'ids'          => implode( ',', $ad_ids ),
-            'fields'       => 'id,name,effective_status,created_time,creative{id,name,thumbnail_url,image_url,video_id,body,title,object_story_spec{link_data{picture,image_url,message,child_attachments{picture}},video_data{image_url,message},photo_data{images{original{uri}},caption}}}',
+            'fields'       => 'id,name,effective_status,created_time,creative{id,name,thumbnail_url,image_url,video_id,body,title,picture,object_story_spec{link_data{picture,image_url,message,child_attachments{picture}},video_data{image_url,message},photo_data{images{original{uri}},caption}}}',
         ] );
 
-        $res2 = wp_remote_get( $batch_url, [ 'timeout' => 8 ] );
+        $res2 = wp_remote_get( $batch_url, [ 'timeout' => 12 ] );
         if ( ! is_wp_error( $res2 ) ) {
             $body2 = json_decode( wp_remote_retrieve_body( $res2 ), true );
             if ( ! empty( $body2 ) && empty( $body2['error'] ) ) {
                 $ads_data = $body2;
+            }
+        }
+
+        // ── Trin 2b: Video-thumbnail fallback – hent thumbnail via video_id ──
+        // Meta returnerer ikke altid thumbnail_url for video-creatives i batch
+        $video_thumbs = [];
+        foreach ( $ad_ids as $ad_id ) {
+            $creative = $ads_data[ $ad_id ]['creative'] ?? [];
+            $video_id = $creative['video_id'] ?? '';
+            $has_img  = ! empty( $creative['thumbnail_url'] )
+                     || ! empty( $creative['image_url'] )
+                     || ! empty( $creative['picture'] )
+                     || ! empty( $creative['object_story_spec']['link_data']['picture'] )
+                     || ! empty( $creative['object_story_spec']['video_data']['image_url'] );
+            if ( $video_id && ! $has_img ) {
+                $video_thumbs[ $ad_id ] = $video_id;
+            }
+        }
+        if ( $video_thumbs ) {
+            // Batch-hent thumbnails for video-IDs via /{video_id}?fields=thumbnails
+            $vid_ids = array_unique( array_values( $video_thumbs ) );
+            $vid_url = self::API_BASE . '?' . http_build_query( [
+                'access_token' => $token,
+                'ids'          => implode( ',', $vid_ids ),
+                'fields'       => 'thumbnails{uri,width}',
+            ] );
+            $vres = wp_remote_get( $vid_url, [ 'timeout' => 8 ] );
+            if ( ! is_wp_error( $vres ) ) {
+                $vbody = json_decode( wp_remote_retrieve_body( $vres ), true );
+                foreach ( $video_thumbs as $ad_id => $vid_id ) {
+                    $thumbs = $vbody[ $vid_id ]['thumbnails']['data'] ?? [];
+                    if ( $thumbs ) {
+                        // Vælg den bredeste thumbnail
+                        usort( $thumbs, fn($a,$b) => ( $b['width'] ?? 0 ) - ( $a['width'] ?? 0 ) );
+                        $ads_data[ $ad_id ]['_video_thumb'] = $thumbs[0]['uri'] ?? '';
+                    }
+                }
             }
         }
 
@@ -473,8 +511,10 @@ class RZPA_Meta_Ads {
                 ?: ( $spec['link_data']['image_url']              ?? '' )
                 ?: ( $spec['video_data']['image_url']             ?? '' )
                 ?: ( $spec['photo_data']['images']['original']['uri'] ?? '' )
+                ?: ( $creative['thumbnail_url']                   ?? '' )
+                ?: ( $creative['picture']                         ?? '' )
                 ?: ( $creative['image_url']                       ?? '' )
-                ?: ( $creative['thumbnail_url']                   ?? '' );
+                ?: ( $ad['_video_thumb']                          ?? '' );
 
             // Ad body copy (til kortbeskrivelse)
             $body_copy = $spec['link_data']['message']   ?? ''
