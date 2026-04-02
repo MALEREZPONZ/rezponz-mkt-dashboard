@@ -2289,12 +2289,19 @@ const RZPA_App = (() => {
                 <td style="padding:12px">${statusBadge(r.status)}</td>
                 ${hasIds ? `<td style="padding:12px;color:#aaa;font-size:12px;font-family:monospace">${r.invoice_id || '–'}</td>` : ''}
                 <td style="padding:12px;text-align:center">
-                  <a href="${r.download_url || '#'}" target="_blank" rel="noopener"
-                     style="display:inline-flex;align-items:center;gap:4px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#ccc;font-size:11px;font-weight:500;padding:5px 10px;text-decoration:none;transition:all .15s"
-                     onmouseenter="this.style.borderColor='#1877F2';this.style.color='#1877F2'"
-                     onmouseleave="this.style.borderColor='#333';this.style.color='#ccc'">
-                    ⬇ Download
-                  </a>
+                  ${r.invoice_id
+                    ? `<a href="${(RZPA?.restBase||'/wp-json/rzpa/v1/')}meta/invoice-pdf?invoice_id=${encodeURIComponent(r.invoice_id)}&_wpnonce=${RZPA?.nonce||''}"
+                          download="Meta-Faktura-${r.invoice_id}.pdf"
+                          style="display:inline-flex;align-items:center;gap:4px;background:#1877F218;border:1px solid #1877F240;border-radius:6px;color:#1877F2;font-size:11px;font-weight:600;padding:5px 10px;text-decoration:none"
+                          title="Download PDF direkte">
+                         ⬇ PDF
+                       </a>`
+                    : `<a href="${r.download_url || '#'}" target="_blank" rel="noopener"
+                          style="display:inline-flex;align-items:center;gap:4px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#888;font-size:11px;font-weight:500;padding:5px 10px;text-decoration:none"
+                          title="Åbn i Meta">
+                         ↗ Meta
+                       </a>`
+                  }
                 </td>
               </tr>`).join('')}
           </tbody>

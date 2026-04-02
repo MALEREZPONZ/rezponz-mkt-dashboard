@@ -247,24 +247,36 @@ class RZPA_Meta_Ads {
         if ( ! $until ) $until = gmdate( 'Y-m-d' );
 
         // ── Trin 1: Hent transaktioner fra /transactions endpoint ─────────────
-        // Bygger URL manuelt for time_range – http_build_query double-encodes JSON
-        $base_params = 'access_token=' . rawurlencode( $token )
-            . '&fields=id,created_time,amount,currency,status,vat_invoice_id,payment_option,billing_reason'
+        $tx_fields = 'id,created_time,amount,currency,status,vat_invoice_id,payment_option,billing_reason';
+
+        // Forsøg A: med time_range filter
+        $url_a = self::API_BASE . '/act_' . $account_id . '/transactions?'
+            . 'access_token=' . rawurlencode( $token )
+            . '&fields=' . $tx_fields
             . '&time_range=' . rawurlencode( wp_json_encode( [ 'since' => $since, 'until' => $until ] ) )
             . '&limit=200';
 
-        $url = self::API_BASE . '/act_' . $account_id . '/transactions?' . $base_params;
+        $res  = wp_remote_get( $url_a, [ 'timeout' => 20 ] );
+        $body = is_wp_error( $res ) ? [] : json_decode( wp_remote_retrieve_body( $res ), true );
 
-        $res  = wp_remote_get( $url, [ 'timeout' => 20 ] );
-        if ( is_wp_error( $res ) ) return [ 'error' => $res->get_error_message() ];
+        // Forsøg B: uden time_range (filtrer PHP-side) – virker på konti der ikke støtter time_range
+        if ( empty( $body['data'] ) ) {
+            $url_b = self::API_BASE . '/act_' . $account_id . '/transactions?'
+                . 'access_token=' . rawurlencode( $token )
+                . '&fields=' . $tx_fields
+                . '&limit=200';
+            $res2  = wp_remote_get( $url_b, [ 'timeout' => 20 ] );
+            if ( ! is_wp_error( $res2 ) ) {
+                $body2 = json_decode( wp_remote_retrieve_body( $res2 ), true );
+                if ( ! empty( $body2['data'] ) ) {
+                    $body = $body2;
+                }
+            }
+        }
 
-        $body = json_decode( wp_remote_retrieve_body( $res ), true );
-
-        // Fallback: hvis transactions-endpoint ikke returnerer data, brug insights
-        // (markér tydeligt at det er annonceforbrugsdata, ikke faktiske opkrævninger)
-        if ( ! empty( $body['error'] ) || empty( $body['data'] ) ) {
+        // Fallback til insights hvis begge transactions-kald fejler
+        if ( empty( $body['data'] ) ) {
             $rows = self::fetch_invoices_from_insights( $token, $account_id, $since, $until );
-            // Tilføj kilde-markering på hvert element så UI kan vise advarsel
             if ( is_array( $rows ) && ! isset( $rows['error'] ) ) {
                 foreach ( $rows as &$row ) { $row['_source'] = 'spend_fallback'; }
                 unset( $row );
@@ -272,18 +284,26 @@ class RZPA_Meta_Ads {
             return $rows;
         }
 
+        $since_ts = strtotime( $since );
+        $until_ts = strtotime( $until ) + 86399; // inkluder hele slutdagen
+
         $rows = [];
         foreach ( $body['data'] as $t ) {
+            $created = substr( $t['created_time'] ?? '', 0, 10 );
+            $ts      = strtotime( $created );
+            // Filtrer dato PHP-side hvis time_range ikke blev brugt
+            if ( $ts < $since_ts || $ts > $until_ts ) continue;
+
             $invoice_id  = $t['vat_invoice_id'] ?? '';
             $download_url = $invoice_id
-                ? 'https://business.facebook.com/billing_hub/invoice?invoice_id=' . rawurlencode( $invoice_id )
-                    . '&business_id=' . $account_id
+                ? 'https://business.facebook.com/ads/ads_invoice/download/?account_id=' . $account_id
+                    . '&invoice_id=' . rawurlencode( $invoice_id )
                 : 'https://business.facebook.com/billing_hub/payment_activity';
 
             $rows[] = [
                 'transaction_id' => $t['id'] ?? '',
-                'date'           => substr( $t['created_time'] ?? '', 0, 10 ),
-                'month'          => substr( $t['created_time'] ?? '', 0, 7 ),
+                'date'           => $created,
+                'month'          => substr( $created, 0, 7 ),
                 'amount'         => round( (float) ( $t['amount'] ?? 0 ), 2 ),
                 'currency'       => strtoupper( $t['currency'] ?? 'DKK' ),
                 'status'         => $t['status'] ?? 'SETTLED',

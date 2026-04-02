@@ -121,6 +121,13 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        // PDF-proxy: henter Meta faktura-PDF server-side og streamer til browser
+        register_rest_route( self::NS, '/meta/invoice-pdf', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'meta_invoice_pdf' ],
+            'permission_callback' => $cap,
+        ] );
+
         register_rest_route( self::NS, '/meta/ai-analysis', [
             'methods'             => 'POST',
             'callback'            => [ __CLASS__, 'meta_ai_analysis' ],
@@ -528,6 +535,52 @@ class RZPA_REST_API {
         $data = RZPA_Meta_Ads::fetch_invoices( $since, $until );
         if ( ! isset( $data['error'] ) ) set_transient( $key, $data, 30 * MINUTE_IN_SECONDS );
         return self::ok( $data );
+    }
+
+    /**
+     * PDF-proxy: henter Meta faktura-PDF server-side med access token
+     * og streamer den direkte til brugerens browser som download.
+     * Kræver ?invoice_id=FBADS-105-XXXXXX
+     */
+    public static function meta_invoice_pdf( WP_REST_Request $r ) {
+        $invoice_id = sanitize_text_field( $r->get_param( 'invoice_id' ) ?? '' );
+        if ( ! $invoice_id || ! preg_match( '/^[A-Z0-9_\-]+$/i', $invoice_id ) ) {
+            return new WP_Error( 'invalid_invoice', 'Ugyldigt faktura-ID', [ 'status' => 400 ] );
+        }
+
+        $opts       = get_option( 'rzpa_settings', [] );
+        $token      = $opts['meta_access_token'] ?? '';
+        $account_id = $opts['meta_ad_account_id'] ?? '';
+        if ( ! $token || ! $account_id ) {
+            return new WP_Error( 'not_configured', 'Meta Ads ikke konfigureret', [ 'status' => 400 ] );
+        }
+
+        $pdf_url = 'https://business.facebook.com/ads/ads_invoice/download/?'
+            . 'account_id=' . rawurlencode( $account_id )
+            . '&invoice_id=' . rawurlencode( $invoice_id )
+            . '&access_token=' . rawurlencode( $token );
+
+        $res = wp_remote_get( $pdf_url, [ 'timeout' => 30, 'redirection' => 5 ] );
+        if ( is_wp_error( $res ) ) {
+            return new WP_Error( 'fetch_error', $res->get_error_message(), [ 'status' => 502 ] );
+        }
+
+        $http_code   = wp_remote_retrieve_response_code( $res );
+        $body        = wp_remote_retrieve_body( $res );
+        $content_type = wp_remote_retrieve_header( $res, 'content-type' ) ?: 'application/pdf';
+
+        if ( $http_code !== 200 || strlen( $body ) < 100 ) {
+            return new WP_Error( 'pdf_unavailable', 'PDF ikke tilgængelig fra Meta (kræver muligvis login)', [ 'status' => 502 ] );
+        }
+
+        // Stream PDF direkte til browser
+        header( 'Content-Type: application/pdf' );
+        header( 'Content-Disposition: attachment; filename="Meta-Faktura-' . sanitize_file_name( $invoice_id ) . '.pdf"' );
+        header( 'Content-Length: ' . strlen( $body ) );
+        header( 'Cache-Control: private, no-cache' );
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        echo $body;
+        exit;
     }
 
     public static function meta_ai_copy( WP_REST_Request $r ) {
