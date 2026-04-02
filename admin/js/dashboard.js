@@ -953,6 +953,104 @@ const RZPA_App = (() => {
     });
   }
 
+  // ── AI helpers ────────────────────────────────────────────────────────────
+
+  function generateActionPlan(keywords, logData, hasKey, tracked) {
+    const actions  = [];
+    const total    = keywords.length;
+    const noAI     = keywords.filter(k => k.has_ai_overview != 1);
+    const noSnip   = keywords.filter(k => k.has_featured_snippet != 1);
+    const noPAA    = keywords.filter(k => k.has_paa != 1);
+    const mentioned= logData.filter(l => l.rezponz_mentioned == 1).length;
+
+    if (!hasKey) {
+      actions.push({
+        color: '#f59e0b',
+        title: 'Tilføj SerpAPI-nøgle for at aktivere AI-tracking',
+        desc:  'Uden SerpAPI-nøgle tracker vi ikke din faktiske synlighed. Gå til Indstillinger → SerpAPI og indsæt din nøgle.',
+        impact: 'Kritisk',
+      });
+    }
+    if (hasKey && !total && tracked.length) {
+      actions.push({
+        color: '#f59e0b',
+        title: 'Klik "Sync SerpAPI" for at hente din synlighed',
+        desc:  `Du har ${tracked.length} søgeord konfigureret men ingen synlighedsdata endnu. Tryk knappen øverst til højre.`,
+        impact: 'Kritisk',
+      });
+    }
+    if (noAI.length > 0) {
+      const kws = noAI.slice(0, 3).map(k => `"${k.keyword}"`).join(', ');
+      actions.push({
+        color: '#ef4444',
+        title: `Skriv FAQ-sider til ${noAI.length} søgeord der mangler AI Overview`,
+        desc:  `${kws}${noAI.length > 3 ? ` og ${noAI.length - 3} andre` : ''} udløser ikke AI Overview. Lav en dedikeret FAQ-side pr. søgeord med direkte, autoritative svar på 300–500 ord. Google AI henter fra præcise, strukturerede svar.`,
+        impact: 'Høj effekt',
+      });
+    }
+    if (noSnip.length > 0 && total > 0) {
+      actions.push({
+        color: '#f97316',
+        title: `Strukturér ${noSnip.length} sider til Featured Snippet`,
+        desc:  'Google foretrækker svar i korte afsnit på 40–60 ord eller som lister/tabeller. Brug H2-overskrifter med spørgsmålsformat ("Hvad er…?") og svar direkte nedenunder uden indledning.',
+        impact: 'Høj effekt',
+      });
+    }
+    if (noPAA.length > 0 && total > 0) {
+      actions.push({
+        color: '#a78bfa',
+        title: `Tilføj Q&A-sektion på ${noPAA.length} sider for "Folk spørger også"`,
+        desc:  '"Folk spørger også"-boksen drives af relaterede spørgsmål. Tilføj 5–8 Q&A-par på dine vigtigste sider og implementér FAQPage Schema Markup (JSON-LD) for at øge sandsynligheden markant.',
+        impact: 'Middel effekt',
+      });
+    }
+    if (logData.length === 0) {
+      actions.push({
+        color: '#60a5fa',
+        title: 'Log dine første ChatGPT/Perplexity-testsvar',
+        desc:  'Test manuelt: spørg ChatGPT "Hvem tilbyder kundeservice outsourcing i Danmark?" og log svaret nedenfor. Det giver dig konkret indsigt i om AI-assistenter kender Rezponz.',
+        impact: 'Vigtig data',
+      });
+    }
+    if (logData.length > 0 && mentioned === 0) {
+      actions.push({
+        color: '#fb923c',
+        title: 'Rezponz nævnes ikke i AI-svar – byg digital autoritet',
+        desc:  'Få Rezponz omtalt på autoritetssider: brancheforeninger, sammenligningstjenester (fx Trustpilot, Capterra), nyhedsmedier og gæsteblogindlæg. Jo flere externe referencer, jo større sandsynlighed for AI-nævnelse.',
+        impact: 'Strategisk',
+      });
+    }
+    if (total > 0 && noAI.length === 0 && actions.length === 0) {
+      actions.push({
+        color: '#4ade80',
+        title: 'Alle søgeord har AI-synlighed – udvid med nye søgeord',
+        desc:  'God synlighed på nuværende søgeord. Overvej at tilføje long-tail varianter og spørgsmålsbaserede søgeord (fx "hvad koster kundeservice outsourcing?") for at fange endnu mere AI-trafik.',
+        impact: 'Vækst',
+      });
+    }
+    return actions;
+  }
+
+  function kwNextStep(k) {
+    if (k.has_ai_overview == 1 && k.has_featured_snippet == 1 && k.has_paa == 1) {
+      return '<span style="color:#4ade80">✓ Fuld synlighed – hold indhold opdateret</span>';
+    }
+    if (k.has_ai_overview != 1) return 'Skriv 300+ ord FAQ-svar på søgeordet';
+    if (k.has_featured_snippet != 1) return 'Strukturér svar: H2 + 50-ords afsnit';
+    if (k.has_paa != 1) return 'Tilføj 5 Q&A med FAQPage schema';
+    return '–';
+  }
+
+  function kwPriority(k) {
+    if (k.has_ai_overview != 1)
+      return '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,.15);color:#ef4444">🔴 Høj</span>';
+    if (k.has_featured_snippet != 1 || k.has_paa != 1)
+      return '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(249,115,22,.15);color:#f97316">🟡 Middel</span>';
+    return '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(74,222,128,.15);color:#4ade80">🟢 OK</span>';
+  }
+
+  // ── loadAI ────────────────────────────────────────────────────────────────
+
   async function loadAI(days) {
     const [sum, logs, ov, kwStatus] = await Promise.all([
       api(`/ai/summary?days=${days}`),
@@ -960,119 +1058,180 @@ const RZPA_App = (() => {
       api(`/ai/overview?days=${days}`),
       api('/ai/keyword-status'),
     ]);
-    const s        = sum.data     || {};
-    const logData  = logs.data    || [];
-    const ovData   = ov.data      || [];
+    const s        = sum.data      || {};
+    const logData  = logs.data     || [];
+    const ovData   = ov.data       || [];
     const kwData   = kwStatus.data || {};
     const keywords = kwData.keywords || [];
     const tracked  = kwData.tracked  || [];
     const hasKey   = kwData.has_api_key;
 
-    // ── KPIer ─────────────────────────────────────────────
-    renderKPI('kpi_ai_ov',     keywords.filter(k => k.has_ai_overview == 1).length || fmt(s.ai_overview_count) || '–');
-    renderKPI('kpi_snippets',  keywords.filter(k => k.has_featured_snippet == 1).length || fmt(s.featured_snippet_count) || '–');
-    renderKPI('kpi_paa',       keywords.filter(k => k.has_paa == 1).length || fmt(s.paa_count) || '–');
-    const mentioned = logData.filter(l => l.rezponz_mentioned == 1).length;
-    renderKPI('kpi_mentioned', mentioned, `af ${logData.length} loggede forespørgsler`);
+    const total    = keywords.length;
+    const withAI   = keywords.filter(k => k.has_ai_overview == 1).length;
+    const withSnip = keywords.filter(k => k.has_featured_snippet == 1).length;
+    const withPAA  = keywords.filter(k => k.has_paa == 1).length;
+    const mentioned= logData.filter(l => l.rezponz_mentioned == 1).length;
 
-    // ── Søgeord-statustabel ───────────────────────────────
+    // Score: AI Overview 50 %, Snippet 30 %, PAA 20 %
+    const score = total > 0
+      ? Math.round((withAI / total * 50) + (withSnip / total * 30) + (withPAA / total * 20))
+      : 0;
+
+    // ── SVG score-ring ────────────────────────────────────
+    const arc       = el('ai-score-arc');
+    const pctEl     = el('ai-score-pct');
+    const verdictEl = el('ai-score-verdict');
+
+    if (arc) {
+      const circumference = 239; // 2π × 38
+      const offset = circumference - (score / 100 * circumference);
+      let ringColor = '#ef4444';
+      if (score >= 70) ringColor = '#4ade80';
+      else if (score >= 40) ringColor = '#CCFF00';
+      else if (score >= 15) ringColor = '#f59e0b';
+      arc.style.stroke = ringColor;
+      setTimeout(() => { arc.style.strokeDashoffset = offset; }, 120);
+    }
+    if (pctEl) pctEl.textContent = total > 0 ? score + '%' : '–';
+
+    if (verdictEl) {
+      let vText, vBg, vColor;
+      if (!total)        { vText = 'Ingen data';  vBg = 'rgba(255,255,255,.06)'; vColor = '#555'; }
+      else if (score>=70){ vText = '🔥 Stærk';    vBg = 'rgba(74,222,128,.12)'; vColor = '#4ade80'; }
+      else if (score>=40){ vText = '✅ OK';        vBg = 'rgba(204,255,0,.10)';  vColor = '#CCFF00'; }
+      else if (score>=15){ vText = '⚠️ Svag';     vBg = 'rgba(245,158,11,.12)'; vColor = '#f59e0b'; }
+      else               { vText = '🚨 Kritisk';  vBg = 'rgba(239,68,68,.12)';  vColor = '#ef4444'; }
+      verdictEl.textContent      = vText;
+      verdictEl.style.background = vBg;
+      verdictEl.style.color      = vColor;
+    }
+
+    // ── Status banner ─────────────────────────────────────
+    const headlineEl = el('ai-status-headline');
+    const subEl      = el('ai-status-sub');
+    const pillsEl    = el('ai-status-pills');
+    const noAI       = keywords.filter(k => k.has_ai_overview != 1);
+
+    if (!total && !hasKey) {
+      if (headlineEl) headlineEl.textContent = 'Kom i gang med AI-synlighedssporing';
+      if (subEl)      subEl.innerHTML = 'Tilføj din SerpAPI-nøgle og søgeord under <a href="' + (RZPA?.adminUrl||'#') + '?page=rzpa-settings" style="color:var(--neon)">Indstillinger</a> for at begynde at tracke din placering i Google AI Overviews.';
+    } else if (!total) {
+      if (headlineEl) headlineEl.textContent = 'Klar til første sync';
+      if (subEl)      subEl.innerHTML = `${tracked.length} søgeord konfigureret. Klik <strong style="color:#fff">"⟳ Sync SerpAPI"</strong> øverst til højre for at hente din nuværende synlighed.`;
+    } else if (score >= 70) {
+      if (headlineEl) headlineEl.textContent = `Fremragende AI-synlighed – ${score}% score`;
+      if (subEl)      subEl.innerHTML = `${withAI} af ${total} søgeord har AI Overview. Du er godt positioneret. Fokus nu: hold indhold frisk og udvid med nye søgeord.`;
+    } else if (score >= 40) {
+      if (headlineEl) headlineEl.textContent = `God start – ${score}% score, men der er plads til forbedring`;
+      if (subEl)      subEl.innerHTML = `${noAI.length} søgeord mangler AI Overview. Struktureret FAQ-indhold er din hurtigste vej til bedre synlighed – se handlingsplanen nedenfor.`;
+    } else {
+      if (headlineEl) headlineEl.textContent = `${score}% score – Stort optimeringspotentiale`;
+      if (subEl)      subEl.innerHTML = `Kun ${withAI} af ${total} søgeord har AI Overview. Følg handlingsplanen nedenfor trin for trin for at forbedre din synlighed hurtigt.`;
+    }
+
+    if (pillsEl) {
+      const pills = [];
+      if (!hasKey) pills.push(['🔑 Mangler SerpAPI-nøgle', '#f59e0b']);
+      else         pills.push(['✓ SerpAPI aktiv', '#4ade80']);
+      if (total)          pills.push([`${total} søgeord tracket`, '#60a5fa']);
+      if (logData.length) pills.push([`${logData.length} AI-logs`, '#a78bfa']);
+      if (mentioned > 0)  pills.push([`Rezponz nævnt ${mentioned}×`, '#CCFF00']);
+      pillsEl.innerHTML = pills.map(([txt, c]) =>
+        `<span style="font-size:11px;padding:3px 10px;border-radius:12px;background:${c}22;color:${c};border:1px solid ${c}44">${txt}</span>`
+      ).join('');
+    }
+
+    // ── KPIer ─────────────────────────────────────────────
+    renderKPI('kpi_ai_ov',    total > 0 ? withAI   : '–');
+    renderKPI('kpi_snippets', total > 0 ? withSnip  : '–');
+    renderKPI('kpi_paa',      total > 0 ? withPAA   : '–');
+    renderKPI('kpi_mentioned',logData.length > 0 ? mentioned : '–');
+
+    // ── Handlingsplan ─────────────────────────────────────
+    const planEl    = el('ai-action-plan');
+    const planCount = el('ai-plan-count');
+    if (planEl) {
+      const actions = generateActionPlan(keywords, logData, hasKey, tracked);
+      if (planCount) planCount.textContent = actions.length ? `${actions.length} handlinger` : '';
+      if (!actions.length) {
+        planEl.innerHTML = '<div style="padding:16px 0;color:#4ade80;font-size:13px">✅ Ingen kritiske handlinger – din AI-synlighed ser stærk ud!</div>';
+      } else {
+        planEl.innerHTML = actions.map((a, i) => `
+          <div style="display:flex;gap:14px;align-items:flex-start;padding:14px 16px;background:rgba(255,255,255,.03);border-radius:10px;border-left:3px solid ${a.color}">
+            <div style="width:22px;height:22px;border-radius:50%;background:${a.color}22;border:1px solid ${a.color}55;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:800;color:${a.color}">${i+1}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600;color:#e5e5e5;margin-bottom:4px">${a.title}</div>
+              <div style="font-size:12px;color:#777;line-height:1.55">${a.desc}</div>
+            </div>
+            <span style="font-size:10px;padding:3px 9px;border-radius:10px;background:${a.color}18;color:${a.color};white-space:nowrap;flex-shrink:0;margin-top:2px">${a.impact}</span>
+          </div>`).join('');
+      }
+    }
+
+    // ── Søgeord-tabel ─────────────────────────────────────
     const kwTbody = el('ai-kw-tbody');
     const kwCount = el('ai-kw-count');
     if (kwTbody) {
-      if (!hasKey && !keywords.length) {
-        kwTbody.innerHTML = `<tr><td colspan="6" style="padding:20px;color:#666;text-align:center">
-          Ingen data endnu. Tilføj din SerpAPI-nøgle og søgeord under
-          <a href="${RZPA?.adminUrl || '#'}?page=rzpa-settings" style="color:var(--neon)">Indstillinger</a>
-          og klik "Sync SerpAPI".
+      if (!hasKey && !total) {
+        kwTbody.innerHTML = `<tr><td colspan="6" style="padding:28px 20px;color:#555;text-align:center">
+          Tilføj SerpAPI-nøgle og søgeord under
+          <a href="${RZPA?.adminUrl||'#'}?page=rzpa-settings" style="color:var(--neon)">Indstillinger</a>
+          for at begynde at tracke.
         </td></tr>`;
-      } else if (!keywords.length) {
-        // Har token men ingen data — vis de konfigurerede søgeord som "ikke tjekket endnu"
-        const rows = tracked.length ? tracked : ['–'];
-        kwTbody.innerHTML = rows.map(kw => `
-          <tr>
-            <td style="padding-left:20px;font-weight:500">${kw}</td>
-            <td style="text-align:center"><span style="color:#555">–</span></td>
-            <td style="text-align:center"><span style="color:#555">–</span></td>
-            <td style="text-align:center"><span style="color:#555">–</span></td>
-            <td style="color:#555">Ikke tjekket</td>
-            <td></td>
+      } else if (!total) {
+        kwTbody.innerHTML = (tracked.length ? tracked : ['–']).map(kw => `
+          <tr data-filter="missing">
+            <td style="padding-left:20px;font-weight:500;color:#aaa">${kw}</td>
+            <td style="text-align:center"><span style="color:#333">–</span></td>
+            <td style="text-align:center"><span style="color:#333">–</span></td>
+            <td style="text-align:center"><span style="color:#333">–</span></td>
+            <td style="color:#555;font-size:12px">Klik Sync SerpAPI</td>
+            <td style="text-align:center"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,.15);color:#f59e0b">Venter</span></td>
           </tr>`).join('');
       } else {
-        const check  = v => v == 1 ? '<span style="color:#4ade80;font-size:16px">✓</span>' : '<span style="color:#444;font-size:14px">✗</span>';
-        kwTbody.innerHTML = keywords.map(k => `
-          <tr>
-            <td style="padding-left:20px;font-weight:500">${k.keyword}</td>
-            <td style="text-align:center">${check(k.has_ai_overview)}</td>
-            <td style="text-align:center">${check(k.has_featured_snippet)}</td>
-            <td style="text-align:center">${check(k.has_paa)}</td>
-            <td style="color:#666;font-size:12px">${k.date || '–'}</td>
-            <td><span style="font-size:11px;color:${k.source==='serpapi'?'#4ade80':'#666'}">${k.source==='serpapi'?'Live':'Mock'}</span></td>
-          </tr>`).join('');
-        if (kwCount) kwCount.textContent = `${keywords.length} søgeord`;
+        const chk = v => v == 1
+          ? '<span style="color:#4ade80;font-size:15px">✓</span>'
+          : '<span style="color:#2d2d2d;font-size:13px">✗</span>';
+        kwTbody.innerHTML = keywords.map(k => {
+          const filter = k.has_ai_overview == 1 ? 'has_ai' : 'missing';
+          return `<tr data-filter="${filter}">
+            <td style="padding-left:20px;font-weight:500;color:#e5e5e5">${k.keyword}</td>
+            <td style="text-align:center">${chk(k.has_ai_overview)}</td>
+            <td style="text-align:center">${chk(k.has_featured_snippet)}</td>
+            <td style="text-align:center">${chk(k.has_paa)}</td>
+            <td style="font-size:12px;color:#999">${kwNextStep(k)}</td>
+            <td style="text-align:center">${kwPriority(k)}</td>
+          </tr>`;
+        }).join('');
+        if (kwCount) kwCount.textContent = `${total} søgeord`;
       }
     }
 
-    // ── Synlighedsscore ───────────────────────────────────
-    if (keywords.length) {
-      const withAI  = keywords.filter(k => k.has_ai_overview == 1 || k.has_featured_snippet == 1 || k.has_paa == 1).length;
-      const pct     = Math.round(withAI / keywords.length * 100);
-      const scoreEl = el('ai-score-value');
-      const barEl   = el('ai-score-bar');
-      const lblEl   = el('ai-score-label');
-      if (scoreEl) scoreEl.textContent = pct + '%';
-      if (barEl)   setTimeout(() => { barEl.style.width = pct + '%'; barEl.style.background = pct >= 60 ? '#4ade80' : pct >= 30 ? '#CCFF00' : '#f59e0b'; }, 100);
-      if (lblEl)   lblEl.textContent = `${withAI} af ${keywords.length} søgeord har AI-synlighed`;
-    }
-
-    // ── Optimeringsindsatser ──────────────────────────────
-    const tipsEl = el('ai-tips');
-    if (tipsEl) {
-      const tips = [];
-      if (!hasKey) {
-        tips.push({ icon: '🔑', color: '#f59e0b', text: '<strong>Tilføj SerpAPI-nøgle</strong> under Indstillinger for at hente reel data i stedet for mock-data.' });
-      }
-      if (!tracked.length && hasKey) {
-        tips.push({ icon: '📝', color: '#f59e0b', text: '<strong>Tilføj søgeord</strong> under Indstillinger → SerpAPI for at tracke din synlighed.' });
-      }
-      const noAI = keywords.filter(k => k.has_ai_overview != 1);
-      if (noAI.length) {
-        tips.push({ icon: '🤖', color: '#60a5fa', text: `<strong>${noAI.length} søgeord mangler AI Overview.</strong> Skriv dybdegående FAQ-indhold der direkte besvarer søgningerne: <em>${noAI.slice(0,2).map(k=>k.keyword).join(', ')}</em>.` });
-      }
-      const noSnippet = keywords.filter(k => k.has_featured_snippet != 1);
-      if (noSnippet.length) {
-        tips.push({ icon: '⭐', color: '#a78bfa', text: `<strong>${noSnippet.length} søgeord mangler Featured Snippet.</strong> Strukturér svar med overskrifter (H2/H3) og korte, præcise afsnit på 40-60 ord.` });
-      }
-      const noPAA = keywords.filter(k => k.has_paa != 1);
-      if (noPAA.length) {
-        tips.push({ icon: '❓', color: '#34d399', text: `<strong>${noPAA.length} søgeord udløser ikke "Folk spørger også".</strong> Tilføj et Q&A-afsnit på din side med de mest stillede spørgsmål.` });
-      }
-      if (logData.length === 0) {
-        tips.push({ icon: '📊', color: '#fb923c', text: '<strong>Ingen ChatGPT/Perplexity-logs endnu.</strong> Spørg selv AI-assistenter om din virksomhed og log resultatet med "+ Tilføj log".' });
-      }
-      if (!tips.length) {
-        tips.push({ icon: '✅', color: '#4ade80', text: '<strong>Fremragende synlighed!</strong> Alle dine søgeord har AI-dækning. Fortsæt med at opdatere indholdet regelmæssigt.' });
-      }
-      tipsEl.innerHTML = tips.map(t => `
-        <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:rgba(255,255,255,.03);border-radius:8px;border-left:3px solid ${t.color}">
-          <span style="font-size:16px;flex-shrink:0">${t.icon}</span>
-          <span style="font-size:13px;color:#bbb;line-height:1.5">${t.text}</span>
-        </div>`).join('');
-    }
-
-    // ── AI Overview tekst-uddrag ──────────────────────────
+    // ── AI Overview tekster ────────────────────────────────
     const textsCard  = el('ai-overview-texts');
     const textsInner = el('ai-overview-texts-inner');
     const withText   = keywords.filter(k => k.ai_overview_text);
-    if (textsCard && textsInner && withText.length) {
-      textsCard.style.display = 'block';
-      textsInner.innerHTML = withText.map(k => `
-        <div style="padding:12px 14px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid var(--border)">
-          <div style="font-size:12px;color:#888;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">${k.keyword}</div>
-          <p style="margin:0;font-size:13px;color:#ccc;line-height:1.6">${k.ai_overview_text}</p>
-        </div>`).join('');
+    if (textsCard && textsInner) {
+      if (withText.length) {
+        textsCard.style.display = 'block';
+        textsInner.innerHTML = withText.map(k => {
+          const isMentioned = k.ai_overview_text && k.ai_overview_text.toLowerCase().includes('rezponz');
+          return `<div style="padding:12px 14px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid ${isMentioned ? '#CCFF0033' : 'var(--border)'}">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.05em">${k.keyword}</span>
+              ${isMentioned
+                ? '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:rgba(204,255,0,.12);color:#CCFF00">Rezponz nævnt ✓</span>'
+                : '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:rgba(239,68,68,.12);color:#ef4444">Ikke nævnt</span>'}
+            </div>
+            <p style="margin:0;font-size:12px;color:#999;line-height:1.6">${k.ai_overview_text}</p>
+          </div>`;
+        }).join('');
+      } else {
+        textsCard.style.display = 'none';
+      }
     }
 
-    // ── Trend-chart ───────────────────────────────────────
+    // ── Trend-chart ────────────────────────────────────────
     const byDate = {};
     ovData.forEach(row => {
       if (!byDate[row.date]) byDate[row.date] = { ai: 0, snippet: 0 };
@@ -1082,16 +1241,16 @@ const RZPA_App = (() => {
     const dates = Object.keys(byDate).sort().slice(-14);
     if (dates.length) {
       barChart('chart_ai_ov', dates.map(d => d.slice(5)), [
-        { label: 'AI Overview',     data: dates.map(d => byDate[d].ai),      backgroundColor: '#CCFF00', borderRadius: 4 },
-        { label: 'Featured Snippet',data: dates.map(d => byDate[d].snippet), backgroundColor: '#4488ff', borderRadius: 4 },
+        { label: 'AI Overview',      data: dates.map(d => byDate[d].ai),      backgroundColor: '#CCFF00', borderRadius: 4 },
+        { label: 'Featured Snippet', data: dates.map(d => byDate[d].snippet), backgroundColor: '#4488ff', borderRadius: 4 },
       ]);
     }
 
-    // ── Manuel log-tabel ─────────────────────────────────
+    // ── Manuel log-tabel ──────────────────────────────────
     const tbody = el('ai_log_tbody');
     if (tbody) {
       if (!logData.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="rzpa-empty">Ingen logs endnu. Tilføj din første.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="rzpa-empty">Ingen logs endnu – tilføj din første med "+ Tilføj log".</td></tr>';
       } else {
         tbody.innerHTML = logData.map(log => `
           <tr>
