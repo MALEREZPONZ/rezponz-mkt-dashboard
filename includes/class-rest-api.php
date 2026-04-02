@@ -1053,8 +1053,8 @@ class RZPA_REST_API {
         $raw_url = $r->get_param( 'url' ) ?? '';
         $url     = filter_var( $raw_url, FILTER_SANITIZE_URL );
 
-        // Kun Meta/Facebook CDN-urls tilladt
-        if ( ! $url || ! preg_match( '#^https?://([\w-]+\.)?(facebook\.com|fbcdn\.net|scontent\.[a-z0-9-]+\.fna\.fbcdn\.net|cdninstagram\.com)#', $url ) ) {
+        // Kun Meta/Facebook CDN-urls tilladt (fbcdn.net dækker alle subdomæner inkl. video.*.fna.fbcdn.net)
+        if ( ! $url || ! preg_match( '#^https?://[^\s]*(facebook\.com|fbcdn\.net|cdninstagram\.com)#i', $url ) ) {
             return new WP_Error( 'invalid_url', 'Only Meta CDN URLs allowed', [ 'status' => 400 ] );
         }
 

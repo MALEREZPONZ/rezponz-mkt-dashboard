@@ -2098,27 +2098,65 @@ const RZPA_App = (() => {
         return proxyBase + encodeURIComponent(raw) + (RZPA?.nonce ? '&_wpnonce=' + RZPA.nonce : '');
       };
 
+      // Link direkte til annoncen i Meta Ads Manager
+      const adLink = ad => {
+        const actId = ad.account_id || '';
+        const adId  = ad.ad_id || '';
+        if (!adId) return 'https://www.facebook.com/adsmanager/';
+        return `https://www.facebook.com/adsmanager/manage/ads?act=${actId}&selected_ad_ids=${adId}`;
+      };
+
+      // Performance-vurdering baseret på CTR og CPM
+      const perfBadge = ad => {
+        const ctr = parseFloat(ad.ctr) || 0;
+        const cpm = parseFloat(ad.cpm) || 0;
+        const reach = parseInt(ad.reach) || 0;
+        if (!ad.impressions || ad.impressions === 0) return { label: 'Ingen data', color: '#666', bg: '#66666618' };
+        // CTR benchmark DK: stærk >1.5%, ok 0.5-1.5%, svag <0.5%
+        if (ctr >= 1.5) return { label: '🟢 Stærk', color: '#4ade80', bg: '#4ade8018' };
+        if (ctr >= 0.5) return { label: '🟡 Okay',  color: '#f59e0b', bg: '#f59e0b18' };
+        return                { label: '🔴 Svag',   color: '#ef4444', bg: '#ef444418' };
+      };
+
       const byDays  = [...ads].sort((a, b) => (b.days_active || 0) - (a.days_active || 0));
       const bySpend = [...ads].sort((a, b) => b.spend - a.spend);
 
       const spotlight = [
-        { ad: ads[0],     icon: '👑', label: 'Højeste Reach',          metric_label: 'Reach',                metric_value: fmt(ads[0]?.reach) },
-        { ad: byDays[0],  icon: '⏱', label: 'Længste Løbetid',         metric_label: 'Aktiv i',              metric_value: `${byDays[0]?.days_active ?? '–'} dage` },
-        { ad: bySpend[0], icon: '📈', label: 'Højeste Annonceforbrug',  metric_label: 'Est. Månedligt Spend', metric_value: `${fmt(bySpend[0]?.spend, 0)} kr.` },
+        { ad: ads[0],     icon: '👑', label: 'Højeste Reach',         metric_label: 'Reach',                metric_value: fmt(ads[0]?.reach) },
+        { ad: byDays[0],  icon: '⏱', label: 'Længste Løbetid',        metric_label: 'Aktiv i',              metric_value: `${byDays[0]?.days_active ?? '–'} dage` },
+        { ad: bySpend[0], icon: '📈', label: 'Højeste Annonceforbrug', metric_label: 'Est. Månedligt Spend', metric_value: `${fmt(bySpend[0]?.spend, 0)} kr.` },
       ];
 
       let html = '<div class="tap-grid">';
       spotlight.forEach(({ ad, icon, label, metric_label, metric_value }) => {
         if (!ad) return;
         const src  = thumbSrc(ad);
-        const copy = (ad.body_copy || ad.ad_name || '').substring(0, 160);
+        const copy = (ad.body_copy || ad.ad_name || '').substring(0, 120);
+        const perf = perfBadge(ad);
+        const link = adLink(ad);
+        const ctrTxt = ad.impressions > 0 ? `CTR ${ad.ctr}% · CPM ${fmt(ad.cpm,0)} kr.` : '';
+
         const imgHtml = src
-          ? `<img src="${src}" class="tap-img" alt="" loading="lazy" onerror="this.style.display='none'">`
-          : '<div class="tap-no-thumb">📷</div>';
+          ? `<img src="${src}" class="tap-img" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+          : '';
+        const fallbackDiv = `<div class="tap-no-thumb" style="${src ? 'display:none' : ''}">📷</div>`;
+
         html += `
           <div class="tap-card">
-            <div class="tap-thumb">${imgHtml}<span class="tap-badge">${icon} ${label}</span></div>
-            <div class="tap-body"><p class="tap-copy">${copy}</p></div>
+            <div class="tap-thumb">
+              ${imgHtml}${fallbackDiv}
+              <span class="tap-badge">${icon} ${label}</span>
+              <a href="${link}" target="_blank" rel="noopener"
+                 style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:3px 7px;border-radius:4px;text-decoration:none;font-weight:500;backdrop-filter:blur(4px)"
+                 title="Åbn i Meta Ads Manager">↗ Meta</a>
+            </div>
+            <div class="tap-body">
+              <p class="tap-copy">${copy || ad.ad_name || '–'}</p>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
+                <span style="display:inline-flex;align-items:center;background:${perf.bg};color:${perf.color};border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600">${perf.label}</span>
+                ${ctrTxt ? `<span style="font-size:11px;color:#666">${ctrTxt}</span>` : ''}
+              </div>
+            </div>
             <div class="tap-foot">
               <span class="tap-foot-label">${metric_label}</span>
               <strong class="tap-foot-val">${metric_value}</strong>

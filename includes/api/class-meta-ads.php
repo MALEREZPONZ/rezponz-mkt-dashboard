@@ -495,6 +495,7 @@ class RZPA_Meta_Ads {
 
             $rows[] = [
                 'ad_id'         => $ad_id,
+                'account_id'    => $account_id,
                 'ad_name'       => $m['ad_name']              ?? ( $ad['name'] ?? '' ),
                 'status'        => $ad['effective_status']    ?? 'ACTIVE',
                 'creative_id'   => $creative['id']            ?? '',
