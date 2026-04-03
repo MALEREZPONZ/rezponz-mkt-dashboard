@@ -457,17 +457,16 @@ class RZPA_Meta_Ads {
         }
         if ( empty( $metrics ) ) return [];
 
-        // ── Trin 2: Hent creative-data for disse annoncer ────────────────────
-        $ad_ids    = array_keys( $metrics );
-        $ads_data  = [];
-        // Inkluder adlabels og picture til video-thumbnails
-        $batch_url = self::API_BASE . '?' . http_build_query( [
-            'access_token' => $token,
-            'ids'          => implode( ',', $ad_ids ),
-            'fields'       => 'id,name,effective_status,created_time,creative{id,name,thumbnail_url,image_url,video_id,body,title,picture,object_story_spec{link_data{picture,image_url,message,child_attachments{picture}},video_data{image_url,message},photo_data{images{original{uri}},caption}}}',
-        ] );
+        // ── Trin 2: Hent basis ad-data (navn, status, created_time, creative id) ─
+        // Brug raw komma i ids – http_build_query encoder dem som %2C hvilket bryder Meta's batch endpoint.
+        $ad_ids   = array_keys( $metrics );
+        $ads_data = [];
+        $step2_url = self::API_BASE
+            . '?access_token=' . rawurlencode( $token )
+            . '&ids=' . implode( ',', $ad_ids )
+            . '&fields=id,name,effective_status,created_time,creative{id,video_id}';
 
-        $res2 = wp_remote_get( $batch_url, [ 'timeout' => 12 ] );
+        $res2 = wp_remote_get( $step2_url, [ 'timeout' => 12 ] );
         if ( ! is_wp_error( $res2 ) ) {
             $body2 = json_decode( wp_remote_retrieve_body( $res2 ), true );
             if ( ! empty( $body2 ) && empty( $body2['error'] ) ) {
@@ -475,8 +474,41 @@ class RZPA_Meta_Ads {
             }
         }
 
-        // ── Trin 2b: Video-thumbnail fallback – hent thumbnail via video_id ──
-        // Meta returnerer ikke altid thumbnail_url for video-creatives i batch
+        // ── Trin 2b: Hent creative thumbnail direkte via creative_id ──────────
+        // Mere pålidelig end at expandere creative{} igennem ad-batch-kaldet.
+        $cre_id_map = []; // ad_id => creative_id
+        foreach ( $ad_ids as $ad_id ) {
+            $cid = $ads_data[ $ad_id ]['creative']['id'] ?? '';
+            if ( $cid ) $cre_id_map[ $ad_id ] = $cid;
+        }
+        if ( $cre_id_map ) {
+            $unique_cre_ids = array_unique( array_values( $cre_id_map ) );
+            $cre_url = self::API_BASE
+                . '?access_token=' . rawurlencode( $token )
+                . '&ids=' . implode( ',', $unique_cre_ids )
+                . '&fields=id,thumbnail_url,image_url,picture,video_id,body,title,'
+                . 'object_story_spec{link_data{picture,image_url,message,child_attachments{picture}},'
+                . 'video_data{image_url,message},photo_data{images{original{uri}},caption}}';
+
+            $cre_res = wp_remote_get( $cre_url, [ 'timeout' => 10 ] );
+            if ( ! is_wp_error( $cre_res ) ) {
+                $cre_body = json_decode( wp_remote_retrieve_body( $cre_res ), true );
+                if ( ! empty( $cre_body ) && empty( $cre_body['error'] ) ) {
+                    foreach ( $cre_id_map as $ad_id => $cid ) {
+                        $cre = $cre_body[ $cid ] ?? null;
+                        if ( $cre ) {
+                            // Merge tilbage – bevar video_id fra trin 2 hvis ikke returneret
+                            $ads_data[ $ad_id ]['creative'] = array_merge(
+                                $ads_data[ $ad_id ]['creative'] ?? [],
+                                $cre
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Trin 2c: Video-thumbnail fallback – hent via /{video_id} ──────────
         $video_thumbs = [];
         foreach ( $ad_ids as $ad_id ) {
             $creative = $ads_data[ $ad_id ]['creative'] ?? [];
@@ -491,22 +523,22 @@ class RZPA_Meta_Ads {
             }
         }
         if ( $video_thumbs ) {
-            // Batch-hent thumbnails for video-IDs via /{video_id}?fields=thumbnails
             $vid_ids = array_unique( array_values( $video_thumbs ) );
-            $vid_url = self::API_BASE . '?' . http_build_query( [
-                'access_token' => $token,
-                'ids'          => implode( ',', $vid_ids ),
-                'fields'       => 'thumbnails{uri,width}',
-            ] );
+            $vid_url = self::API_BASE
+                . '?access_token=' . rawurlencode( $token )
+                . '&ids=' . implode( ',', $vid_ids )
+                . '&fields=id,thumbnails{uri,width},picture';
+
             $vres = wp_remote_get( $vid_url, [ 'timeout' => 8 ] );
             if ( ! is_wp_error( $vres ) ) {
                 $vbody = json_decode( wp_remote_retrieve_body( $vres ), true );
                 foreach ( $video_thumbs as $ad_id => $vid_id ) {
                     $thumbs = $vbody[ $vid_id ]['thumbnails']['data'] ?? [];
                     if ( $thumbs ) {
-                        // Vælg den bredeste thumbnail
                         usort( $thumbs, fn($a,$b) => ( $b['width'] ?? 0 ) - ( $a['width'] ?? 0 ) );
                         $ads_data[ $ad_id ]['_video_thumb'] = $thumbs[0]['uri'] ?? '';
+                    } elseif ( ! empty( $vbody[ $vid_id ]['picture'] ) ) {
+                        $ads_data[ $ad_id ]['_video_thumb'] = $vbody[ $vid_id ]['picture'];
                     }
                 }
             }
