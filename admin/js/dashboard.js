@@ -1484,6 +1484,88 @@ const RZPA_App = (() => {
     document.body.style.overflow = '';
   }
 
+  function closeTapDetailModal() {
+    const modal = el('rzpa-top-ad-modal');
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  function openTopAdDetailModal(ad) {
+    const modal = el('rzpa-top-ad-modal');
+    if (!modal) return;
+
+    const proxyBase = (RZPA?.restBase || '/wp-json/rzpa/v1/') + 'meta/image-proxy?url=';
+    const rawImg = ad.thumbnail_url || ad.image_url;
+    const imgSrc = rawImg
+      ? proxyBase + encodeURIComponent(rawImg) + (RZPA?.nonce ? '&_wpnonce=' + RZPA.nonce : '')
+      : '';
+
+    const fmtMap = { video: '▶ Video', carousel: '⊞ Carousel', image: '🖼 Billede' };
+    const fmtLabel = fmtMap[ad.format] || '🖼 Billede';
+    const fmtText  = { video: 'Video', carousel: 'Carousel', image: 'Billede' }[ad.format] || 'Billede';
+
+    const reach   = parseInt(ad.reach) || 0;
+    const spend   = parseFloat(ad.spend) || 0;
+    const days    = ad.days_active || 0;
+    const adLink  = `https://www.facebook.com/adsmanager/manage/ads?act=${ad.account_id || ''}&selected_ad_ids=${ad.ad_id || ''}`;
+
+    // Tier badge (shown as status on image)
+    const tier = reach >= 5000 ? { label: '🏆 Winner', cls: 'cam-status-active' }
+               : reach >= 1000 ? { label: '✅ Solid',  cls: 'cam-status-active' }
+               : reach > 0     ? { label: '🧪 Testing', cls: 'cam-status-paused' }
+               : null;
+
+    const titleEl = el('rzpa-tap-modal-title');
+    const bodyEl  = el('rzpa-tap-modal-body');
+    if (titleEl) titleEl.textContent = ad.ad_name || '–';
+    if (bodyEl) bodyEl.innerHTML = `
+      <div class="rzpa-tap-detail-thumb">
+        ${imgSrc
+          ? `<img src="${imgSrc}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+          : ''}
+        <div class="rzpa-tap-detail-nothumb"${imgSrc ? ' style="display:none"' : ''}>📷</div>
+        <span class="cam-fmt-badge">${fmtLabel}</span>
+        ${tier ? `<span class="cam-status-badge ${tier.cls}">${tier.label}</span>` : ''}
+      </div>
+
+      <div class="rzpa-tap-detail-stats">
+        <div class="rzpa-tap-stat">
+          <span class="rzpa-tap-stat-icon">👁</span>
+          <span class="rzpa-tap-stat-label">Reach</span>
+          <strong>${reach.toLocaleString('da-DK')}</strong>
+        </div>
+        <div class="rzpa-tap-stat">
+          <span class="rzpa-tap-stat-icon">💰</span>
+          <span class="rzpa-tap-stat-label">Est. Månedligt Spend</span>
+          <strong class="rzpa-tap-stat--green">${spend.toLocaleString('da-DK', {maximumFractionDigits:0})} kr.</strong>
+        </div>
+        <div class="rzpa-tap-stat">
+          <span class="rzpa-tap-stat-icon">📅</span>
+          <span class="rzpa-tap-stat-label">Aktiv i</span>
+          <strong>${days} dage</strong>
+        </div>
+        <div class="rzpa-tap-stat">
+          <span class="rzpa-tap-stat-icon">⊞</span>
+          <span class="rzpa-tap-stat-label">Format</span>
+          <strong>${fmtText}</strong>
+        </div>
+      </div>
+
+      ${(ad.body_copy || ad.title) ? `
+      <div class="rzpa-tap-detail-copy">
+        <div class="rzpa-tap-section-label">Annoncetekst</div>
+        ${ad.title ? `<div style="font-size:14px;font-weight:700;color:#1a1a1a;margin-bottom:6px">${ad.title}</div>` : ''}
+        ${ad.body_copy ? `<div class="rzpa-tap-detail-body-text">${ad.body_copy}</div>` : ''}
+      </div>` : ''}
+
+      <div class="rzpa-tap-detail-footer">
+        <a href="${adLink}" target="_blank" rel="noopener" class="cam-meta-link">Se i Meta Ads Manager →</a>
+      </div>`;
+
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
   function loadAdPreview(adId, container) {
     if (!container) return;
     container.innerHTML = '<div class="rzpa-loading-modal" style="min-height:80px">Indlæser annonce…</div>';
@@ -1500,9 +1582,10 @@ const RZPA_App = (() => {
   // Modal luk-handlers (oprettes én gang ved modul-init)
   document.addEventListener('click', e => {
     if (e.target.id === 'rzpa-modal-close' || e.target.id === 'rzpa-ad-modal') closeAdModal();
+    if (e.target.id === 'rzpa-tap-modal-close' || e.target.id === 'rzpa-top-ad-modal') closeTapDetailModal();
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeAdModal();
+    if (e.key === 'Escape') { closeAdModal(); closeTapDetailModal(); }
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -2286,6 +2369,10 @@ const RZPA_App = (() => {
         { ad: bySpend[0], icon: '📈', label: 'Højeste Annonceforbrug', metric_label: 'Est. Månedligt Spend', metric_value: `${fmt(bySpend[0]?.spend, 0)} kr.` },
       ];
 
+      // Store ad data keyed by ad_id for modal access
+      window._rzpaTopAdsMap = window._rzpaTopAdsMap || {};
+      spotlight.forEach(({ ad }) => { if (ad) window._rzpaTopAdsMap[ad.ad_id] = ad; });
+
       let html = '<div class="tap-grid">';
       spotlight.forEach(({ ad, icon, label, metric_label, metric_value }) => {
         if (!ad) return;
@@ -2301,13 +2388,13 @@ const RZPA_App = (() => {
         const fallbackDiv = `<div class="tap-no-thumb" style="${src ? 'display:none' : ''}">📷</div>`;
 
         html += `
-          <div class="tap-card">
+          <div class="tap-card" data-adid="${ad.ad_id}">
             <div class="tap-thumb">
               ${imgHtml}${fallbackDiv}
               <span class="tap-badge">${icon} ${label}</span>
               <a href="${link}" target="_blank" rel="noopener"
                  style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:3px 7px;border-radius:4px;text-decoration:none;font-weight:500;backdrop-filter:blur(4px)"
-                 title="Åbn i Meta Ads Manager">↗ Meta</a>
+                 title="Åbn i Meta Ads Manager" onclick="event.stopPropagation()">↗ Meta</a>
             </div>
             <div class="tap-body">
               <p class="tap-copy">${copy || ad.ad_name || '–'}</p>
@@ -2324,6 +2411,14 @@ const RZPA_App = (() => {
       });
       html += '</div>';
       content.innerHTML = html;
+
+      // Klik på tap-card åbner detail modal
+      content.querySelectorAll('.tap-card[data-adid]').forEach(card => {
+        card.addEventListener('click', () => {
+          const ad = window._rzpaTopAdsMap?.[card.dataset.adid];
+          if (ad) openTopAdDetailModal(ad);
+        });
+      });
     }
 
     // Eksponér globalt så inline onclick-knapper virker fra genereret HTML
@@ -2934,7 +3029,7 @@ const RZPA_App = (() => {
       app.innerHTML  = newApp.innerHTML;
 
       // Modaler lever udenfor #rzpa-app — synkroniser dem
-      ['rzpa-ad-modal'].forEach(id => {
+      ['rzpa-ad-modal', 'rzpa-top-ad-modal'].forEach(id => {
         const oldEl = document.getElementById(id);
         const newEl = doc.getElementById(id);
         if (newEl && oldEl) oldEl.replaceWith(newEl.cloneNode(true));

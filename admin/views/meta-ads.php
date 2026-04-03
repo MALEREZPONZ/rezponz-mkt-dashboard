@@ -234,3 +234,12 @@ $has_openai = ! empty( $meta_opts['openai_api_key'] );
     </div>
   </div>
 </div>
+
+<!-- ── Top Ad Detail Modal ───────────────────────────────────────────── -->
+<div id="rzpa-top-ad-modal" class="rzpa-modal-overlay" style="display:none" role="dialog" aria-modal="true">
+  <div class="rzpa-modal rzpa-tap-detail-modal">
+    <button id="rzpa-tap-modal-close" class="rzpa-tap-detail-close" aria-label="Luk">✕</button>
+    <h2 id="rzpa-tap-modal-title" class="rzpa-tap-detail-title"></h2>
+    <div id="rzpa-tap-modal-body"></div>
+  </div>
+</div>

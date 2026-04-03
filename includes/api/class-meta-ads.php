@@ -486,7 +486,7 @@ class RZPA_Meta_Ads {
             $cre_url = self::API_BASE
                 . '?access_token=' . rawurlencode( $token )
                 . '&ids=' . implode( ',', $unique_cre_ids )
-                . '&fields=id,thumbnail_url,image_url,picture,video_id,body,title,'
+                . '&fields=id,thumbnail_url,image_url,picture,video_id,body,title,call_to_action_type,link_url,'
                 . 'object_story_spec{link_data{picture,image_url,message,child_attachments{picture}},'
                 . 'video_data{image_url,message},photo_data{images{original{uri}},caption}}';
 
@@ -497,11 +497,15 @@ class RZPA_Meta_Ads {
                     foreach ( $cre_id_map as $ad_id => $cid ) {
                         $cre = $cre_body[ $cid ] ?? null;
                         if ( $cre ) {
-                            // Merge tilbage – bevar video_id fra trin 2 hvis ikke returneret
+                            $vid_before = $ads_data[ $ad_id ]['creative']['video_id'] ?? '';
                             $ads_data[ $ad_id ]['creative'] = array_merge(
                                 $ads_data[ $ad_id ]['creative'] ?? [],
                                 $cre
                             );
+                            // Restore video_id from Step 2 if Step 2b returned it empty
+                            if ( empty( $ads_data[ $ad_id ]['creative']['video_id'] ) && $vid_before ) {
+                                $ads_data[ $ad_id ]['creative']['video_id'] = $vid_before;
+                            }
                         }
                     }
                 }
@@ -596,6 +600,9 @@ class RZPA_Meta_Ads {
                 'has_video'     => $format === 'video',
                 'format'        => $format,
                 'body_copy'     => $body_copy,
+                'title'         => $creative['title']               ?? '',
+                'cta'           => $creative['call_to_action_type'] ?? '',
+                'link_url'      => $creative['link_url']            ?? ( $spec['link_data']['link'] ?? '' ),
                 'days_active'   => $days_active,
                 'reach'         => $reach,
                 'impressions'   => $impressions,
