@@ -22,6 +22,7 @@ const RZPA_App = (() => {
     if (path.includes('/seo/summary'))               return _preload.seo_summary;
     if (path.includes('/seo/keywords'))              return _preload.seo_keywords;
     if (path.includes('/seo/pages'))                 return _preload.seo_pages;
+    if (path.includes('/blog/insights') && !path.includes('days=7') && !path.includes('days=90')) return _preload.blog_insights;
     return undefined;
   }
 
@@ -2981,19 +2982,13 @@ const RZPA_App = (() => {
       if (kpiBar)  kpiBar.style.display = 'none';
       if (toolbar) toolbar.style.display = 'none';
 
-      // Brug preload på første load
-      let posts = (RZPA?.preload?.blog_insights && d === 30)
-        ? RZPA.preload.blog_insights
-        : null;
-
-      if (!posts) {
-        try {
-          const r = await api(`/blog/insights?days=${d}`, { timeout: 15 });
-          posts = r?.data ?? r;
-        } catch(e) {
-          content.innerHTML = `<p style="color:#ef4444;margin:0">⚠️ Fejl: ${e.message}</p>`;
-          return;
-        }
+      let posts;
+      try {
+        const r = await api(`/blog/insights?days=${d}`, { timeout: 30 });
+        posts = Array.isArray(r) ? r : (r?.data ?? r);
+      } catch(e) {
+        content.innerHTML = `<div style="color:#ef4444;padding:32px;text-align:center">⚠️ Kunne ikke hente blogdata: ${e.message}</div>`;
+        return;
       }
 
       if (!Array.isArray(posts) || !posts.length) {
@@ -3002,8 +2997,13 @@ const RZPA_App = (() => {
       }
 
       allPosts = posts;
-      renderBlogKPIs(posts, kpiBar);
-      renderBlogTable(posts, content);
+      try {
+        renderBlogKPIs(posts, kpiBar);
+        renderBlogTable(posts, content);
+      } catch(e) {
+        content.innerHTML = `<div style="color:#ef4444;padding:32px;text-align:center">⚠️ Render fejl: ${e.message}</div>`;
+        return;
+      }
       if (toolbar) toolbar.style.display = 'flex';
 
       // Søgning

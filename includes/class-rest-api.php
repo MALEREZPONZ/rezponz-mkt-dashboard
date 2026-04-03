@@ -301,7 +301,7 @@ class RZPA_REST_API {
     public static function blog_insights( WP_REST_Request $r ) {
         $days = (int) ( $r->get_param( 'days' ) ?? 30 );
         $days = in_array( $days, [ 7, 30, 90 ], true ) ? $days : 30;
-        return rest_ensure_response( RZPA_Database::get_blog_insights( $days ) );
+        return self::ok( RZPA_Database::get_blog_insights( $days ) );
     }
     public static function seo_sync( $r ) {
         $rows  = RZPA_Google_SEO::fetch( 90 );
