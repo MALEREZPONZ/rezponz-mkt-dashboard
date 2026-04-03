@@ -252,6 +252,178 @@ class RZPA_Database {
         ), ARRAY_A ) ?: [];
     }
 
+    /**
+     * Henter alle publicerede blogindlæg og beriger dem med GSC-data + AI-synlighed.
+     */
+    public static function get_blog_insights( int $days = 30 ) : array {
+        global $wpdb;
+
+        // Hent alle publicerede blogindlæg
+        $posts = get_posts( [
+            'post_type'      => 'post',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+        ] );
+
+        if ( empty( $posts ) ) return [];
+
+        // GSC sidedata
+        $pages_t    = $wpdb->prefix . 'rzpa_seo_pages';
+        $pages_rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT page_url,
+                    AVG(position)    AS avg_position,
+                    SUM(clicks)      AS total_clicks,
+                    SUM(impressions) AS total_impressions,
+                    AVG(ctr)         AS avg_ctr
+             FROM {$pages_t}
+             WHERE date >= DATE_SUB(CURDATE(), INTERVAL %d DAY)
+             GROUP BY page_url",
+            $days
+        ), ARRAY_A ) ?: [];
+
+        $pages_map = [];
+        foreach ( $pages_rows as $p ) {
+            $norm = self::normalize_url_for_match( $p['page_url'] );
+            $pages_map[ $norm ] = $p;
+        }
+
+        // AI søgeords-synlighed (seneste pr. keyword)
+        $ai_t    = $wpdb->prefix . 'rzpa_ai_overview';
+        $ai_rows = $wpdb->get_results(
+            "SELECT k.keyword, k.has_ai_overview, k.has_featured_snippet, k.has_paa
+             FROM {$ai_t} k
+             INNER JOIN (SELECT MAX(id) AS max_id FROM {$ai_t} GROUP BY keyword) latest
+                ON k.id = latest.max_id",
+            ARRAY_A
+        ) ?: [];
+
+        // Byg resultat
+        $result = [];
+        foreach ( $posts as $post ) {
+            $url      = get_permalink( $post );
+            $norm_url = self::normalize_url_for_match( $url );
+            $gsc      = $pages_map[ $norm_url ] ?? null;
+
+            $position    = $gsc ? round( (float) $gsc['avg_position'], 1 ) : null;
+            $clicks      = $gsc ? (int) $gsc['total_clicks'] : 0;
+            $impressions = $gsc ? (int) $gsc['total_impressions'] : 0;
+            $ctr         = $gsc ? round( (float) $gsc['avg_ctr'] * 100, 2 ) : 0.0;
+
+            // Simpel AI-match: tjek om et sporet keyword matcher bloggens slug/titel
+            $ai_visible = false;
+            $ai_keyword = '';
+            $title_lower = mb_strtolower( $post->post_title );
+            $slug        = $post->post_name;
+            foreach ( $ai_rows as $ak ) {
+                if ( ! $ak['has_ai_overview'] ) continue;
+                $kw = mb_strtolower( $ak['keyword'] );
+                if (
+                    mb_strpos( $title_lower, $kw ) !== false ||
+                    mb_strpos( $slug, str_replace( ' ', '-', $kw ) ) !== false
+                ) {
+                    $ai_visible = true;
+                    $ai_keyword = $ak['keyword'];
+                    break;
+                }
+            }
+
+            [ $rec_label, $rec_detail, $priority ] = self::blog_recommendation( $position, $clicks, $impressions, $ctr, $ai_visible );
+
+            $result[] = [
+                'post_id'     => $post->ID,
+                'title'       => $post->post_title,
+                'url'         => $url,
+                'slug'        => $slug,
+                'date'        => $post->post_date,
+                'thumbnail'   => get_the_post_thumbnail_url( $post, 'thumbnail' ) ?: '',
+                'position'    => $position,
+                'clicks'      => $clicks,
+                'impressions' => $impressions,
+                'ctr'         => $ctr,
+                'has_gsc'     => $gsc !== null,
+                'ai_visible'  => $ai_visible,
+                'ai_keyword'  => $ai_keyword,
+                'rec_label'   => $rec_label,
+                'rec_detail'  => $rec_detail,
+                'priority'    => $priority,
+            ];
+        }
+
+        return $result;
+    }
+
+    private static function normalize_url_for_match( string $url ) : string {
+        $url = preg_replace( '#^https?://#i', '', $url );
+        $url = preg_replace( '#\?.*#', '', $url );
+        return rtrim( $url, '/' );
+    }
+
+    private static function blog_recommendation( ?float $pos, int $clicks, int $impressions, float $ctr, bool $ai ) : array {
+        if ( $pos === null ) {
+            return [
+                'Ikke i GSC',
+                'Siden er ikke fundet i Google Search Console. Indsend URL i GSC og tjek at den er indekseret.',
+                'high',
+            ];
+        }
+        if ( $pos <= 3 ) {
+            if ( ! $ai ) {
+                return [
+                    'Mangler AI-synlighed',
+                    'Fremragende Google-placering! Men siden nævnes ikke i AI-søgninger. Tilføj en FAQ-sektion og brug schema.org/FAQPage markup.',
+                    'medium',
+                ];
+            }
+            return [
+                'Top performer 🏆',
+                'Siden rangerer suverænt på Google og er synlig i AI-søgninger. Vedligehold indholdet og byg backlinks for at fastholde positionen.',
+                'low',
+            ];
+        }
+        if ( $pos <= 10 ) {
+            if ( $impressions > 300 && $ctr < 2.0 ) {
+                return [
+                    'Optimer title & CTR',
+                    'Siden er på side 1 men har lav CTR. Forbedr title tag: tilføj tal, power words og søgeordet tidligt. Opdater meta description med en klar CTA.',
+                    'high',
+                ];
+            }
+            if ( ! $ai ) {
+                return [
+                    'Øg AI-synlighed',
+                    'God Google-placering. For at blive nævnt af ChatGPT og Gemini: tilføj "Hvad er ...?"-afsnit, bullet points og FAQ med structured data.',
+                    'medium',
+                ];
+            }
+            return [
+                'Side 1 ✅',
+                'Stærk placering og AI-synlighed. Tilføj interne links fra nyere blogindlæg og opdater med frisk data for at holde positionen.',
+                'low',
+            ];
+        }
+        if ( $pos <= 20 ) {
+            return [
+                'Tæt på side 1',
+                'Siden er på side 2 — kun få forbedringer fra side 1. Opdater indholdet (min. 800 ord), optimer H2-struktur og tilføj 2-3 interne links.',
+                'high',
+            ];
+        }
+        if ( $pos <= 50 ) {
+            return [
+                'Svag placering',
+                'Siden rangerer svagt. Genskriv med fokus på primært søgeord i H1/intro, tilføj mere unikt indhold og byg interne + eksterne links.',
+                'high',
+            ];
+        }
+        return [
+            'Meget lav synlighed',
+            'Siden er næsten usynlig på Google. Overvej en komplet omskrivning: research søgeord, skriv mindst 1.000 ord og tilføj billeder med alt-tekst.',
+            'high',
+        ];
+    }
+
     /** Månedlig SEO-statistik – bruges til trend-graf */
     public static function get_seo_monthly( int $months = 6 ) : array {
         global $wpdb;

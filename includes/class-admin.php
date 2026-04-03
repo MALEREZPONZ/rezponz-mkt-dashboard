@@ -88,6 +88,7 @@ class RZPA_Admin {
         $pages = [
             'rzpa-seo'       => [ 'SEO',              [ __CLASS__, 'page_seo' ] ],
             'rzpa-ai'        => [ 'AI-synlighed',     [ __CLASS__, 'page_ai' ] ],
+            'rzpa-blog'      => [ 'Blog Indsigt',      [ __CLASS__, 'page_blog' ] ],
             'rzpa-meta'      => [ 'Meta Ads',          [ __CLASS__, 'page_meta' ] ],
             'rzpa-google-ads'=> [ 'Google Ads',        [ __CLASS__, 'page_google_ads' ] ],
             'rzpa-snapchat'  => [ 'Snapchat Ads',      [ __CLASS__, 'page_snap' ] ],
@@ -187,6 +188,16 @@ class RZPA_Admin {
             ];
         }
 
+        // Blog Indsigt
+        if ( strpos( $hook, 'rzpa-blog' ) !== false ) {
+            $opts       = get_option( 'rzpa_settings', [] );
+            $seo_ok     = ! empty( $opts['google_client_id'] ) && ! empty( $opts['google_refresh_token'] );
+            return [
+                'blog_seo_configured' => $seo_ok,
+                'blog_insights'       => RZPA_Database::get_blog_insights( 30 ),
+            ];
+        }
+
         return [];
     }
 
@@ -239,6 +250,7 @@ class RZPA_Admin {
     public static function page_dashboard() { include RZPA_DIR . 'admin/views/dashboard.php'; }
     public static function page_seo()       { include RZPA_DIR . 'admin/views/seo.php'; }
     public static function page_ai()        { include RZPA_DIR . 'admin/views/ai-search.php'; }
+    public static function page_blog()      { include RZPA_DIR . 'admin/views/blog-insights.php'; }
     public static function page_meta()      { include RZPA_DIR . 'admin/views/meta-ads.php'; }
     public static function page_google_ads() {
         $f = RZPA_DIR . 'admin/views/google-ads.php';

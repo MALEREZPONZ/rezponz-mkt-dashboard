@@ -1312,4 +1312,156 @@ body.wp-admin #wpbody-content { overflow-x: hidden; }
 .gads-ad-desc{font-size:12px;color:#aaa;line-height:1.6;margin-bottom:10px}
 .gads-ad-meta{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#888;margin-bottom:8px}
 .gads-ad-meta span{background:rgba(255,255,255,.04);padding:2px 7px;border-radius:5px}
+
+/* ── Blog Indsigt ────────────────────────────────────── */
+.rzpa-blog-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.rzpa-blog-search-wrap { flex: 1; min-width: 200px; }
+.rzpa-blog-search {
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-200);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.rzpa-blog-search:focus { outline: none; border-color: var(--neon); }
+.rzpa-blog-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.rzpa-blog-filter {
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-200);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.rzpa-blog-filter.active,
+.rzpa-blog-filter:hover {
+  background: rgba(204,255,0,.12);
+  border-color: rgba(204,255,0,.4);
+  color: var(--neon);
+}
+
+/* Table */
+.rzpa-blog-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.rzpa-blog-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rzpa-blog-table thead tr {
+  background: var(--bg-200);
+  border-bottom: 1px solid var(--border);
+}
+.rzpa-blog-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.rzpa-blog-table th.num { text-align: right; }
+.rzpa-blog-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.rzpa-blog-table td.num { text-align: right; }
+.rzpa-blog-table tbody tr:last-child td { border-bottom: none; }
+
+.rzpa-blog-row {
+  cursor: pointer;
+  transition: background .12s;
+}
+.rzpa-blog-row:hover { background: var(--bg-200); }
+.rzpa-blog-row.active { background: rgba(204,255,0,.04); }
+
+.rzpa-blog-title-cell {
+  display: flex; align-items: center; gap: 12px;
+  min-width: 240px;
+}
+.rzpa-blog-thumb {
+  width: 48px; height: 36px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: var(--bg-300);
+}
+.rzpa-blog-thumb-empty {
+  width: 48px; height: 36px;
+  border-radius: 6px;
+  background: var(--bg-300);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.rzpa-blog-title-wrap { min-width: 0; }
+.rzpa-blog-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+.rzpa-blog-meta {
+  display: flex; gap: 10px; align-items: center;
+  margin-top: 3px;
+  font-size: 11px; color: var(--text-muted);
+}
+.rzpa-blog-url-link {
+  color: var(--neon);
+  text-decoration: none;
+  font-size: 11px;
+}
+.rzpa-blog-url-link:hover { text-decoration: underline; }
+
+/* AI badge */
+.rzpa-blog-ai-badge {
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 20px;
+  white-space: nowrap;
+}
+.rzpa-blog-ai-yes { background: rgba(204,255,0,.12); color: var(--neon); }
+.rzpa-blog-ai-no  { color: #555; }
+
+/* Rec cell */
+.rzpa-blog-rec-cell {
+  display: flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+  max-width: 200px;
+}
+.rzpa-blog-rec-dot  { font-size: 10px; flex-shrink: 0; }
+.rzpa-blog-rec-label { font-size: 12px; color: var(--text-muted); }
+
+/* Expand row */
+.rzpa-blog-expand-row td { padding: 0; background: var(--bg-200); }
+.rzpa-blog-expand {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 16px 18px;
+  border-left: 3px solid var(--neon);
+}
+.rzpa-blog-expand-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.rzpa-blog-expand-title { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.rzpa-blog-expand-text { font-size: 13px; color: #aaa; line-height: 1.6; }
+
+/* Empty state */
+.rzpa-empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
 .gads-ad-campaign{font-size:10px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid rgba(255,255,255,.04);padding-top:6px;margin-top:4px}

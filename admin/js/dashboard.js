@@ -2961,6 +2961,231 @@ const RZPA_App = (() => {
     initDateFilter('rzpa-date-filter', () => {});
   }
 
+  // ════════════════════════════════════════════════════
+  // PAGE: BLOG INDSIGT
+  // ════════════════════════════════════════════════════
+
+  async function initBlogInsights() {
+    let days = 30;
+    let allPosts = [];
+
+    initDateFilter('rzpa-blog-date-filter', d => { days = d; loadBlogInsights(d); });
+
+    async function loadBlogInsights(d) {
+      const content  = el('rzpa-blog-content');
+      const kpiBar   = el('rzpa-blog-kpis');
+      const toolbar  = el('rzpa-blog-toolbar');
+      if (!content) return;
+
+      content.innerHTML = '<div class="rzpa-loading">Henter blogdata…</div>';
+      if (kpiBar)  kpiBar.style.display = 'none';
+      if (toolbar) toolbar.style.display = 'none';
+
+      // Brug preload på første load
+      let posts = (RZPA?.preload?.blog_insights && d === 30)
+        ? RZPA.preload.blog_insights
+        : null;
+
+      if (!posts) {
+        try {
+          const r = await api(`/blog/insights?days=${d}`, { timeout: 15 });
+          posts = r?.data ?? r;
+        } catch(e) {
+          content.innerHTML = `<p style="color:#ef4444;margin:0">⚠️ Fejl: ${e.message}</p>`;
+          return;
+        }
+      }
+
+      if (!Array.isArray(posts) || !posts.length) {
+        content.innerHTML = '<div class="rzpa-empty-state">Ingen blogindlæg fundet. Sørg for at der er publicerede indlæg på sitet.</div>';
+        return;
+      }
+
+      allPosts = posts;
+      renderBlogKPIs(posts, kpiBar);
+      renderBlogTable(posts, content);
+      if (toolbar) toolbar.style.display = 'flex';
+
+      // Søgning
+      el('rzpa-blog-search')?.addEventListener('input', e => {
+        const q = e.target.value.toLowerCase();
+        const filtered = q ? allPosts.filter(p => p.title.toLowerCase().includes(q) || p.slug.includes(q)) : allPosts;
+        const activeFilter = document.querySelector('.rzpa-blog-filter.active')?.dataset.filter || 'all';
+        renderBlogTable(applyBlogFilter(filtered, activeFilter), content);
+      });
+
+      // Filtre
+      document.querySelectorAll('.rzpa-blog-filter').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.rzpa-blog-filter').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const q = el('rzpa-blog-search')?.value.toLowerCase() || '';
+          let base = q ? allPosts.filter(p => p.title.toLowerCase().includes(q)) : allPosts;
+          renderBlogTable(applyBlogFilter(base, btn.dataset.filter), content);
+        });
+      });
+    }
+
+    function applyBlogFilter(posts, filter) {
+      switch (filter) {
+        case 'high':   return posts.filter(p => p.priority === 'high');
+        case 'top1-3': return posts.filter(p => p.position !== null && p.position <= 3);
+        case 'page1':  return posts.filter(p => p.position !== null && p.position <= 10);
+        case 'no-gsc': return posts.filter(p => !p.has_gsc);
+        case 'ai':     return posts.filter(p => p.ai_visible);
+        default:       return posts;
+      }
+    }
+
+    function renderBlogKPIs(posts, container) {
+      if (!container) return;
+      const withGsc  = posts.filter(p => p.has_gsc);
+      const page1    = posts.filter(p => p.position !== null && p.position <= 10).length;
+      const aiVis    = posts.filter(p => p.ai_visible).length;
+      const avgPos   = withGsc.length
+        ? (withGsc.reduce((s, p) => s + (p.position || 0), 0) / withGsc.length).toFixed(1)
+        : '–';
+      const highPri  = posts.filter(p => p.priority === 'high').length;
+
+      container.innerHTML = `
+        <div class="rzpa-kpi-card">
+          <div class="rzpa-kpi-icon">📝</div>
+          <div class="rzpa-kpi-label">Blogindlæg i alt</div>
+          <div class="rzpa-kpi-value">${posts.length}</div>
+        </div>
+        <div class="rzpa-kpi-card">
+          <div class="rzpa-kpi-icon">🏆</div>
+          <div class="rzpa-kpi-label">Side 1 (top 10)</div>
+          <div class="rzpa-kpi-value">${page1}</div>
+        </div>
+        <div class="rzpa-kpi-card">
+          <div class="rzpa-kpi-icon">📊</div>
+          <div class="rzpa-kpi-label">Gns. placering</div>
+          <div class="rzpa-kpi-value">${avgPos}</div>
+        </div>
+        <div class="rzpa-kpi-card">
+          <div class="rzpa-kpi-icon">🤖</div>
+          <div class="rzpa-kpi-label">AI-synlige</div>
+          <div class="rzpa-kpi-value" style="color:var(--neon)">${aiVis}</div>
+        </div>
+        <div class="rzpa-kpi-card">
+          <div class="rzpa-kpi-icon">🔴</div>
+          <div class="rzpa-kpi-label">Kræver handling</div>
+          <div class="rzpa-kpi-value" style="color:#ef4444">${highPri}</div>
+        </div>`;
+      container.style.display = 'grid';
+    }
+
+    function renderBlogTable(posts, container) {
+      if (!posts.length) {
+        container.innerHTML = '<div class="rzpa-empty-state">Ingen indlæg matcher det valgte filter.</div>';
+        return;
+      }
+
+      const posColor = p => {
+        if (p === null) return '#666';
+        if (p <= 3)  return '#4ade80';
+        if (p <= 10) return '#CCFF00';
+        if (p <= 20) return '#f59e0b';
+        return '#ef4444';
+      };
+      const posBg = p => {
+        if (p === null) return '#66666618';
+        if (p <= 3)  return '#4ade8018';
+        if (p <= 10) return '#CCFF0018';
+        if (p <= 20) return '#f59e0b18';
+        return '#ef444418';
+      };
+      const priDot = pri => pri === 'high' ? '🔴' : pri === 'medium' ? '🟡' : '🟢';
+
+      let html = `
+        <div class="rzpa-blog-table-wrap">
+          <table class="rzpa-blog-table">
+            <thead>
+              <tr>
+                <th>Blogindlæg</th>
+                <th class="num">Pos.</th>
+                <th class="num">Klik</th>
+                <th class="num">Visn.</th>
+                <th class="num">CTR</th>
+                <th>AI</th>
+                <th>Anbefaling</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+      posts.forEach(post => {
+        const pos     = post.position;
+        const posLabel = pos !== null ? pos.toFixed(1) : '–';
+        const date    = post.date ? post.date.substring(0, 10) : '';
+        const thumb   = post.thumbnail
+          ? `<img src="${post.thumbnail}" alt="" class="rzpa-blog-thumb" loading="lazy">`
+          : `<div class="rzpa-blog-thumb-empty">📝</div>`;
+        const aiLabel = post.ai_visible
+          ? `<span class="rzpa-blog-ai-badge rzpa-blog-ai-yes">🤖 Synlig</span>`
+          : `<span class="rzpa-blog-ai-badge rzpa-blog-ai-no">–</span>`;
+
+        html += `
+              <tr class="rzpa-blog-row" data-postid="${post.post_id}">
+                <td class="rzpa-blog-title-cell">
+                  ${thumb}
+                  <div class="rzpa-blog-title-wrap">
+                    <div class="rzpa-blog-title">${post.title}</div>
+                    <div class="rzpa-blog-meta">
+                      <span>${date}</span>
+                      <a href="${post.url}" target="_blank" rel="noopener" class="rzpa-blog-url-link" onclick="event.stopPropagation()">↗ Se side</a>
+                    </div>
+                  </div>
+                </td>
+                <td class="num">
+                  <span style="background:${posBg(pos)};color:${posColor(pos)};padding:3px 9px;border-radius:20px;font-size:12px;font-weight:700">${posLabel}</span>
+                </td>
+                <td class="num">${post.clicks > 0 ? post.clicks.toLocaleString('da-DK') : '–'}</td>
+                <td class="num">${post.impressions > 0 ? post.impressions.toLocaleString('da-DK') : '–'}</td>
+                <td class="num">${post.ctr > 0 ? post.ctr.toFixed(1) + '%' : '–'}</td>
+                <td>${aiLabel}</td>
+                <td class="rzpa-blog-rec-cell">
+                  <span class="rzpa-blog-rec-dot">${priDot(post.priority)}</span>
+                  <span class="rzpa-blog-rec-label">${post.rec_label}</span>
+                </td>
+              </tr>
+              <tr class="rzpa-blog-expand-row" id="expand-${post.post_id}" style="display:none">
+                <td colspan="7">
+                  <div class="rzpa-blog-expand">
+                    <div class="rzpa-blog-expand-icon">💡</div>
+                    <div>
+                      <div class="rzpa-blog-expand-title">Anbefaling: ${post.rec_label}</div>
+                      <div class="rzpa-blog-expand-text">${post.rec_detail}</div>
+                      ${post.ai_keyword ? `<div style="margin-top:8px;font-size:12px;color:#888">🤖 Matchet AI-søgeord: <strong style="color:var(--neon)">${post.ai_keyword}</strong></div>` : ''}
+                    </div>
+                  </div>
+                </td>
+              </tr>`;
+      });
+
+      html += `</tbody></table></div>`;
+      container.innerHTML = html;
+
+      // Klik på række → toggle udvidet anbefaling
+      container.querySelectorAll('.rzpa-blog-row').forEach(row => {
+        row.addEventListener('click', () => {
+          const expandRow = document.getElementById('expand-' + row.dataset.postid);
+          if (!expandRow) return;
+          const isOpen = expandRow.style.display !== 'none';
+          // Luk alle andre
+          container.querySelectorAll('.rzpa-blog-expand-row').forEach(r => r.style.display = 'none');
+          container.querySelectorAll('.rzpa-blog-row.active').forEach(r => r.classList.remove('active'));
+          if (!isOpen) {
+            expandRow.style.display = '';
+            row.classList.add('active');
+          }
+        });
+      });
+    }
+
+    loadBlogInsights(days);
+  }
+
   // ── Section init map (IIFE-scoped so PJAX can reach it) ─────────────────
 
   const initMap = {
@@ -2972,6 +3197,7 @@ const RZPA_App = (() => {
     snap:         initSnap,
     tiktok:       initTikTok,
     rapport:      initRapport,
+    blog:         initBlogInsights,
     // settings: pure PHP form — ingen JS init nødvendig
   };
 
