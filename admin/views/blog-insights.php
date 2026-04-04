@@ -61,6 +61,9 @@ $has_openai = ! empty( $opts['openai_api_key'] );
     </div>
   </div>
 
+  <!-- Inline blogdata (30 dage) – tilgængeligt synkront for JS, undgår API-kald ved pageload -->
+  <div id="rzpa-blog-inline" data-days="30" data-posts="<?php echo esc_attr( wp_json_encode( RZPA_Database::get_blog_insights( 30 ) ) ); ?>" style="display:none"></div>
+
   <!-- Blog tabel -->
   <div id="rzpa-blog-content">
     <div class="rzpa-loading">Henter blogdata…</div>

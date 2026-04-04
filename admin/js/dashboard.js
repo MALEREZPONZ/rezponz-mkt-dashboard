@@ -2983,12 +2983,22 @@ const RZPA_App = (() => {
       if (toolbar) toolbar.style.display = 'none';
 
       let posts;
-      try {
-        const r = await api(`/blog/insights?days=${d}`, { timeout: 30 });
-        posts = Array.isArray(r) ? r : (r?.data ?? r);
-      } catch(e) {
-        content.innerHTML = `<div style="color:#ef4444;padding:32px;text-align:center">⚠️ Kunne ikke hente blogdata: ${e.message}</div>`;
-        return;
+
+      // Prøv inline PHP-data først (synkront, ingen API-kald nødvendigt)
+      const inlineEl = el('rzpa-blog-inline');
+      if (inlineEl && inlineEl.dataset.days === String(d)) {
+        try { posts = JSON.parse(inlineEl.dataset.posts); } catch(e) {}
+      }
+
+      // Fallback: hent via REST API (ved datofilter-skift eller manglende inline-data)
+      if (!Array.isArray(posts)) {
+        try {
+          const r = await api(`/blog/insights?days=${d}`, { timeout: 30 });
+          posts = Array.isArray(r) ? r : (r?.data ?? r);
+        } catch(e) {
+          content.innerHTML = `<div style="color:#ef4444;padding:32px;text-align:center">⚠️ Kunne ikke hente blogdata: ${e.message}</div>`;
+          return;
+        }
       }
 
       if (!Array.isArray(posts) || !posts.length) {
