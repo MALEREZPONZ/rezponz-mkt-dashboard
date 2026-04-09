@@ -11,7 +11,7 @@ if ( $import_result ) {
 }
 
 // Supported columns (static list matching what RZPA_SEO_CSV expects)
-$supported_columns = defined( 'RZPA_SEO_CSV::DATASET_COLUMNS' )
+$supported_columns = class_exists( 'RZPA_SEO_CSV' )
     ? RZPA_SEO_CSV::DATASET_COLUMNS
     : [ 'keyword', 'primary_keyword', 'city', 'region', 'area', 'template_id', 'template_name',
         'intent', 'tone_of_voice', 'article_type', 'target_length', 'faq_required',
