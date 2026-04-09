@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      2.3.1
+ * Version:      2.3.2
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '2.3.1' );
+define( 'RZPA_VERSION',     '2.3.2' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -36,19 +36,6 @@ require_once RZPA_DIR . 'includes/api/class-tiktok-ads.php';
 require_once RZPA_DIR . 'includes/api/class-google-ads.php';
 require_once RZPA_DIR . 'includes/class-rest-api.php';
 require_once RZPA_DIR . 'includes/class-admin.php';
-
-// ── SEO Content Engine Module ────────────────────────────────────────────────
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-db.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-engine.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-meta.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-template.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-quality.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-generator.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-blog.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-linking.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-csv.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-ai.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-admin.php';
 
 // ── Rekruttering Module ──────────────────────────────────────────────────────
 require_once RZPA_DIR . 'modules/rekruttering/class-rekruttering.php';
@@ -80,15 +67,11 @@ require_once RZPA_DIR . 'modules/quiz/class-quiz.php';
 
 register_activation_hook( __FILE__, function () {
     RZPA_Database::install();
-    RZPA_SEO_DB::install();
     RZPZ_Crew_DB::install();
     RZPZ_Henvis::install_db();
     RZPA_Quiz_DB::install();
     RZLQ_DB::install();
     RZLQ_Dept::install();
-    // Flush rewrite rules after CPT registration on activation
-    RZPA_SEO_Engine::register_cpt();
-    flush_rewrite_rules();
 } );
 register_deactivation_hook( __FILE__, [ 'RZPA_Scheduler', 'clear_crons' ] );
 
@@ -147,14 +130,6 @@ add_action( 'plugins_loaded', function () {
     RZPA_Admin::init();
     RZPA_REST_API::init();
     RZPA_Scheduler::init();
-
-    // SEO Content Engine
-    if ( get_option( RZPA_SEO_DB::DB_VERSION_KEY ) !== RZPA_SEO_DB::DB_VERSION ) {
-        RZPA_SEO_DB::install();
-    }
-    RZPA_SEO_Engine::init();
-    RZPA_SEO_Meta::init();
-    RZPA_SEO_Admin::init();
 
     // Crew module – auto-install tables if missing or outdated
     if ( get_option( RZPZ_Crew_DB::DB_VERSION_KEY ) !== RZPZ_Crew_DB::DB_VERSION ) {
