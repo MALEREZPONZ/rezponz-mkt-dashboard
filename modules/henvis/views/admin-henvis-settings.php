@@ -209,7 +209,7 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
       </span>
     </h2>
     <p>Konfigurer SMTP for pålidelig email-afsendelse. Uden SMTP bruger WordPress standard PHP mail(), som ofte blokeres af hosting-udbydere.</p>
-    <p style="color:#f59e0b">💡 <strong>Anbefalede SMTP-udbydere:</strong> Brevo (gratis op til 300/dag), Mailgun, SendGrid eller din virksomheds Exchange/Gmail.</p>
+    <p style="color:#f59e0b">💡 <strong>SMTP er konfigureret og klar til brug.</strong> Brug "Send test-email" nedenfor for at bekræfte at det virker.</p>
 
     <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
       <input type="hidden" name="action" value="rzpz_henvis_save_smtp">
@@ -224,7 +224,7 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
       <div class="rzpz-field-row">
         <div class="rzpz-field" style="flex:3">
           <label>SMTP Host</label>
-          <input type="text" name="smtp_host" value="<?php echo esc_attr( $smtp['host'] ); ?>" placeholder="smtp.brevo.com · smtp.mailgun.org · smtp.gmail.com">
+          <input type="text" name="smtp_host" value="<?php echo esc_attr( $smtp['host'] ); ?>" placeholder="smtp.itsit.dk">
         </div>
         <div class="rzpz-field" style="flex:1;min-width:100px">
           <label>Port</label>
@@ -260,13 +260,12 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
         </div>
         <div class="rzpz-field" style="flex:2">
           <label>Fra-navn</label>
-          <input type="text" name="smtp_from_name" value="<?php echo esc_attr( $smtp['from_name'] ); ?>" placeholder="Rezponz Marketing Platform">
+          <input type="text" name="smtp_from_name" value="<?php echo esc_attr( $smtp['from_name'] ); ?>" placeholder="Rezponz">
         </div>
       </div>
 
       <div style="display:flex;gap:12px;align-items:center;margin-top:8px;flex-wrap:wrap">
         <button type="submit" class="rzpz-btn-primary">💾 Gem SMTP-indstillinger</button>
-        <div style="color:#555;font-size:12px">Brug "Send test-email" nedenfor for at bekræfte at det virker.</div>
       </div>
     </form>
   </div>
@@ -342,14 +341,12 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
   elseif ( $tab === 'form' ) :
     $fc = $form_config;
     $fd = $fc['fields'];
-    $core_fields = [ 'referrer_name', 'referrer_email', 'friend_name', 'friend_email' ];
+    $core_fields = [ 'referrer_name', 'referrer_email', 'friend_name' ];
     $field_labels_static = [
         'referrer_name'  => 'Dit navn',
         'referrer_phone' => 'Din telefon',
         'referrer_email' => 'Din email',
         'friend_name'    => 'Vennens navn',
-        'friend_phone'   => 'Vennens telefon',
-        'friend_email'   => 'Vennens email',
     ];
   ?>
 
@@ -569,9 +566,11 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
   // ── TAB: EMAIL SKABELONER ─────────────────────────────────────────────────
   elseif ( $tab === 'skabeloner' ) :
     $tpl_labels = [
-        'manager'     => [ 'icon' => '👔', 'title' => 'Email til Manager',     'desc' => 'Sendes til Senior Manageren når en medarbejder sender en ny henvisning.' ],
-        'ven'         => [ 'icon' => '👋', 'title' => 'Email til Ven',          'desc' => 'Invitations-email sendt til vennen/kandidaten.' ],
-        'medarbejder' => [ 'icon' => '✅', 'title' => 'Email til Medarbejder',  'desc' => 'Bekræftelse sendt til den medarbejder der sendte henvisningen.' ],
+        'manager'              => [ 'icon' => '👔', 'title' => 'Email til Manager',                 'desc' => 'Sendes til Senior Manageren når en medarbejder sender en ny henvisning.' ],
+        'medarbejder'          => [ 'icon' => '✅', 'title' => 'Email til Medarbejder (ved indsendelse)', 'desc' => 'Bekræftelse sendt til medarbejderen med link til ansøgningsside.' ],
+        'afvist'               => [ 'icon' => '❌', 'title' => 'Afvisningsmail til Medarbejder',    'desc' => 'Sendes til medarbejderen når en henvisning afvises.' ],
+        'godkendt_medarbejder' => [ 'icon' => '🎉', 'title' => 'Bonus – mail til Medarbejder',      'desc' => 'Sendes til medarbejderen (+500 kr bonus) når kandidaten trykker "Kandidat startet" – ikke ved godkendelse.' ],
+        'godkendt_lon'         => [ 'icon' => '💰', 'title' => 'Bonus – mail til Lønafregning',    'desc' => 'Sendes til loen@rezponz.dk med instruks om +500 kr bonus, når kandidaten trykker "Kandidat startet".' ],
     ];
     $variables = [
         '{{medarbejder_navn}}'  => 'Medarbejderens navn',

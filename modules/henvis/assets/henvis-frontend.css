@@ -1,183 +1,345 @@
-/* ── Henvis Din Ven – Frontend Styles (lyst tema matching rezponz.dk) ── */
+/* ── Henvis Din Ven – Frontend (dark brand theme) ── */
+
 .rzpz-henvis-wrap {
-    max-width: 720px;
+    max-width: 680px;
     margin: 0 auto;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    color: #1a1a1a;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    color: #e0e0e0 !important;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* Success state */
-.rzpz-henvis-success {
-    background: #f0faf5;
-    border: 1px solid #5d8089;
-    border-radius: 14px;
-    padding: 40px;
-    text-align: center;
-    margin: 20px 0;
+/* ── Hero ── */
+.rzpz-henvis-wrap .rzpz-hero {
+    background: #0d0d0d !important;
+    border-radius: 16px 16px 0 0 !important;
+    padding: 40px 36px 32px !important;
+    text-align: center !important;
+    position: relative !important;
+    overflow: hidden !important;
+    border: none !important;
+    margin: 0 !important;
 }
-.rzpz-success-icon { font-size: 48px; margin-bottom: 12px; }
-.rzpz-henvis-success h2 { color: #2d6a4f; margin: 0 0 10px; font-size: 24px; font-weight: 700; }
-.rzpz-henvis-success p  { color: #3d7a5f; margin: 0; font-size: 16px; }
-
-/* Error banner */
-.rzpz-henvis-error {
-    background: #fff5f5;
-    border: 1px solid #f87171;
-    border-radius: 8px;
-    padding: 12px 16px;
-    color: #c0392b;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
+.rzpz-henvis-wrap .rzpz-hero::before {
+    content: '' !important;
+    position: absolute !important;
+    top: -60px; right: -60px;
+    width: 220px; height: 220px;
+    background: #CCFF00 !important;
+    border-radius: 50% !important;
+    opacity: .06;
 }
 
-/* Form card */
-.rzpz-henvis-form {
-    background: #ffffff;
-    border: 1px solid #e8e8e8;
-    border-radius: 16px;
-    padding: 32px;
-    margin-top: 16px;
-    box-shadow: 0 4px 24px rgba(0,0,0,.08);
+.rzpz-henvis-wrap .rzpz-hero-bonus {
+    display: inline-block !important;
+    background: #CCFF00 !important;
+    color: #0d0d0d !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    letter-spacing: 1.5px !important;
+    text-transform: uppercase !important;
+    padding: 5px 14px !important;
+    border-radius: 20px !important;
+    margin-bottom: 16px !important;
+    border: none !important;
 }
 
-/* CAPTCHA card */
-.rzpz-captcha-card {
-    text-align: center;
-    padding: 32px 24px;
+.rzpz-henvis-wrap .rzpz-hero h2 {
+    font-size: clamp(28px, 5.5vw, 42px) !important;
+    font-weight: 900 !important;
+    line-height: 1.05 !important;
+    color: #fff !important;
+    margin: 0 0 14px !important;
+    text-transform: uppercase !important;
+    letter-spacing: -0.5px !important;
+    padding: 0 !important;
+    border: none !important;
+    background: none !important;
 }
-.rzpz-captcha-icon { font-size: 40px; margin-bottom: 12px; }
-.rzpz-captcha-card h3 {
-    font-size: 20px;
-    font-weight: 700;
-    color: #1a1a1a;
-    margin: 0 0 8px;
+.rzpz-henvis-wrap .rzpz-hero h2 em {
+    font-style: normal !important;
+    color: #CCFF00 !important;
 }
-.rzpz-captcha-question {
-    font-size: 22px;
-    font-weight: 700;
-    color: #5d8089;
-    margin: 16px 0 20px;
+.rzpz-henvis-wrap .rzpz-hero-sub {
+    font-size: 14px !important;
+    color: #888 !important;
+    line-height: 1.5 !important;
+    max-width: 420px !important;
+    margin: 0 auto !important;
 }
-.rzpz-captcha-input {
-    width: 120px;
-    padding: 10px 14px;
-    background: #fff;
-    border: 2px solid #d0d0d0;
-    border-radius: 8px;
-    color: #1a1a1a;
-    font-size: 20px;
-    text-align: center;
-    display: block;
-    margin: 0 auto 16px;
+
+/* ── Form card ── */
+.rzpz-henvis-wrap .rzpz-henvis-form {
+    background: #141414 !important;
+    border: 1px solid #222 !important;
+    border-top: none !important;
+    border-radius: 0 0 16px 16px !important;
+    padding: 32px 36px 36px !important;
+    margin: 0 !important;
+}
+
+/* ── CAPTCHA card ── */
+.rzpz-henvis-wrap .rzpz-captcha-card {
+    text-align: center !important;
+    padding: 36px 24px !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+.rzpz-henvis-wrap .rzpz-captcha-icon {
+    font-size: 40px !important;
+    margin-bottom: 12px !important;
+}
+.rzpz-henvis-wrap .rzpz-captcha-card h3 {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: #fff !important;
+    margin: 0 0 8px !important;
+    padding: 0 !important;
+    background: none !important;
+    border: none !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+}
+.rzpz-henvis-wrap .rzpz-captcha-question {
+    font-size: 28px !important;
+    font-weight: 900 !important;
+    color: #CCFF00 !important;
+    margin: 18px 0 24px !important;
+    letter-spacing: -0.5px !important;
+}
+.rzpz-henvis-wrap .rzpz-captcha-input {
+    width: 120px !important;
+    padding: 12px 14px !important;
+    background: #1e1e1e !important;
+    border: 2px solid #333 !important;
+    border-radius: 8px !important;
+    color: #fff !important;
+    font-size: 22px !important;
+    text-align: center !important;
+    display: block !important;
+    margin: 0 auto 20px !important;
+    box-shadow: none !important;
+    outline: none !important;
     transition: border-color .2s;
 }
-.rzpz-captcha-input:focus {
-    outline: none;
-    border-color: #5d8089;
+.rzpz-henvis-wrap .rzpz-captcha-input:focus {
+    border-color: #CCFF00 !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(204,255,0,.1) !important;
 }
-.rzpz-captcha-btn {
-    background: #5d8089;
-    color: #ffffff;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 28px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background .2s;
+/* Fjern spinner-pile fra number input */
+.rzpz-henvis-wrap .rzpz-captcha-input::-webkit-outer-spin-button,
+.rzpz-henvis-wrap .rzpz-captcha-input::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
 }
-.rzpz-captcha-btn:hover { background: #4a6870; }
-
-/* Form sections */
-.rzpz-form-section { margin-bottom: 28px; }
-.rzpz-section-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: #5d8089;
-    margin: 0 0 16px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #e8e8e8;
+.rzpz-henvis-wrap .rzpz-captcha-input[type=number] {
+    -moz-appearance: textfield !important;
+    appearance: textfield !important;
 }
-
-/* Field grid */
-.rzpz-field-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-    margin-bottom: 14px;
-}
-@media (max-width: 580px) {
-    .rzpz-field-row { grid-template-columns: 1fr; }
-    .rzpz-henvis-form { padding: 20px 16px; }
-}
-
-/* Labels & inputs */
-.rzpz-field label {
-    display: block;
-    font-size: 13px;
-    font-weight: 500;
-    color: #555;
-    margin-bottom: 5px;
-}
-.rzpz-field label .req { color: #e74c3c; }
-.rzpz-field input[type=text],
-.rzpz-field input[type=email],
-.rzpz-field input[type=tel],
-.rzpz-field select {
-    width: 100%;
-    padding: 9px 12px;
-    background: #ffffff;
-    border: 1px solid #d0d0d0;
-    border-radius: 8px;
-    color: #1a1a1a;
-    font-size: 14px;
-    box-sizing: border-box;
-    transition: border-color .2s, box-shadow .2s;
-    font-family: inherit;
-}
-.rzpz-field input:focus,
-.rzpz-field select:focus {
-    outline: none;
-    border-color: #5d8089;
-    box-shadow: 0 0 0 3px rgba(93,128,137,.12);
-}
-.rzpz-field input::placeholder { color: #aaa; }
-
-/* Consent */
-.rzpz-consent-field { margin: 20px 0; }
-.rzpz-checkbox-label {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    cursor: pointer;
-    font-size: 14px;
-    color: #444;
-}
-.rzpz-checkbox-label input[type=checkbox] {
-    margin-top: 2px;
-    accent-color: #5d8089;
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-}
-
-/* Submit */
-.rzpz-submit-row { text-align: center; margin-top: 8px; }
-.rzpz-submit-btn {
-    background: #5d8089;
-    color: #ffffff;
-    border: none;
-    border-radius: 10px;
-    padding: 13px 40px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
+.rzpz-henvis-wrap .rzpz-captcha-btn {
+    background: #CCFF00 !important;
+    color: #0d0d0d !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 12px 32px !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    cursor: pointer !important;
+    letter-spacing: .3px !important;
+    text-transform: none !important;
     transition: background .2s, transform .15s;
-    letter-spacing: .3px;
-    font-family: inherit;
+    display: inline-block !important;
+    line-height: 1 !important;
 }
-.rzpz-submit-btn:hover { background: #4a6870; transform: translateY(-1px); }
-.rzpz-submit-btn:active { transform: translateY(0); }
+.rzpz-henvis-wrap .rzpz-captcha-btn:hover {
+    background: #bbee00 !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ── Section titles ── */
+.rzpz-henvis-wrap .rzpz-form-section {
+    margin-bottom: 28px !important;
+}
+.rzpz-henvis-wrap .rzpz-section-title {
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1.5px !important;
+    color: #CCFF00 !important;
+    margin: 0 0 16px !important;
+    padding: 0 0 10px !important;
+    border-bottom: 1px solid #222 !important;
+    border-top: none !important;
+    background: none !important;
+}
+
+/* ── Field grid ── */
+.rzpz-henvis-wrap .rzpz-field-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    margin-bottom: 12px !important;
+}
+@media (max-width: 560px) {
+    .rzpz-henvis-wrap .rzpz-field-row { grid-template-columns: 1fr !important; }
+    .rzpz-henvis-wrap .rzpz-henvis-form { padding: 24px 20px 28px !important; }
+    .rzpz-henvis-wrap .rzpz-hero { padding: 28px 20px 24px !important; }
+}
+
+/* ── Labels ── */
+.rzpz-henvis-wrap .rzpz-field label {
+    display: block !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #888 !important;
+    margin-bottom: 6px !important;
+    text-transform: uppercase !important;
+    letter-spacing: .5px !important;
+    cursor: default !important;
+    background: none !important;
+}
+.rzpz-henvis-wrap .rzpz-field label .req {
+    color: #CCFF00 !important;
+}
+
+/* ── Inputs ── */
+.rzpz-henvis-wrap .rzpz-field input[type=text],
+.rzpz-henvis-wrap .rzpz-field input[type=email],
+.rzpz-henvis-wrap .rzpz-field input[type=tel],
+.rzpz-henvis-wrap .rzpz-field input[type=number],
+.rzpz-henvis-wrap .rzpz-field select {
+    width: 100% !important;
+    padding: 11px 14px !important;
+    background: #1e1e1e !important;
+    border: 1px solid #2e2e2e !important;
+    border-radius: 8px !important;
+    color: #e0e0e0 !important;
+    font-size: 14px !important;
+    box-sizing: border-box !important;
+    font-family: inherit !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    box-shadow: none !important;
+    transition: border-color .2s, box-shadow .2s;
+    outline: none !important;
+}
+.rzpz-henvis-wrap .rzpz-field select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
+    padding-right: 36px !important;
+}
+.rzpz-henvis-wrap .rzpz-field select option {
+    background: #1e1e1e !important;
+    color: #e0e0e0 !important;
+}
+.rzpz-henvis-wrap .rzpz-field input:focus,
+.rzpz-henvis-wrap .rzpz-field select:focus {
+    outline: none !important;
+    border-color: #CCFF00 !important;
+    box-shadow: 0 0 0 3px rgba(204,255,0,.1) !important;
+}
+.rzpz-henvis-wrap .rzpz-field input::placeholder {
+    color: #444 !important;
+}
+
+/* ── Consent ── */
+.rzpz-henvis-wrap .rzpz-consent-field {
+    margin: 22px 0 0 !important;
+}
+.rzpz-henvis-wrap .rzpz-checkbox-label {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+    color: #666 !important;
+    line-height: 1.5 !important;
+    font-weight: 400 !important;
+    background: none !important;
+}
+.rzpz-henvis-wrap .rzpz-checkbox-label input[type=checkbox] {
+    margin-top: 2px !important;
+    accent-color: #CCFF00 !important;
+    width: 16px !important;
+    height: 16px !important;
+    flex-shrink: 0 !important;
+    cursor: pointer !important;
+}
+
+/* ── Submit button ── */
+.rzpz-henvis-wrap .rzpz-submit-row {
+    text-align: center !important;
+    margin-top: 28px !important;
+}
+.rzpz-henvis-wrap .rzpz-submit-btn {
+    background: #CCFF00 !important;
+    color: #0d0d0d !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 15px 48px !important;
+    font-size: 15px !important;
+    font-weight: 900 !important;
+    cursor: pointer !important;
+    letter-spacing: .5px !important;
+    text-transform: uppercase !important;
+    font-family: inherit !important;
+    box-shadow: 0 4px 20px rgba(204,255,0,.25) !important;
+    display: inline-block !important;
+    line-height: 1 !important;
+    transition: background .2s, transform .15s, box-shadow .2s;
+}
+.rzpz-henvis-wrap .rzpz-submit-btn:hover {
+    background: #bbee00 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 28px rgba(204,255,0,.35) !important;
+}
+.rzpz-henvis-wrap .rzpz-submit-btn:active {
+    transform: translateY(0) !important;
+}
+
+/* ── Error banner ── */
+.rzpz-henvis-wrap .rzpz-henvis-error {
+    background: #2d0a0a !important;
+    border: 1px solid rgba(248,113,113,.25) !important;
+    border-radius: 8px !important;
+    padding: 12px 16px !important;
+    color: #f87171 !important;
+    margin-bottom: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-size: 14px !important;
+}
+
+/* ── Success state ── */
+.rzpz-henvis-wrap .rzpz-henvis-success {
+    background: #0d0d0d !important;
+    border: 1px solid rgba(204,255,0,.2) !important;
+    border-radius: 16px !important;
+    padding: 60px 40px !important;
+    text-align: center !important;
+}
+.rzpz-henvis-wrap .rzpz-success-icon {
+    font-size: 56px !important;
+    margin-bottom: 16px !important;
+}
+.rzpz-henvis-wrap .rzpz-henvis-success h2 {
+    color: #CCFF00 !important;
+    margin: 0 0 12px !important;
+    font-size: 28px !important;
+    font-weight: 900 !important;
+    text-transform: uppercase !important;
+    letter-spacing: -0.5px !important;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+}
+.rzpz-henvis-wrap .rzpz-henvis-success p {
+    color: #888 !important;
+    margin: 0 !important;
+    font-size: 15px !important;
+    line-height: 1.6 !important;
+}

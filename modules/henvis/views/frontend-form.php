@@ -52,9 +52,16 @@ function rzpz_render_custom_field( array $cf, array $post ) : void {
 
 <?php else : ?>
 
+    <!-- Hero -->
+    <div class="rzpz-hero">
+        <div class="rzpz-hero-bonus">& få 500 kr. hvis din ven bliver ansat</div>
+        <h2><?php echo esc_html( $cfg['form_title'] ); ?><br><em>til et fedt job</em></h2>
+        <p class="rzpz-hero-sub"><?php echo esc_html( $cfg['form_subtitle'] ); ?></p>
+    </div>
+
 <?php if ( ! empty( $result['error'] ) ) : ?>
     <div class="rzpz-henvis-error">
-        <span class="rzpz-error-icon">⚠️</span>
+        <span>⚠️</span>
         <?php echo esc_html( $result['error'] ); ?>
     </div>
 <?php endif; ?>
@@ -142,31 +149,12 @@ function rzpz_render_custom_field( array $cf, array $post ) : void {
         <div class="rzpz-form-section">
             <h3 class="rzpz-section-title"><?php echo esc_html( $cfg['section_friend'] ); ?></h3>
 
-            <?php $show_fphone = ! empty( $f['friend_phone']['enabled'] ); ?>
             <div class="rzpz-field-row">
                 <div class="rzpz-field">
                     <label for="friend_name"><?php echo esc_html( $f['friend_name']['label'] ); ?> <span class="req">*</span></label>
                     <input type="text" name="friend_name" id="friend_name" required
                         value="<?php echo esc_attr( $_POST['friend_name'] ?? '' ); ?>"
                         placeholder="<?php echo esc_attr( $f['friend_name']['placeholder'] ); ?>">
-                </div>
-                <?php if ( $show_fphone ) : ?>
-                <div class="rzpz-field">
-                    <label for="friend_phone"><?php echo esc_html( $f['friend_phone']['label'] ); ?><?php echo ! empty($f['friend_phone']['required']) ? ' <span class="req">*</span>' : ''; ?></label>
-                    <input type="tel" name="friend_phone" id="friend_phone"
-                        <?php echo ! empty($f['friend_phone']['required']) ? 'required' : ''; ?>
-                        value="<?php echo esc_attr( $_POST['friend_phone'] ?? '' ); ?>"
-                        placeholder="<?php echo esc_attr( $f['friend_phone']['placeholder'] ); ?>">
-                </div>
-                <?php endif; ?>
-            </div>
-
-            <div class="rzpz-field-row">
-                <div class="rzpz-field">
-                    <label for="friend_email"><?php echo esc_html( $f['friend_email']['label'] ); ?> <span class="req">*</span></label>
-                    <input type="email" name="friend_email" id="friend_email" required
-                        value="<?php echo esc_attr( $_POST['friend_email'] ?? '' ); ?>"
-                        placeholder="<?php echo esc_attr( $f['friend_email']['placeholder'] ); ?>">
                 </div>
             </div>
 

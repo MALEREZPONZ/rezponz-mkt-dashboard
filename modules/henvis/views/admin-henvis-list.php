@@ -37,7 +37,7 @@ if ( $search ) {
     $params[] = '%' . $wpdb->esc_like( $search ) . '%';
 }
 
-$query     = "SELECT * FROM {$table} WHERE {$where} ORDER BY submitted_at DESC";
+$query     = "SELECT * FROM {$table} WHERE {$where} ORDER BY CASE WHEN status='pending' THEN 0 ELSE 1 END ASC, submitted_at DESC";
 $referrals = $params
     ? $wpdb->get_results( $wpdb->prepare( $query, ...$params ) )
     : $wpdb->get_results( $query );
@@ -108,6 +108,16 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
 .rzpz-email-entry .ee-status.ok  { background:#0a2e0a; color:#4ade80; }
 .rzpz-email-entry .ee-status.err { background:#2d0a0a; color:#f87171; }
 .rzpz-email-entry .ee-status.cc  { background:#0a1a2e; color:#60a5fa; }
+/* Approve / Reject buttons */
+.rzpz-btn-approve { background:#0a2e0a; color:#4ade80; border:1px solid #4ade8040; border-radius:5px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.rzpz-btn-approve:hover { background:#0f3d0f; border-color:#4ade8080; }
+.rzpz-btn-reject  { background:#2d0a0a; color:#f87171; border:1px solid #f8717140; border-radius:5px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.rzpz-btn-reject:hover  { background:#3d0f0f; border-color:#f8717180; }
+.rzpz-btn-bonus   { background:#2a1f00; color:#f59e0b; border:1px solid #f59e0b50; border-radius:5px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.rzpz-btn-bonus:hover   { background:#3a2a00; border-color:#f59e0b90; }
+.rzpz-bonus-sent  { display:inline-block; background:#0a1a2e; color:#60a5fa; border:1px solid #60a5fa30; border-radius:5px; padding:4px 10px; font-size:11px; white-space:nowrap; }
+.rzpz-status.hired-bonus { background:#0a1a2e; color:#60a5fa; }
+.rzpz-section-sep td { background:#111 !important; padding:6px 14px !important; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#555; border-bottom:2px solid #222 !important; }
 /* Note row */
 .rzpz-note-row { display:none; background:#0d0d0d; }
 .rzpz-note-row.open { display:table-row; }
@@ -122,6 +132,22 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
 </style>
 
 <div class="rzpz-henvis-page">
+
+  <?php if ( ! empty( $_GET['approved'] ) ) : ?>
+    <div style="background:#0a2e0a;color:#4ade80;border:1px solid #4ade8040;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">✅ Henvisning godkendt og markeret som ansat. <strong>Husk:</strong> Klik "💰 Kandidat startet" den dag kandidaten møder ind — så udløses bonusmailen til medarbejder og løn.</div>
+  <?php elseif ( ! empty( $_GET['rejected'] ) ) : ?>
+    <div style="background:#2d0a0a;color:#f87171;border:1px solid #f8717140;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">❌ Henvisning afvist – afvisningsmail sendt til medarbejder.</div>
+  <?php elseif ( ! empty( $_GET['bonus_sent'] ) ) : ?>
+    <div style="background:#0a1a2e;color:#60a5fa;border:1px solid #60a5fa40;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">💰 Bonus udløst – email sendt til medarbejder og loen@rezponz.dk.</div>
+  <?php elseif ( ! empty( $_GET['deleted'] ) ) : ?>
+    <div style="background:#1a1a1a;color:#888;border:1px solid #33333380;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">🗑️ Henvisning slettet.</div>
+  <?php elseif ( isset( $_GET['error'] ) && $_GET['error'] === 'bonus_already_sent' ) : ?>
+    <div style="background:#2a1f00;color:#f59e0b;border:1px solid #f59e0b40;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">⚠️ Bonusmail er allerede sendt for denne henvisning.</div>
+  <?php elseif ( ! empty( $_GET['batch_sent'] ) ) : ?>
+    <div style="background:#052e16;color:#4ade80;border:1px solid #16653440;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">💰 Batch bonus sendt: <strong><?php echo (int) $_GET['batch_sent']; ?> medarbejder-email(s)</strong> + 1 samlet løn-mail til loen@rezponz.dk.</div>
+  <?php elseif ( isset( $_GET['batch_error'] ) && $_GET['batch_error'] === 'empty' ) : ?>
+    <div style="background:#2a1f00;color:#f59e0b;border:1px solid #f59e0b40;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">⚠️ Ingen henvisninger valgt — sæt mindst ét kryds.</div>
+  <?php endif; ?>
 
   <div class="rzpz-ha-header">
     <h1 class="rzpz-ha-title">🤝 Henvisninger</h1>
@@ -177,10 +203,27 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
     <?php endif; ?>
   </form>
 
+  <!-- Batch bonus-form (separat fra tabellen for at undgå nested forms) -->
+  <form id="rzpz-batch-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+    <input type="hidden" name="action" value="rzpz_henvis_batch_bonus">
+    <?php wp_nonce_field( 'rzpz_henvis_batch_bonus' ); ?>
+    <input type="hidden" id="rzpz-batch-ids" name="referral_ids" value="">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <button type="button" id="rzpz-batch-btn" disabled onclick="rzpzSubmitBatch()"
+              style="background:#f59e0b;color:#0d0d0d;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;opacity:.35;transition:opacity .15s">
+        💰 Send batch bonus-mail til løn (<span id="rzpz-batch-count">0</span> valgte)
+      </button>
+      <span style="font-size:12px;color:#555">Markér "Ansat – bonus afventer"-rækker og send individuelle medarbejder-mails + én samlet løn-mail</span>
+    </div>
+  </form>
+
   <!-- Table -->
   <table class="rzpz-ha-table">
     <thead>
       <tr>
+        <th style="width:36px;text-align:center">
+          <input type="checkbox" id="rzpz-check-all" title="Vælg alle" style="cursor:pointer;width:15px;height:15px;accent-color:#f59e0b">
+        </th>
         <th>#</th>
         <th>Dato</th>
         <th>Fra (medarbejder)</th>
@@ -192,8 +235,12 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
     </thead>
     <tbody>
     <?php if ( empty( $referrals ) ) : ?>
-      <tr><td colspan="7" class="rzpz-ha-empty">Ingen henvisninger fundet.</td></tr>
-    <?php else : foreach ( $referrals as $r ) :
+      <tr><td colspan="8" class="rzpz-ha-empty">Ingen henvisninger fundet.</td></tr>
+    <?php else :
+      $pending_count   = count( array_filter( $referrals, fn($x) => $x->status === 'pending' ) );
+      $in_pending_sec  = false;
+      $in_handled_sec  = false;
+      foreach ( $referrals as $r ) :
       $mgr        = $managers[ $r->manager_key ] ?? null;
       $label      = $status_labels[ $r->status ] ?? $r->status;
       $cls        = esc_attr( $r->status );
@@ -201,9 +248,24 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
       $has_log    = ! empty( $elog['sent_at'] ) || ! empty( $elog['manager'] );
       $has_note   = ! empty( $r->notes );
       $row_id     = (int) $r->id;
+
+      // Section separators
+      if ( $r->status === 'pending' && ! $in_pending_sec ) {
+          $in_pending_sec = true;
+          echo '<tr class="rzpz-section-sep"><td colspan="8">⏳ Afventer behandling (' . $pending_count . ')</td></tr>';
+      } elseif ( $r->status !== 'pending' && ! $in_handled_sec ) {
+          $in_handled_sec = true;
+          echo '<tr class="rzpz-section-sep"><td colspan="8">📋 Behandlede</td></tr>';
+      }
     ?>
       <!-- Data row -->
       <tr class="rzpz-data-row">
+        <td style="text-align:center">
+          <?php if ( $r->status === 'hired' && ! $bonus_sent ) : ?>
+            <input type="checkbox" class="rzpz-batch-cb" value="<?php echo $row_id; ?>"
+                   style="cursor:pointer;width:15px;height:15px;accent-color:#f59e0b">
+          <?php endif; ?>
+        </td>
         <td><?php echo $row_id; ?></td>
         <td style="white-space:nowrap"><?php echo esc_html( wp_date( 'd/m/Y H:i', strtotime( $r->submitted_at ) ) ); ?></td>
         <td>
@@ -212,22 +274,49 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
           <?php if ( $r->referrer_phone ) : ?><br><small style="color:#666"><?php echo esc_html( $r->referrer_phone ); ?></small><?php endif; ?>
         </td>
         <td>
-          <strong><?php echo esc_html( $r->friend_name ); ?></strong><br>
-          <small style="color:#888"><?php echo esc_html( $r->friend_email ); ?></small>
+          <strong><?php echo esc_html( $r->friend_name ); ?></strong>
+          <?php if ( $r->friend_email ) : ?><br><small style="color:#888"><?php echo esc_html( $r->friend_email ); ?></small><?php endif; ?>
           <?php if ( $r->friend_phone ) : ?><br><small style="color:#666"><?php echo esc_html( $r->friend_phone ); ?></small><?php endif; ?>
         </td>
         <td><?php echo $mgr ? esc_html( $mgr['label'] ) : esc_html( $r->manager_key ); ?></td>
         <td>
-          <form method="post" class="rzpz-ha-form-inline" style="display:flex;gap:4px;align-items:center;">
-            <?php wp_nonce_field( 'rzpz_henvis_status', 'rzpz_henvis_status_nonce' ); ?>
-            <input type="hidden" name="referral_id" value="<?php echo $row_id; ?>">
-            <select name="new_status">
-              <?php foreach ( $status_labels as $k => $l ) : ?>
-                <option value="<?php echo esc_attr($k); ?>" <?php selected($r->status,$k); ?>><?php echo esc_html($l); ?></option>
-              <?php endforeach; ?>
-            </select>
-            <button type="submit">Gem</button>
-          </form>
+          <?php
+          $bonus_sent = ! empty( $elog['bonus_log']['sent_at'] );
+          if ( $r->status === 'pending' ) : ?>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
+                <input type="hidden" name="action" value="rzpz_henvis_approve">
+                <input type="hidden" name="referral_id" value="<?php echo $row_id; ?>">
+                <?php wp_nonce_field( 'rzpz_henvis_approve' ); ?>
+                <button type="submit" class="rzpz-btn-approve">✅ Godkend</button>
+              </form>
+              <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
+                <input type="hidden" name="action" value="rzpz_henvis_reject">
+                <input type="hidden" name="referral_id" value="<?php echo $row_id; ?>">
+                <?php wp_nonce_field( 'rzpz_henvis_reject' ); ?>
+                <button type="submit" class="rzpz-btn-reject">❌ Afvis</button>
+              </form>
+            </div>
+          <?php elseif ( $r->status === 'hired' ) : ?>
+            <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-start">
+              <span class="rzpz-status <?php echo $bonus_sent ? 'hired-bonus' : 'hired'; ?>">
+                <?php echo $bonus_sent ? '💰 Bonus sendt' : '✅ Ansat'; ?>
+              </span>
+              <?php if ( ! $bonus_sent ) : ?>
+                <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" style="margin:0"
+                      onsubmit="return confirm('Send bonusmail til medarbejder og løn nu?\n\nDette bekræfter at kandidaten er mødt på arbejde.')">
+                  <input type="hidden" name="action" value="rzpz_henvis_bonus">
+                  <input type="hidden" name="referral_id" value="<?php echo $row_id; ?>">
+                  <?php wp_nonce_field( 'rzpz_henvis_bonus' ); ?>
+                  <button type="submit" class="rzpz-btn-bonus">💰 Kandidat startet</button>
+                </form>
+              <?php else : ?>
+                <span class="rzpz-bonus-sent">✓ <?php echo esc_html( wp_date( 'd/m/Y', strtotime( $elog['bonus_log']['sent_at'] ) ) ); ?></span>
+              <?php endif; ?>
+            </div>
+          <?php else : ?>
+            <span class="rzpz-status <?php echo $cls; ?>"><?php echo esc_html( $label ); ?></span>
+          <?php endif; ?>
         </td>
         <td>
           <div class="rzpz-row-actions">
@@ -239,6 +328,13 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
             <button class="rzpz-btn-xs<?php echo $has_note ? ' active' : ''; ?>" onclick="rzpzToggleRow('note-<?php echo $row_id; ?>', this)">
               📝 <?php echo $has_note ? 'Note' : 'Tilføj note'; ?>
             </button>
+            <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" style="display:inline;margin:0"
+                  onsubmit="return confirm('Slet denne henvisning permanent?\n\nDette kan ikke fortrydes.')">
+              <input type="hidden" name="action"      value="rzpz_henvis_delete">
+              <input type="hidden" name="referral_id" value="<?php echo $row_id; ?>">
+              <?php wp_nonce_field( 'rzpz_henvis_delete' ); ?>
+              <button type="submit" class="rzpz-btn-xs" style="color:#f87171;border-color:#f8717140" title="Slet henvisning">🗑️</button>
+            </form>
           </div>
           <?php if ( $has_note ) : ?>
             <div class="rzpz-note-preview" style="margin-top:4px" title="<?php echo esc_attr( $r->notes ); ?>"><?php echo esc_html( $r->notes ); ?></div>
@@ -249,7 +345,7 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
       <!-- Email log accordion -->
       <?php if ( $has_log ) : ?>
       <tr class="rzpz-email-log-row" id="email-<?php echo $row_id; ?>">
-        <td colspan="7">
+        <td colspan="8">
           <div class="rzpz-email-log-inner">
             <?php
             // Manager email
@@ -320,7 +416,7 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
 
       <!-- Note row -->
       <tr class="rzpz-note-row" id="note-<?php echo $row_id; ?>">
-        <td colspan="7">
+        <td colspan="8">
           <div class="rzpz-note-inner">
             <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
               <input type="hidden" name="action"      value="rzpz_henvis_save_note">
@@ -355,4 +451,38 @@ function rzpzToggleRow(id, btn, forceClose) {
         if (btn) btn.classList.add('active');
     }
 }
+
+// ── Batch bonus checkboxe ──────────────────────────────────────────────────
+(function () {
+    var allCb    = document.querySelectorAll('.rzpz-batch-cb');
+    var checkAll = document.getElementById('rzpz-check-all');
+    var countEl  = document.getElementById('rzpz-batch-count');
+    var btn      = document.getElementById('rzpz-batch-btn');
+
+    function updateBtn() {
+        var n = document.querySelectorAll('.rzpz-batch-cb:checked').length;
+        countEl.textContent = n;
+        btn.disabled        = n === 0;
+        btn.style.opacity   = n > 0 ? '1' : '.35';
+        btn.style.cursor    = n > 0 ? 'pointer' : 'not-allowed';
+    }
+
+    allCb.forEach(function (cb) { cb.addEventListener('change', updateBtn); });
+
+    if (checkAll) {
+        checkAll.addEventListener('change', function () {
+            allCb.forEach(function (cb) { cb.checked = checkAll.checked; });
+            updateBtn();
+        });
+    }
+
+    window.rzpzSubmitBatch = function () {
+        var checked = Array.from(document.querySelectorAll('.rzpz-batch-cb:checked'));
+        if (!checked.length) return;
+        var ids = checked.map(function (cb) { return cb.value; }).join(',');
+        if (!confirm('Send bonusmail til ' + checked.length + ' medarbejder(e) og én samlet løn-mail til loen@rezponz.dk?\n\nDette kan ikke fortrydes.')) return;
+        document.getElementById('rzpz-batch-ids').value = ids;
+        document.getElementById('rzpz-batch-form').submit();
+    };
+}());
 </script>

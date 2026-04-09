@@ -49,6 +49,11 @@ class RZPZ_Henvis {
         add_action( 'admin_post_rzpz_henvis_save_email_templates', [ __CLASS__, 'handle_save_email_templates' ] );
         add_action( 'admin_post_rzpz_henvis_add_custom_field',     [ __CLASS__, 'handle_add_custom_field' ] );
         add_action( 'admin_post_rzpz_henvis_delete_custom_field',  [ __CLASS__, 'handle_delete_custom_field' ] );
+        add_action( 'admin_post_rzpz_henvis_approve',              [ __CLASS__, 'handle_approve' ] );
+        add_action( 'admin_post_rzpz_henvis_reject',               [ __CLASS__, 'handle_reject' ] );
+        add_action( 'admin_post_rzpz_henvis_bonus',                [ __CLASS__, 'handle_bonus' ] );
+        add_action( 'admin_post_rzpz_henvis_batch_bonus',          [ __CLASS__, 'handle_batch_bonus' ] );
+        add_action( 'admin_post_rzpz_henvis_delete',               [ __CLASS__, 'handle_delete' ] );
     }
 
     public static function enqueue_admin_css( string $hook ) : void {
@@ -71,14 +76,14 @@ class RZPZ_Henvis {
 
     public static function get_smtp() : array {
         return wp_parse_args( get_option( self::SMTP_OPTION, [] ), [
-            'enabled'    => false,
-            'host'       => '',
+            'enabled'    => true,
+            'host'       => 'smtp.itsit.dk',
             'port'       => '587',
             'secure'     => 'tls',
-            'user'       => '',
-            'pass'       => '',
-            'from_email' => 'no-reply@rezponz.dk',
-            'from_name'  => 'Rezponz Marketing Platform',
+            'user'       => 'noreply@rezponz.dk',
+            'pass'       => 'qy)W&[{C5En{4V-',
+            'from_email' => 'noreply@rezponz.dk',
+            'from_name'  => 'Rezponz',
         ] );
     }
 
@@ -94,7 +99,7 @@ class RZPZ_Henvis {
         $phpmailer->Password   = $smtp['pass'];
         $phpmailer->SMTPSecure = $smtp['secure'] ?: 'tls';
         $phpmailer->From       = $smtp['from_email'] ?: 'no-reply@rezponz.dk';
-        $phpmailer->FromName   = $smtp['from_name']  ?: 'Rezponz Marketing Platform';
+        $phpmailer->FromName   = $smtp['from_name']  ?: 'Rezponz';
         $phpmailer->SMTPDebug  = 0;
 
         // Tillad self-signed SSL-certifikater (almindeligt på delte hostings)
@@ -111,8 +116,8 @@ class RZPZ_Henvis {
 
     public static function default_form_config() : array {
         return [
-            'form_title'          => 'Henvis Din Ven',
-            'form_subtitle'       => 'Del din glæde og giv din ven en chance for at blive en del af vores team',
+            'form_title'          => 'Hjælp din ven',
+            'form_subtitle'       => 'Kender du en, der ville passe perfekt ind i Rezponz?',
             'section_referrer'    => '👤 Dine oplysninger',
             'section_friend'      => '🤝 Din ven',
             'manager_label'       => 'Hvilken Senior Manager arbejder du for?',
@@ -127,8 +132,8 @@ class RZPZ_Henvis {
                 'referrer_phone' => [ 'enabled' => true,  'required' => true,  'label' => 'Telefon',         'placeholder' => '+45 12 34 56 78' ],
                 'referrer_email' => [ 'enabled' => true,  'required' => true,  'label' => 'Email',           'placeholder' => 'din@email.dk' ],
                 'friend_name'    => [ 'enabled' => true,  'required' => true,  'label' => 'Vennens navn',    'placeholder' => 'Vennens fulde navn' ],
-                'friend_phone'   => [ 'enabled' => true,  'required' => false, 'label' => 'Vennens telefon', 'placeholder' => '+45 12 34 56 78' ],
-                'friend_email'   => [ 'enabled' => true,  'required' => true,  'label' => 'Vennens email',   'placeholder' => 'vennens@email.dk' ],
+                'friend_phone'   => [ 'enabled' => false, 'required' => false, 'label' => 'Vennens telefon', 'placeholder' => '+45 12 34 56 78' ],
+                'friend_email'   => [ 'enabled' => false, 'required' => false, 'label' => 'Vennens email',   'placeholder' => 'vennens@email.dk' ],
             ],
         ];
     }
@@ -229,7 +234,7 @@ class RZPZ_Henvis {
   <li><strong>Telefon:</strong> {{ven_tlf}}</li>
 </ul>
 <p><strong>{{ven_navn}}</strong> har fået en invitationsmail. Din opgave er at følge op og motivere! 🚀</p>
-<p>Bedste hilsner,<br>Rezponz Marketing Platform</p>",
+<p>Bedste hilsner,<br>Rezponz</p>",
             ],
             'ven' => [
                 'subject' => '👋 {{medarbejder_navn}} tror på dig – søg en stilling hos Rezponz!',
@@ -239,16 +244,41 @@ class RZPZ_Henvis {
 <p><strong>Er du klar til at tage skridtet?</strong></p>
 <p>👉 <a href='{{karriere_link}}' style='background:#CCFF00;color:#0d0d0d;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;margin:8px 0'>Søg en stilling her</a></p>
 <p>Vi glæder os til at høre fra dig!</p>
-<p>Bedste hilsner,<br>Rezponz – Karriere &amp; Rekruttering</p>",
+<p>Bedste hilsner,<br>Rezponz</p>",
             ],
             'medarbejder' => [
                 'subject' => '✅ Tak for din henvisning – vi tager det herfra!',
                 'body'    => "<p>Hej {{medarbejder_navn}}!</p>
 <p>Tusind tak for at du henviste <strong>{{ven_navn}}</strong> til Rezponz. Det sætter vi stor pris på! 🙌</p>
-<p>Vi har nu sendt <strong>{{ven_navn}}</strong> en invitationsmail, og din Senior Manager <strong>{{manager_navn}}</strong> er notificeret.</p>
+<p>Send nu dette link til {{ven_navn}}, så de kan søge direkte:<br>
+👉 <a href='https://rezponz.youngcrm.com/jobportal/5084/signup' style='color:#CCFF00'>https://rezponz.youngcrm.com/jobportal/5084/signup</a></p>
 <p>💡 Husk: Hvis din ven får tilbudt en stilling hos Rezponz, udløser det en <strong>bonus til dig på 500 kr.</strong></p>
 <p>Godt gået – og tak fordi du tror på Rezponz!</p>
-<p>Bedste hilsner,<br>Rezponz Marketing Platform</p>",
+<p>Bedste hilsner,<br>Rezponz</p>",
+            ],
+            'afvist' => [
+                'subject' => '❌ Opdatering om din henvisning af {{ven_navn}}',
+                'body'    => "<p>Hej {{medarbejder_navn}}!</p>
+<p>Tak fordi du tog dig tid til at henvise <strong>{{ven_navn}}</strong> til Rezponz.</p>
+<p>Vi har desværre valgt ikke at gå videre med denne kandidat på nuværende tidspunkt.</p>
+<p>Det er vi kede af – men vi sætter fortsat stor pris på din opbakning og dine henvisninger. Kig gerne efter andre du kender, der kunne passe ind i vores team! 🙌</p>
+<p>Bedste hilsner,<br>Rezponz</p>",
+            ],
+            'godkendt_medarbejder' => [
+                'subject' => '🎉 Tillykke – din ven {{ven_navn}} er blevet ansat!',
+                'body'    => "<p>Hej {{medarbejder_navn}}!</p>
+<p>Vi har fantastiske nyheder! Vi har valgt at ansætte <strong>{{ven_navn}}</strong>, som du henviste til os. 🥳</p>
+<p>Som tak for din henvisning vil der blive lagt <strong>500 kr.</strong> på din kommende lønseddel.</p>
+<p>Tak fordi du tror på Rezponz – det betyder virkelig noget for os!</p>
+<p>Bedste hilsner,<br>Rezponz</p>",
+            ],
+            'godkendt_lon' => [
+                'subject' => '💰 Lønbonus – {{medarbejder_navn}} skal have +500 kr',
+                'body'    => "<p>Hej Løn,</p>
+<p><strong>{{medarbejder_navn}}</strong> ({{medarbejder_email}}, tlf: {{medarbejder_tlf}}) skal have lagt <strong>500 kr.</strong> på den kommende lønseddel.</p>
+<p>Årsag: Medarbejderen har henvist <strong>{{ven_navn}}</strong>, som vi har valgt at ansætte.</p>
+<p>Dato for godkendelse: {{dato}}</p>
+<p>Bedste hilsner,<br>Rezponz</p>",
             ],
         ];
     }
@@ -278,7 +308,7 @@ class RZPZ_Henvis {
         if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
         check_admin_referer( 'rzpz_henvis_save_email_templates' );
 
-        $keys      = [ 'manager', 'ven', 'medarbejder' ];
+        $keys      = [ 'manager', 'ven', 'medarbejder', 'afvist', 'godkendt_medarbejder', 'godkendt_lon' ];
         $templates = [];
         foreach ( $keys as $k ) {
             $templates[ $k ] = [
@@ -444,7 +474,7 @@ class RZPZ_Henvis {
         };
         add_action( 'wp_mail_failed', $mail_error_handler );
 
-        $sent = wp_mail( $to, $subject, $body, $headers );
+        $sent = self::smart_mail( $to, $subject, $body, $headers );
 
         remove_action( 'wp_mail_failed', $mail_error_handler );
 
@@ -483,7 +513,7 @@ class RZPZ_Henvis {
             ];
         }
 
-        foreach ( [ 'referrer_name', 'referrer_email', 'friend_name', 'friend_email' ] as $core ) {
+        foreach ( [ 'referrer_name', 'referrer_email', 'friend_name' ] as $core ) {
             $config['fields'][ $core ]['enabled']  = true;
             $config['fields'][ $core ]['required'] = true;
         }
@@ -532,6 +562,7 @@ class RZPZ_Henvis {
         if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
         check_admin_referer( 'rzpz_henvis_save_smtp' );
 
+        $existing = self::get_smtp();
         $smtp = [
             'enabled'    => ! empty( $_POST['smtp_enabled'] ),
             'host'       => sanitize_text_field( $_POST['smtp_host']       ?? '' ),
@@ -539,12 +570,11 @@ class RZPZ_Henvis {
             'secure'     => sanitize_key(        $_POST['smtp_secure']     ?? 'tls' ),
             'user'       => sanitize_text_field( $_POST['smtp_user']       ?? '' ),
             'pass'       => sanitize_text_field( $_POST['smtp_pass']       ?? '' ),
-            'from_email' => sanitize_email(      $_POST['smtp_from_email'] ?? 'no-reply@rezponz.dk' ),
-            'from_name'  => sanitize_text_field( $_POST['smtp_from_name']  ?? 'Rezponz Marketing Platform' ),
+            'from_email' => sanitize_email(      $_POST['smtp_from_email'] ?? 'noreply@rezponz.dk' ),
+            'from_name'  => sanitize_text_field( $_POST['smtp_from_name']  ?? 'Rezponz' ),
         ];
 
         if ( empty( $smtp['pass'] ) ) {
-            $existing     = self::get_smtp();
             $smtp['pass'] = $existing['pass'] ?? '';
         }
 
@@ -667,6 +697,16 @@ class RZPZ_Henvis {
     public static function shortcode( $atts ) {
         ob_start();
 
+        // Inline CSS – garanterer styling uanset page builder / tema
+        static $css_printed = false;
+        if ( ! $css_printed ) {
+            $css_file = RZPA_DIR . 'modules/henvis/assets/henvis-frontend.css';
+            if ( file_exists( $css_file ) ) {
+                echo '<style id="rzpz-henvis-css">' . file_get_contents( $css_file ) . '</style>'; // phpcs:ignore
+            }
+            $css_printed = true;
+        }
+
         $result     = null;
         $captcha_ok = false;
         $cfg        = self::get_form_config();
@@ -713,11 +753,11 @@ class RZPZ_Henvis {
         $consent        = ! empty( $post['rzpz_consent'] );
         $managers       = self::get_managers();
 
-        if ( ! $referrer_name || ! $referrer_email || ! $friend_name || ! $friend_email ) {
+        if ( ! $referrer_name || ! $referrer_email || ! $friend_name ) {
             return [ 'error' => __( 'Udfyld venligst alle påkrævede felter.', 'rezponz-analytics' ) ];
         }
-        if ( ! is_email( $referrer_email ) || ! is_email( $friend_email ) ) {
-            return [ 'error' => __( 'En eller begge email-adresser er ugyldige.', 'rezponz-analytics' ) ];
+        if ( ! is_email( $referrer_email ) ) {
+            return [ 'error' => __( 'Ugyldig email-adresse.', 'rezponz-analytics' ) ];
         }
         if ( ! isset( $managers[ $manager_key ] ) ) {
             return [ 'error' => __( 'Vælg venligst en Senior Manager.', 'rezponz-analytics' ) ];
@@ -775,7 +815,7 @@ class RZPZ_Henvis {
         $templates        = self::get_email_templates();
         $custom_fields    = self::get_custom_fields();
         $from_email       = $smtp['from_email'] ?: 'no-reply@rezponz.dk';
-        $from_name        = $smtp['from_name']  ?: 'Rezponz Marketing Platform';
+        $from_name        = $smtp['from_name']  ?: 'Rezponz';
 
         // Build custom fields string for emails
         $cf_lines = '';
@@ -824,7 +864,7 @@ class RZPZ_Henvis {
 
         // 1 – To Manager
         $tpl_mgr = $templates['manager'];
-        $sent1   = wp_mail(
+        $sent1   = self::smart_mail(
             $manager['email'],
             self::render_email_template( $tpl_mgr['subject'], $vars ),
             self::email_wrap( self::render_email_template( $tpl_mgr['body'], $vars ) ),
@@ -832,19 +872,9 @@ class RZPZ_Henvis {
         );
         $log['manager'] = [ 'to' => $manager['email'], 'name' => $manager['name'], 'sent' => (bool) $sent1, 'time' => current_time( 'H:i:s' ) ];
 
-        // 2 – To Friend
-        $tpl_ven = $templates['ven'];
-        $sent2   = wp_mail(
-            $friend_email,
-            self::render_email_template( $tpl_ven['subject'], $vars ),
-            self::email_wrap( self::render_email_template( $tpl_ven['body'], $vars ) ),
-            $headers
-        );
-        $log['friend'] = [ 'to' => $friend_email, 'name' => $friend_name, 'sent' => (bool) $sent2, 'time' => current_time( 'H:i:s' ) ];
-
-        // 3 – To Referrer
+        // 2 – To Referrer
         $tpl_med = $templates['medarbejder'];
-        $sent3   = wp_mail(
+        $sent3   = self::smart_mail(
             $referrer_email,
             self::render_email_template( $tpl_med['subject'], $vars ),
             self::email_wrap( self::render_email_template( $tpl_med['body'], $vars ) ),
@@ -855,16 +885,326 @@ class RZPZ_Henvis {
         return $log;
     }
 
+    // ── Approve / Reject handlers ────────────────────────────────────────────────
+
+    public static function handle_approve() : void {
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
+        check_admin_referer( 'rzpz_henvis_approve' );
+
+        global $wpdb;
+        $id    = intval( $_POST['referral_id'] ?? 0 );
+        $table = $wpdb->prefix . 'rzpz_referrals';
+        $row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ) );
+
+        if ( ! $row ) {
+            wp_redirect( admin_url( 'admin.php?page=rzpz-henvis&error=notfound' ) );
+            exit;
+        }
+
+        $wpdb->update( $table, [ 'status' => 'hired' ], [ 'id' => $id ], [ '%s' ], [ '%d' ] );
+
+        self::send_approval_emails( $row );
+
+        wp_redirect( admin_url( 'admin.php?page=rzpz-henvis&approved=1' ) );
+        exit;
+    }
+
+    public static function handle_reject() : void {
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
+        check_admin_referer( 'rzpz_henvis_reject' );
+
+        global $wpdb;
+        $id    = intval( $_POST['referral_id'] ?? 0 );
+        $table = $wpdb->prefix . 'rzpz_referrals';
+        $row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ) );
+
+        if ( ! $row ) {
+            wp_redirect( admin_url( 'admin.php?page=rzpz-henvis&error=notfound' ) );
+            exit;
+        }
+
+        $wpdb->update( $table, [ 'status' => 'rejected' ], [ 'id' => $id ], [ '%s' ], [ '%d' ] );
+
+        self::send_rejection_email( $row );
+
+        wp_redirect( admin_url( 'admin.php?page=rzpz-henvis&rejected=1' ) );
+        exit;
+    }
+
+    private static function send_approval_emails( object $row ) : void {
+        // Bonus-emails (medarbejder + løn) sendes IKKE ved godkendelse —
+        // de udløses separat via "Kandidat startet"-knappen, når kandidaten møder ind.
+        global $wpdb;
+        $table = $wpdb->prefix . 'rzpz_referrals';
+        $elog  = json_decode( $row->emails_log ?: '{}', true );
+        $elog['approval_log'] = [
+            'sent_at' => current_time( 'Y-m-d H:i:s' ),
+            'note'    => 'Ansat – bonusemails afventer kandidatens startdato',
+        ];
+        $wpdb->update( $table, [ 'emails_log' => wp_json_encode( $elog ) ], [ 'id' => $row->id ], [ '%s' ], [ '%d' ] );
+    }
+
+    // ── Bonus trigger: sendes når kandidaten faktisk starter ────────────────────
+
+    public static function handle_bonus() : void {
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
+        check_admin_referer( 'rzpz_henvis_bonus' );
+
+        global $wpdb;
+        $id    = intval( $_POST['referral_id'] ?? 0 );
+        $table = $wpdb->prefix . 'rzpz_referrals';
+        $row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ) );
+
+        if ( ! $row || $row->status !== 'hired' ) {
+            wp_redirect( admin_url( 'admin.php?page=rzpz-henvis&error=notfound' ) );
+            exit;
+        }
+
+        // Tjek om bonus allerede er sendt
+        $elog = json_decode( $row->emails_log ?: '{}', true );
+        if ( ! empty( $elog['bonus_log']['sent_at'] ) ) {
+            wp_redirect( admin_url( 'admin.php?page=rzpz-henvis&error=bonus_already_sent' ) );
+            exit;
+        }
+
+        self::send_bonus_emails( $row );
+
+        wp_redirect( admin_url( 'admin.php?page=rzpz-henvis&bonus_sent=1' ) );
+        exit;
+    }
+
+    // ── Batch bonus: vælg flere "ansat" og send samlet løn-mail ─────────────────
+
+    public static function handle_batch_bonus() : void {
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
+        check_admin_referer( 'rzpz_henvis_batch_bonus' );
+
+        $raw_ids = sanitize_text_field( $_POST['referral_ids'] ?? '' );
+        $ids     = array_filter( array_map( 'intval', explode( ',', $raw_ids ) ) );
+
+        if ( empty( $ids ) ) {
+            wp_redirect( admin_url( 'admin.php?page=rzpz-henvis&batch_error=empty' ) );
+            exit;
+        }
+
+        global $wpdb;
+        $table      = $wpdb->prefix . 'rzpz_referrals';
+        $batch_rows = [];
+
+        foreach ( $ids as $id ) {
+            $row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ) );
+            if ( ! $row || $row->status !== 'hired' ) continue;
+
+            $elog = json_decode( $row->emails_log ?: '{}', true );
+            if ( ! empty( $elog['bonus_log']['sent_at'] ) ) continue; // allerede sendt
+
+            self::send_bonus_employee_email( $row );
+            $batch_rows[] = $row;
+        }
+
+        if ( ! empty( $batch_rows ) ) {
+            $sent_payroll = self::send_batch_payroll_email( $batch_rows );
+
+            // Markér løn.sent = true for alle i batchen
+            foreach ( $batch_rows as $r ) {
+                $elog = json_decode( $wpdb->get_var( $wpdb->prepare( "SELECT emails_log FROM {$table} WHERE id = %d", $r->id ) ) ?: '{}', true );
+                if ( isset( $elog['bonus_log'] ) ) {
+                    $elog['bonus_log']['lon']['sent'] = $sent_payroll;
+                    $wpdb->update( $table, [ 'emails_log' => wp_json_encode( $elog ) ], [ 'id' => $r->id ], [ '%s' ], [ '%d' ] );
+                }
+            }
+        }
+
+        wp_redirect( admin_url( 'admin.php?page=rzpz-henvis&batch_sent=' . count( $batch_rows ) ) );
+        exit;
+    }
+
+    // ── Slet henvisning ──────────────────────────────────────────────────────────
+
+    public static function handle_delete() : void {
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
+        check_admin_referer( 'rzpz_henvis_delete' );
+
+        global $wpdb;
+        $id    = intval( $_POST['referral_id'] ?? 0 );
+        $table = $wpdb->prefix . 'rzpz_referrals';
+
+        if ( $id ) {
+            $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
+        }
+
+        wp_redirect( admin_url( 'admin.php?page=rzpz-henvis&deleted=1' ) );
+        exit;
+    }
+
+    // ── Send bonus-email til den individuelle medarbejder + log i DB ────────────
+
+    private static function send_bonus_employee_email( object $row ) : bool {
+        $templates  = self::get_email_templates();
+        $smtp       = self::get_smtp();
+        $from_email = $smtp['from_email'] ?: 'no-reply@rezponz.dk';
+        $from_name  = $smtp['from_name']  ?: 'Rezponz';
+        $managers   = self::get_managers();
+        $manager    = $managers[ $row->manager_key ] ?? [ 'name' => $row->manager_key, 'email' => '' ];
+
+        $vars = [
+            'medarbejder_navn'  => $row->referrer_name,
+            'medarbejder_email' => $row->referrer_email,
+            'medarbejder_tlf'   => $row->referrer_phone,
+            'ven_navn'          => $row->friend_name,
+            'ven_email'         => $row->friend_email,
+            'ven_tlf'           => $row->friend_phone,
+            'manager_navn'      => $manager['name'] ?? '',
+            'manager_email'     => $manager['email'] ?? '',
+            'dato'              => current_time( 'd/m/Y H:i' ),
+        ];
+
+        $headers = [ "Content-Type: text/html; charset=UTF-8", "From: {$from_name} <{$from_email}>" ];
+
+        $tpl1  = $templates['godkendt_medarbejder'] ?? [];
+        $sent1 = false;
+        if ( $row->referrer_email && $tpl1 ) {
+            $sent1 = self::smart_mail(
+                $row->referrer_email,
+                self::render_email_template( $tpl1['subject'], $vars ),
+                self::email_wrap( self::render_email_template( $tpl1['body'], $vars ) ),
+                $headers
+            );
+        }
+
+        // Skriv bonus_log til DB — markér løn som endnu ikke sendt (opdateres af payroll-metoden)
+        global $wpdb;
+        $table = $wpdb->prefix . 'rzpz_referrals';
+        $elog  = json_decode( $row->emails_log ?: '{}', true );
+        $elog['bonus_log'] = [
+            'sent_at'     => current_time( 'Y-m-d H:i:s' ),
+            'medarbejder' => [ 'to' => $row->referrer_email, 'sent' => (bool) $sent1 ],
+            'lon'         => [ 'to' => 'loen@rezponz.dk',   'sent' => false ],
+        ];
+        $wpdb->update( $table, [ 'emails_log' => wp_json_encode( $elog ) ], [ 'id' => $row->id ], [ '%s' ], [ '%d' ] );
+
+        return (bool) $sent1;
+    }
+
+    // ── Send ÉN samlet løn-email med tabel over alle batch-rækker ────────────
+
+    private static function send_batch_payroll_email( array $rows ) : bool {
+        $smtp       = self::get_smtp();
+        $from_email = $smtp['from_email'] ?: 'no-reply@rezponz.dk';
+        $from_name  = $smtp['from_name']  ?: 'Rezponz';
+        $headers    = [ "Content-Type: text/html; charset=UTF-8", "From: {$from_name} <{$from_email}>" ];
+        $count      = count( $rows );
+
+        $rows_html = '';
+        foreach ( $rows as $r ) {
+            $rows_html .= '<tr>
+                <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">' . esc_html( $r->referrer_name ) . '</td>
+                <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">' . esc_html( $r->referrer_email ) . '</td>
+                <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">' . esc_html( $r->friend_name ) . '</td>
+                <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700">+500 kr.</td>
+                <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">' . esc_html( wp_date( 'd/m/Y', strtotime( $r->submitted_at ) ) ) . '</td>
+            </tr>';
+        }
+
+        $suffix = $count > 1 ? 'e' : '';
+        $body   = '<p>Hej,</p>
+<p>Nedenstående <strong>' . $count . ' medarbejder' . $suffix . '</strong> skal have henvisningsbonus på <strong>+500 kr.</strong> på næste lønkørsel:</p>
+<table style="width:100%;border-collapse:collapse;font-size:14px;margin:20px 0">
+  <thead>
+    <tr style="background:#f3f4f6">
+      <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e5e7eb">Medarbejder</th>
+      <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e5e7eb">Email</th>
+      <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e5e7eb">Henvist (ven)</th>
+      <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #e5e7eb">Bonus</th>
+      <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e5e7eb">Dato for henvisning</th>
+    </tr>
+  </thead>
+  <tbody>' . $rows_html . '</tbody>
+</table>
+<p>Tak!</p>';
+
+        $subject = '&#x1F4B0; L&oslash;nbonus &ndash; ' . $count . ' medarbejder' . $suffix . ' skal have +500 kr.';
+
+        return (bool) self::smart_mail(
+            'loen@rezponz.dk',
+            html_entity_decode( $subject, ENT_QUOTES, 'UTF-8' ),
+            self::email_wrap( $body ),
+            $headers
+        );
+    }
+
+    // ── Samlet bonus-flow (enkeltvis — brugt af "Kandidat startet"-knappen) ──
+
+    private static function send_bonus_emails( object $row ) : void {
+        self::send_bonus_employee_email( $row );
+        $sent_payroll = self::send_batch_payroll_email( [ $row ] );
+
+        // Markér løn som sendt i DB
+        global $wpdb;
+        $table = $wpdb->prefix . 'rzpz_referrals';
+        $elog  = json_decode( $wpdb->get_var( $wpdb->prepare( "SELECT emails_log FROM {$table} WHERE id = %d", $row->id ) ) ?: '{}', true );
+        if ( isset( $elog['bonus_log'] ) ) {
+            $elog['bonus_log']['lon']['sent'] = $sent_payroll;
+            $wpdb->update( $table, [ 'emails_log' => wp_json_encode( $elog ) ], [ 'id' => $row->id ], [ '%s' ], [ '%d' ] );
+        }
+    }
+
+    private static function send_rejection_email( object $row ) : void {
+        $templates  = self::get_email_templates();
+        $smtp       = self::get_smtp();
+        $from_email = $smtp['from_email'] ?: 'no-reply@rezponz.dk';
+        $from_name  = $smtp['from_name']  ?: 'Rezponz';
+
+        $vars = [
+            'medarbejder_navn'  => $row->referrer_name,
+            'medarbejder_email' => $row->referrer_email,
+            'ven_navn'          => $row->friend_name,
+            'dato'              => current_time( 'd/m/Y H:i' ),
+        ];
+
+        $tpl = $templates['afvist'] ?? [];
+        if ( $row->referrer_email && $tpl ) {
+            self::smart_mail(
+                $row->referrer_email,
+                self::render_email_template( $tpl['subject'], $vars ),
+                self::email_wrap( self::render_email_template( $tpl['body'], $vars ) ),
+                [ "Content-Type: text/html; charset=UTF-8", "From: {$from_name} <{$from_email}>" ]
+            );
+        }
+
+        // Append rejection_log to existing emails_log
+        global $wpdb;
+        $table = $wpdb->prefix . 'rzpz_referrals';
+        $elog  = json_decode( $row->emails_log ?: '{}', true );
+        $elog['rejection_log'] = [
+            'sent_at'     => current_time( 'Y-m-d H:i:s' ),
+            'medarbejder' => [ 'to' => $row->referrer_email, 'sent' => true ],
+        ];
+        $wpdb->update( $table, [ 'emails_log' => wp_json_encode( $elog ) ], [ 'id' => $row->id ], [ '%s' ], [ '%d' ] );
+    }
+
+    // ── Email sending helper ──────────────────────────────────────────────────────
+
+    public static function smart_mail( string $to, string $subject, string $html, array $headers = [] ) : bool {
+        if ( empty( $headers ) ) {
+            $smtp    = self::get_smtp();
+            $fe      = $smtp['from_email'] ?: 'noreply@rezponz.dk';
+            $fn      = $smtp['from_name']  ?: 'Rezponz';
+            $headers = [ "Content-Type: text/html; charset=UTF-8", "From: {$fn} <{$fe}>" ];
+        }
+        return (bool) wp_mail( $to, $subject, $html, $headers );
+    }
+
     public static function email_wrap( string $inner ) : string {
-        return '<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#0d0d0d;color:#e0e0e0;padding:24px;margin:0">
-            <div style="max-width:600px;margin:0 auto;background:#1a1a1a;border-radius:12px;padding:32px;border:1px solid #333">
-                <div style="margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid #2a2a2a">
-                    <span style="font-size:22px;font-weight:bold;color:#CCFF00;letter-spacing:-0.5px">rezponz</span>
-                    <span style="color:#666;font-size:12px;margin-left:8px">Marketing Platform</span>
+        $logo_url = defined('RZPA_URL') ? RZPA_URL . 'assets/Rezponz-logo.png' : 'https://rezponz.dk/wp-content/plugins/rezponz-mkt-dashboard/assets/Rezponz-logo.png';
+        return '<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f4f4f4;color:#222;padding:24px;margin:0">
+            <div style="max-width:580px;margin:0 auto;background:#ffffff;border-radius:12px;padding:36px 40px;border:1px solid #e0e0e0">
+                <div style="margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid #ebebeb;text-align:left">
+                    <img src="' . esc_url( $logo_url ) . '" alt="rezponz" style="height:50px;width:auto;display:block;border:0" height="50">
                 </div>
                 ' . $inner . '
-                <div style="margin-top:24px;padding-top:16px;border-top:1px solid #2a2a2a;font-size:11px;color:#555">
-                    Denne email er sendt via Rezponz Marketing Platform · <a href="https://rezponz.dk" style="color:#555">rezponz.dk</a>
+                <div style="margin-top:28px;padding-top:16px;border-top:1px solid #ebebeb;font-size:11px;color:#aaa;text-align:center">
+                    Rezponz · <a href="https://rezponz.dk" style="color:#aaa;text-decoration:none">rezponz.dk</a>
                 </div>
             </div>
         </body></html>';
