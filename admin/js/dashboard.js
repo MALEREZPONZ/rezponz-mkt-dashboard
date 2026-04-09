@@ -1274,6 +1274,203 @@ const RZPA_App = (() => {
   }
 
   // ════════════════════════════════════════════════════
+  // PAGE: REKRUTTERING
+  // ════════════════════════════════════════════════════
+
+  if (el('page-rekruttering')) {
+    let rekrutDays = 30;
+
+    const rekrutDaysSel = el('rekrut-days');
+    const rekrutRefresh = el('rekrut-refresh');
+    if (rekrutDaysSel) rekrutDaysSel.addEventListener('change', () => { rekrutDays = parseInt(rekrutDaysSel.value); loadRekruttering(rekrutDays, true); });
+    if (rekrutRefresh) rekrutRefresh.addEventListener('click', () => loadRekruttering(rekrutDays, true));
+
+    // Filter-knapper
+    document.querySelectorAll('[data-rekrut-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-rekrut-filter]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const f = btn.dataset.rekrutFilter;
+        document.querySelectorAll('#rekrut-campaigns-tbody tr[data-channel]').forEach(row => {
+          row.style.display = (f === 'all' || row.dataset.channel === f) ? '' : 'none';
+        });
+      });
+    });
+
+    // Pipeline: vis Gem-knap ved ændring
+    document.addEventListener('input', e => {
+      if (e.target.classList.contains('pipeline-input')) {
+        const saveBtn = el('rekrut-pipeline-save');
+        if (saveBtn) saveBtn.style.display = '';
+      }
+    });
+
+    // Gem pipeline
+    el('rekrut-pipeline-save')?.addEventListener('click', async () => {
+      const inputs = document.querySelectorAll('.pipeline-input');
+      const data = {};
+      inputs.forEach(inp => {
+        const stage = inp.dataset.stage;
+        const col   = inp.dataset.col;
+        if (!data[stage]) data[stage] = {};
+        data[stage][col] = parseInt(inp.value) || 0;
+      });
+      await api('/rekruttering/pipeline', { method: 'POST', body: JSON.stringify(data) });
+      const saveBtn = el('rekrut-pipeline-save');
+      if (saveBtn) { saveBtn.textContent = '✓ Gemt'; setTimeout(() => { saveBtn.textContent = '💾 Gem'; saveBtn.style.display = 'none'; }, 2000); }
+    });
+
+    loadRekruttering(rekrutDays);
+  }
+
+  async function loadRekruttering(days, force = false) {
+    const params = new URLSearchParams({ days });
+    if (force) params.set('force', '1');
+    const r = await api('/rekruttering/stats?' + params.toString());
+    const d = r.data || r;
+    if (!d || d.error) return;
+
+    const t = d.totals || {};
+    const pipeline = d.pipeline || {};
+    const meta     = d.meta_campaigns   || [];
+    const google   = d.google_campaigns || [];
+    const all      = [...meta, ...google];
+
+    // ── KPIs ──────────────────────────────────────────────
+    const hired = (pipeline.ansat?.aalborg||0) + (pipeline.ansat?.remote||0) + (pipeline.ansat?.uopfordret||0);
+    renderKPI('rekrut-kpi-leads',  t.leads  || 0);
+    renderKPI('rekrut-kpi-cpl',    t.leads  > 0 ? (t.cpl + ' kr.') : '–');
+    renderKPI('rekrut-kpi-spend',  t.spend  > 0 ? fmt(t.spend, 0) + ' kr.' : '–');
+    renderKPI('rekrut-kpi-hired',  hired || '–');
+    const leadsSubEl = el('rekrut-kpi-leads-sub');
+    if (leadsSubEl) leadsSubEl.textContent = `Meta: ${t.meta_leads||0} · Google: ${t.google_leads||0}`;
+    const spendSubEl = el('rekrut-kpi-spend-sub');
+    if (spendSubEl) spendSubEl.textContent = `Meta: ${fmt(t.meta_spend||0,0)} kr. · Google: ${fmt(t.google_spend||0,0)} kr.`;
+
+    // ── Kanalfordeling ────────────────────────────────────
+    const chanEl = el('rekrut-channels');
+    if (chanEl) {
+      const totalLeads = (t.meta_leads||0) + (t.google_leads||0);
+      const channels = [
+        { label: 'Meta Ads',    leads: t.meta_leads||0,   spend: t.meta_spend||0,   color: '#4488ff' },
+        { label: 'Google Ads',  leads: t.google_leads||0, spend: t.google_spend||0, color: '#CCFF00' },
+      ];
+      chanEl.innerHTML = channels.map(c => {
+        const pct = totalLeads > 0 ? Math.round(c.leads / totalLeads * 100) : 0;
+        const cpl = c.leads > 0 ? Math.round(c.spend / c.leads) : 0;
+        return `
+          <div class="channel-bar-wrap">
+            <div style="width:90px;font-size:12px;color:#aaa;flex-shrink:0">${c.label}</div>
+            <div class="channel-bar-bg">
+              <div class="channel-bar-fill" style="width:${pct}%;background:${c.color}"></div>
+            </div>
+            <div style="width:40px;text-align:right;font-size:12px;font-weight:700;color:#e5e5e5">${c.leads}</div>
+            <div style="width:70px;text-align:right;font-size:11px;color:#666">${cpl ? cpl + ' kr/ans.' : '–'}</div>
+          </div>`;
+      }).join('') + (totalLeads === 0 ? '<div style="color:#555;font-size:13px;padding:8px 0">Ingen ansøgningsdata for perioden.<br><small style="color:#444">Meta Pixel tracker Lead-events — sikr at eventet er aktivt.</small></div>' : '');
+    }
+
+    // ── Pipeline ──────────────────────────────────────────
+    const pipeEl = el('rekrut-pipeline-rows');
+    if (pipeEl) {
+      const stageColors = { ansoegt:'#60a5fa', screenet:'#a78bfa', samtale:'#CCFF00', tilbudt:'#f59e0b', ansat:'#4ade80' };
+      pipeEl.innerHTML = Object.entries(pipeline).map(([stage, vals]) => {
+        const col = stageColors[stage] || '#666';
+        const total = (vals.aalborg||0) + (vals.remote||0) + (vals.uopfordret||0);
+        return `
+          <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span>
+              <span style="font-size:13px;color:#ccc">${vals.label}</span>
+              <span style="font-size:11px;color:#555">(${total})</span>
+            </div>
+            ${['aalborg','remote','uopfordret'].map(col =>
+              `<input type="number" min="0" class="pipeline-input" data-stage="${stage}" data-col="${col}" value="${vals[col]||0}" title="${col}">`
+            ).join('')}
+          </div>`;
+      }).join('');
+    }
+
+    // ── Kampagnetabel ─────────────────────────────────────
+    const tbody = el('rekrut-campaigns-tbody');
+    if (tbody) {
+      if (!all.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="rzpa-empty">Ingen kampagnedata for perioden</td></tr>';
+      } else {
+        tbody.innerHTML = all.map(c => {
+          const cplBadge = c.cpl <= 0 ? '<span style="color:#555">–</span>'
+            : c.cpl <= 100 ? `<span style="color:#4ade80;font-weight:600">${fmt(c.cpl,0)} kr.</span>`
+            : c.cpl <= 300 ? `<span style="color:#f59e0b;font-weight:600">${fmt(c.cpl,0)} kr.</span>`
+            : `<span style="color:#ef4444;font-weight:600">${fmt(c.cpl,0)} kr.</span>`;
+
+          const rating = c.leads >= 10 ? '<span class="badge badge-active">🟢 Godt</span>'
+            : c.leads >= 3 ? '<span class="badge badge-paused">🟡 Middel</span>'
+            : c.leads > 0  ? '<span class="badge" style="background:#ef444420;color:#ef4444">🔴 Lavt</span>'
+            : '<span style="color:#444;font-size:11px">Ingen leads</span>';
+
+          const chanBadge = c.channel === 'meta'
+            ? '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#4488ff20;color:#4488ff">Meta</span>'
+            : '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#CCFF0020;color:#CCFF00">Google</span>';
+
+          return `<tr data-channel="${c.channel}">
+            <td style="font-weight:500">${c.campaign_name}</td>
+            <td>${chanBadge}</td>
+            <td style="text-align:right">${fmt(c.spend,0)} kr.</td>
+            <td style="text-align:right;font-weight:700">${c.leads}</td>
+            <td style="text-align:right">${cplBadge}</td>
+            <td style="text-align:right">${fmt(c.clicks||0)}</td>
+            <td style="text-align:right">${c.ctr||0}%</td>
+            <td>${rating}</td>
+          </tr>`;
+        }).join('');
+      }
+    }
+
+    // ── Anbefalinger ──────────────────────────────────────
+    const tipsEl = el('rekrut-tips');
+    if (tipsEl) {
+      const tips = [];
+      const totalLeads = t.leads || 0;
+      const cpl = t.cpl || 0;
+
+      if (totalLeads === 0) {
+        tips.push({ color:'#ef4444', icon:'🚨', text:'<strong>Ingen ansøgninger sporet.</strong> Meta Pixel-eventet "Lead" skal aktiveres på <code>/tak-for-din-ansoegning/</code>. Kontakt din webmaster for at sætte det op.' });
+      } else if (cpl > 500) {
+        tips.push({ color:'#f59e0b', icon:'⚠️', text:`<strong>Høj CPL på ${fmt(cpl,0)} kr.</strong> Overvej at teste nye annonce-kreativerne eller justere målgruppen for at sænke kostprisen per ansøger.` });
+      } else if (cpl > 0 && cpl <= 100) {
+        tips.push({ color:'#4ade80', icon:'✅', text:`<strong>Fremragende CPL på ${fmt(cpl,0)} kr.!</strong> Jeres rekrutteringsannoncer performer rigtig godt. Overvej at øge budgettet for at skalere ansøgningsvolumen.` });
+      }
+
+      const noleadsOnMeta = meta.length > 0 && t.meta_leads === 0;
+      if (noleadsOnMeta) {
+        tips.push({ color:'#60a5fa', icon:'📡', text:'<strong>Meta Ads tracker ingen ansøgninger.</strong> Pixel-eventet "Lead" er ikke koblet til jeres Meta-kampagner. Gå til Events Manager og aktiver eventet på tak-siden.' });
+      }
+
+      const topGoogle = google.sort((a,b)=>b.leads-a.leads)[0];
+      if (topGoogle && topGoogle.leads > 0) {
+        tips.push({ color:'#CCFF00', icon:'🏆', text:`<strong>"${topGoogle.campaign_name}"</strong> er jeres bedste Google-kampagne med ${topGoogle.leads} ansøgninger til ${fmt(topGoogle.cpl||0,0)} kr./ans.` });
+      }
+
+      const pipelineAnsoegt = (pipeline.ansoegt?.aalborg||0) + (pipeline.ansoegt?.remote||0) + (pipeline.ansoegt?.uopfordret||0);
+      const pipelineAnsat   = (pipeline.ansat?.aalborg||0)   + (pipeline.ansat?.remote||0)   + (pipeline.ansat?.uopfordret||0);
+      if (pipelineAnsoegt > 0 && pipelineAnsat > 0) {
+        const convRate = Math.round(pipelineAnsat / pipelineAnsoegt * 100);
+        tips.push({ color:'#a78bfa', icon:'📊', text:`<strong>Pipeline-konverteringsrate: ${convRate}%</strong> — ${pipelineAnsoegt} ansøgt → ${pipelineAnsat} ansat. ${convRate < 10 ? 'Overvej at optimere screenings-processen.' : 'Flot konverteringsrate!'}` });
+      }
+
+      if (!tips.length) {
+        tips.push({ color:'#4ade80', icon:'✅', text:'<strong>Alt ser godt ud!</strong> Jeres rekruttering kører. Husk at opdatere pipeline-tallene regelmæssigt.' });
+      }
+
+      tipsEl.innerHTML = tips.map(t => `
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;background:rgba(255,255,255,.03);border-radius:8px;border-left:3px solid ${t.color}">
+          <span style="font-size:15px;flex-shrink:0">${t.icon}</span>
+          <span style="font-size:13px;color:#bbb;line-height:1.5">${t.text}</span>
+        </div>`).join('');
+    }
+  }
+
+  // ════════════════════════════════════════════════════
   // PAGE: META ADS
   // ════════════════════════════════════════════════════
 
@@ -2002,31 +2199,67 @@ const RZPA_App = (() => {
       const col = ok ? '#4ade80' : '#ef4444';
       const settingsUrl = (RZPA?.settingsUrl || 'admin.php?page=rzpa-settings') + '#google-ads';
 
+      // ── Network + token check ─────────────────────────────────────────────
+      const pingOk    = td.ping_ok === true;
+      const ping2Ok   = td.ping2_ok === true;
+      const tokenOk   = td.token_http === 200;
+      const scopeOk   = td.token_scope ? td.token_scope.includes('adwords') : null;
+
+      let infraHtml = `
+        <div style="display:grid;grid-template-columns:repeat(2,1fr) repeat(2,1fr);gap:8px;margin-bottom:12px">
+          <div style="background:#111;border:1px solid ${pingOk?'#2a4a2a':'#4a2a2a'};border-radius:8px;padding:8px 12px">
+            <div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:2px">Netværk → googleapis.com</div>
+            <div style="font-size:12px;color:${pingOk?'#4ade80':'#ef4444'}">${pingOk ? '✅ OK' : '❌ Blokeret' + (td.ping_err ? ': ' + td.ping_err : '')}</div>
+          </div>
+          <div style="background:#111;border:1px solid ${ping2Ok?'#2a4a2a':'#4a2a2a'};border-radius:8px;padding:8px 12px">
+            <div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:2px">Netværk → googleads API ${td.ping2_http ? '(HTTP '+td.ping2_http+')' : ''}</div>
+            <div style="font-size:12px;color:${ping2Ok?'#4ade80':'#ef4444'}">${ping2Ok ? '✅ OK' : '❌ BLOKERET' + (td.ping2_err ? ': ' + td.ping2_err : '')}</div>
+          </div>
+          <div style="background:#111;border:1px solid ${tokenOk?'#2a4a2a':'#4a2a2a'};border-radius:8px;padding:8px 12px">
+            <div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:2px">OAuth Token (HTTP ${td.token_http ?? '–'})</div>
+            <div style="font-size:12px;color:${tokenOk?'#4ade80':'#ef4444'}">${tokenOk ? '✅ Token OK' : '❌ Token fejl'}</div>
+          </div>
+          <div style="background:#111;border:1px solid ${scopeOk===true?'#2a4a2a':scopeOk===false?'#4a2a2a':'#2a2a2a'};border-radius:8px;padding:8px 12px">
+            <div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:2px">Scope: adwords</div>
+            <div style="font-size:12px;color:${scopeOk===true?'#4ade80':scopeOk===false?'#ef4444':'#888'}">${scopeOk===true ? '✅ Inkluderet' : scopeOk===false ? '❌ MANGLER' : '– ukendt'}</div>
+          </div>
+        </div>
+        ${!ping2Ok ? `<div style="background:#2d0a0a;border:1px solid #f8717140;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#f87171">🚨 <strong>Din server kan IKKE nå googleads.googleapis.com</strong> — det er sandsynligvis årsagen til alle 404-fejlene. Kontakt din hostingudbyder og bed dem whiteliste udgående forbindelser til <code>googleads.googleapis.com</code>.</div>` : ''}
+        ${td.client_id_hint ? `<div style="font-size:11px;color:#555;margin-bottom:10px">OAuth Client ID: <code style="color:#777">${td.client_id_hint}</code></div>` : ''}`;
+
+      const directAccounts = td.accessible_accounts || [];
+      const mccAccounts    = td.accessible_via_mcc  || [];
+      const allAccounts    = [...new Set([...directAccounts, ...mccAccounts])];
+
       let accessHtml = '';
-      if (td.accessible_accounts?.length) {
-        const inList = td.accessible_accounts.includes(td.customer_id);
+      if (allAccounts.length) {
         accessHtml = `
           <div style="margin-top:12px">
-            <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Tilgængelige konti via dit token</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              ${td.accessible_accounts.map(a => {
+            <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Tilgængelige konti</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+              ${allAccounts.map(a => {
                 const isTarget = a === td.customer_id;
-                return `<span style="background:${isTarget?'#4ade8020':'#1a1a1a'};border:1px solid ${isTarget?'#4ade80':'#333'};border-radius:6px;padding:3px 10px;font-family:monospace;font-size:12px;color:${isTarget?'#4ade80':'#888'}">${a}${isTarget?' ✓ (din CID)':''}</span>`;
+                const tag = mccAccounts.includes(a) ? ' (MCC)' : ' (direkte)';
+                return `<span style="background:${isTarget?'#4ade8020':'#1a1a1a'};border:1px solid ${isTarget?'#4ade80':'#333'};border-radius:6px;padding:3px 10px;font-family:monospace;font-size:12px;color:${isTarget?'#4ade80':'#888'}">${a}${isTarget?' ✓':tag}</span>`;
               }).join('')}
             </div>
-            ${!inList ? `<div style="margin-top:8px;color:#f59e0b;font-size:12px">⚠️ Din Customer ID <strong>${td.customer_id}</strong> er IKKE i listen — det er sandsynligvis årsagen til fejlen. Tjek at du har brugt det rigtige Customer ID.</div>` : ''}
+            ${!td.cid_in_direct && !td.cid_in_mcc ? `<div style="color:#ef4444;font-size:12px">🚨 <strong>${td.customer_id}</strong> er IKKE i nogen af listerne — Customer ID er muligvis forkert.</div>` : ''}
+            ${td.cid_in_mcc ? `<div style="color:#4ade80;font-size:12px">✅ ${td.customer_id} er tilgængeligt via MCC (${td.manager_id}).</div>` : ''}
           </div>`;
-      } else if (!ok) {
-        accessHtml = `<div style="margin-top:8px;color:#888;font-size:12px">Kunne ikke hente liste over tilgængelige konti.</div>`;
+      } else if (tokenOk) {
+        const listErrMsg = td.list_raw_snippet ? ` — Google svarede: <code style="font-size:10px;color:#aaa">${td.list_raw_snippet.substring(0,200)}</code>` : '';
+        accessHtml = `<div style="margin-top:10px;color:#f59e0b;font-size:12px">⚠️ Ingen konti returneret fra Google (listAccessibleCustomers HTTP ${td.list_http ?? '–'})${listErrMsg}</div>
+          <div style="margin-top:6px;font-size:12px;color:#888">Mulig årsag: Developer Token er ikke godkendt, eller OAuth-client tilhører et andet Google Cloud-projekt end der hvor Google Ads API er aktiveret.</div>`;
       }
 
       let statusHtml = ok
         ? `<span style="color:#4ade80;font-weight:600">✅ Forbindelsen virker! ${td.campaigns_found} kampagner fundet${!td.used_mcc ? ' (direkte adgang uden MCC)' : ''}.</span>`
         : `<span style="color:#ef4444;font-weight:600">❌ Fejl: ${td.error || 'Ukendt fejl'}</span>
-           ${td.http_no_mcc ? `<div style="margin-top:6px;color:#f59e0b;font-size:12px">ℹ️ Direkte adgang (uden MCC) returnerede HTTP ${td.http_no_mcc}</div>` : ''}
+           <div style="margin-top:6px;font-size:12px;color:#888">Med MCC: HTTP ${td.http_code} · Uden MCC: HTTP ${td.http_no_mcc ?? '–'} · Stream: HTTP ${td.http_stream ?? '–'} · ListCustomers: HTTP ${td.list_http ?? '–'}</div>
            <div style="margin-top:10px"><a href="${settingsUrl}" style="color:#CCFF00;font-size:12px">⚙️ Gå til Google Ads Indstillinger →</a></div>`;
 
       if (content) content.innerHTML = `
+        ${infraHtml}
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">
           <div style="background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:10px 14px">
             <div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:3px">Customer ID</div>
@@ -2383,10 +2616,12 @@ const RZPA_App = (() => {
         const link = adLink(ad);
         const ctrTxt = ad.impressions > 0 ? `CTR ${ad.ctr}% · CPM ${fmt(ad.cpm,0)} kr.` : '';
 
+        const isVideo = ad.has_video || ad.format === 'video';
+        const fallbackIcon = isVideo ? '🎬' : '🖼️';
         const imgHtml = src
           ? `<img src="${src}" class="tap-img" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
           : '';
-        const fallbackDiv = `<div class="tap-no-thumb" style="${src ? 'display:none' : ''}">📷</div>`;
+        const fallbackDiv = `<div class="tap-no-thumb" style="${src ? 'display:none' : ''}">${fallbackIcon}</div>`;
 
         html += `
           <div class="tap-card" data-adid="${ad.ad_id}">
@@ -2742,44 +2977,282 @@ const RZPA_App = (() => {
   }
 
   // ════════════════════════════════════════════════════
+  // CREATIVE INTELLIGENCE — Shared scoring utilities
+  // ════════════════════════════════════════════════════
+
+  /**
+   * Compute superads.ai-inspired performance scores (0–100) from available metrics.
+   * hookScore   = how well the ad captures attention (CTR-based)
+   * holdScore   = how long people engage (video_views / impressions for video)
+   * clickScore  = click efficiency (CTR + CPC inverse)
+   * engScore    = social engagement depth
+   * convScore   = conversion downstream performance
+   * overall     = weighted composite
+   */
+  function computeCreativeScores(ad) {
+    const ctr   = parseFloat(ad.ctr)             || 0;  // %
+    const cpc   = parseFloat(ad.cpc || ad.cost_per_view) || 99;
+    const eng   = parseFloat(ad.engagement_rate) || 0;  // %
+    const roas  = parseFloat(ad.roas)            || 0;
+    const impr  = parseInt(ad.impressions)       || 1;
+    const views = parseInt(ad.video_views || ad.swipe_ups || 0);
+    const conv  = parseInt(ad.conversions)       || 0;
+    const clicks= parseInt(ad.clicks)            || 1;
+
+    // Hook Score (0-100) — CTR benchmarks: 0.5%=20, 1.5%=60, 3%=100
+    const hookScore = Math.min(100, Math.round(Math.sqrt(Math.min(ctr / 3, 1)) * 100));
+
+    // Hold Score (0-100) — view rate (video views / impressions)
+    const viewRate  = Math.min(1, views / impr);
+    const holdScore = Math.min(100, Math.round(Math.sqrt(viewRate / 0.6) * 100));
+
+    // Click Score (0-100) — blend of CTR and CPC efficiency
+    const cpcScore  = Math.min(100, Math.round(100 * Math.exp(-cpc / 15)));
+    const clickScore= Math.min(100, Math.round(hookScore * 0.55 + cpcScore * 0.45));
+
+    // Engagement Score (0-100) — engagement rate (snap/meta) or ROAS proxy
+    const engScore  = roas > 0
+      ? Math.min(100, Math.round(Math.sqrt(Math.min(roas / 4, 1)) * 100))
+      : Math.min(100, Math.round(Math.sqrt(Math.min(eng / 5, 1)) * 100));
+
+    // Conversion Score (0-100) — conv rate
+    const convRate  = conv > 0 ? (conv / clicks * 100) : 0;
+    const convScore = Math.min(100, Math.round(Math.sqrt(Math.min(convRate / 5, 1)) * 100));
+
+    // Overall — weighted
+    const overall = Math.round(
+      hookScore  * 0.28 +
+      holdScore  * 0.18 +
+      clickScore * 0.24 +
+      engScore   * 0.18 +
+      convScore  * 0.12
+    );
+
+    return { hookScore, holdScore, clickScore, engScore, convScore, overall };
+  }
+
+  function scoreColor(s) {
+    return s >= 70 ? '#4ade80' : s >= 40 ? '#f59e0b' : '#ef4444';
+  }
+
+  function scoreLabel(s) {
+    return s >= 70 ? 'Stærk' : s >= 40 ? 'Ok' : 'Svag';
+  }
+
+  /** Small circular SVG score ring + number */
+  function scoreRing(score, label, sz = 52) {
+    const c    = scoreColor(score);
+    const r    = sz / 2 - 4;
+    const circ = 2 * Math.PI * r;
+    const dash = Math.round((score / 100) * circ * 10) / 10;
+    return `<div style="text-align:center;flex-shrink:0">
+      <div style="position:relative;width:${sz}px;height:${sz}px">
+        <svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" style="transform:rotate(-90deg)">
+          <circle cx="${sz/2}" cy="${sz/2}" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="3.5"/>
+          <circle cx="${sz/2}" cy="${sz/2}" r="${r}" fill="none" stroke="${c}" stroke-width="3.5"
+                  stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:${c}">${score}</div>
+      </div>
+      <div style="font-size:9px;color:#666;margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">${label}</div>
+    </div>`;
+  }
+
+  /** Full 5-score row for a creative card */
+  function scoreRow(sc) {
+    return `<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:14px 0 10px;border-top:1px solid #1e1e1e">
+      ${scoreRing(sc.hookScore,  'Hook',  44)}
+      ${scoreRing(sc.holdScore,  'Hold',  44)}
+      ${scoreRing(sc.clickScore, 'Click', 44)}
+      ${scoreRing(sc.engScore,   'Eng.',  44)}
+      ${scoreRing(sc.convScore,  'Conv.', 44)}
+    </div>`;
+  }
+
+  /** Overall score badge pill */
+  function overallBadge(overall) {
+    const c = scoreColor(overall);
+    return `<span style="display:inline-flex;align-items:center;gap:4px;background:${c}18;color:${c};border:1px solid ${c}30;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800">
+      ${overall} · ${scoreLabel(overall)}
+    </span>`;
+  }
+
+  /** Fatigue warning badge — shown when ad has run 30+ days and score is weak */
+  function fatigueBadge(ad, scores) {
+    const days = parseInt(ad.days_active || ad.age_days || 0);
+    if (days >= 30 && scores.overall < 45) {
+      return `<span style="background:#ef444415;color:#ef4444;border:1px solid #ef444430;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:3px">⚠️ Creative fatigue</span>`;
+    }
+    if (days >= 60) {
+      return `<span style="background:#f59e0b15;color:#f59e0b;border:1px solid #f59e0b30;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:3px">⏱ ${days} dage aktiv</span>`;
+    }
+    return '';
+  }
+
+  /** Render a sorted creative gallery grid for any platform */
+  function renderCreativeGallery(containerEl, ads, opts = {}) {
+    if (!ads.length) {
+      containerEl.innerHTML = '<div style="text-align:center;padding:40px;color:#555">Ingen aktive annoncer fundet.</div>';
+      return;
+    }
+
+    const platform  = opts.platform || 'generic';
+    const accentClr = opts.accent   || '#CCFF00';
+    const noThumb   = opts.noThumb  || '📱';
+
+    // Compute scores and sort
+    const scored = ads.map(ad => ({ ...ad, _sc: computeCreativeScores(ad) }));
+    const sortKey = opts.sortKey || 'score';
+    scored.sort((a, b) => {
+      if (sortKey === 'score')  return b._sc.overall - a._sc.overall;
+      if (sortKey === 'roas')   return (parseFloat(b.roas) || 0) - (parseFloat(a.roas) || 0);
+      if (sortKey === 'views')  return (parseInt(b.video_views) || 0) - (parseInt(a.video_views) || 0);
+      if (sortKey === 'swipes') return (parseInt(b.swipe_ups) || 0) - (parseInt(a.swipe_ups) || 0);
+      if (sortKey === 'spend')  return (parseFloat(b.spend) || 0) - (parseFloat(a.spend) || 0);
+      return 0;
+    });
+
+    const topScore = scored[0]?._sc.overall || 0;
+
+    const cards = scored.map((ad, idx) => {
+      const sc  = ad._sc;
+      const isTop = idx === 0;
+      const thumb = ad.thumbnail_url || ad.image_url || '';
+      const name  = (ad.ad_name || ad.name || 'Unavngivet annonce').substring(0, 60);
+
+      // Primary metric display based on platform
+      let metric1Label, metric1Val, metric2Label, metric2Val;
+      if (platform === 'tiktok') {
+        metric1Label = 'Video Views';  metric1Val = fmt(ad.video_views);
+        metric2Label = 'ROAS';         metric2Val = fmt(ad.roas, 2) + 'x';
+      } else if (platform === 'snap') {
+        metric1Label = 'Swipe-ups';    metric1Val = fmt(ad.swipe_ups);
+        metric2Label = 'CPM';          metric2Val = fmt(ad.cpm, 0) + ' kr';
+      } else {
+        metric1Label = 'Reach';        metric1Val = fmt(ad.reach);
+        metric2Label = 'CTR';          metric2Val = (parseFloat(ad.ctr)||0).toFixed(2) + '%';
+      }
+
+      return `
+        <div class="rzpa-ci-card${isTop ? ' rzpa-ci-card--top' : ''}" style="${isTop ? `border-color:${accentClr}30` : ''}">
+          ${isTop ? `<div class="rzpa-ci-crown" style="background:${accentClr}">👑 #1 Best performer</div>` : ''}
+
+          <!-- Thumbnail -->
+          <div class="rzpa-ci-thumb">
+            ${thumb
+              ? `<img src="${thumb}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+              : ''}
+            <div class="rzpa-ci-no-thumb" style="${thumb ? 'display:none' : ''}">${noThumb}</div>
+            <div class="rzpa-ci-overall" style="background:${scoreColor(sc.overall)}18;color:${scoreColor(sc.overall)};border:1px solid ${scoreColor(sc.overall)}40">
+              ${sc.overall}
+            </div>
+            ${fatigueBadge(ad, sc) ? `<div style="position:absolute;bottom:8px;left:8px">${fatigueBadge(ad, sc)}</div>` : ''}
+          </div>
+
+          <!-- Body -->
+          <div class="rzpa-ci-body">
+            <div class="rzpa-ci-rank" style="color:${accentClr}">#${idx + 1}</div>
+            <div class="rzpa-ci-name" title="${name}">${name}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 0">
+              ${overallBadge(sc.overall)}
+              ${ad.format ? `<span style="background:rgba(255,255,255,.06);color:#888;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:600">${ad.format === 'video' ? '▶ Video' : '🖼 Billede'}</span>` : ''}
+            </div>
+
+            <!-- Metrics -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+              <div style="background:#0f0f0f;border-radius:8px;padding:8px 10px">
+                <div style="font-size:10px;color:#555;margin-bottom:2px;text-transform:uppercase;letter-spacing:.4px">${metric1Label}</div>
+                <div style="font-size:16px;font-weight:800;color:${accentClr}">${metric1Val}</div>
+              </div>
+              <div style="background:#0f0f0f;border-radius:8px;padding:8px 10px">
+                <div style="font-size:10px;color:#555;margin-bottom:2px;text-transform:uppercase;letter-spacing:.4px">${metric2Label}</div>
+                <div style="font-size:16px;font-weight:800;color:#ddd">${metric2Val}</div>
+              </div>
+            </div>
+
+            <!-- 5 Score rings -->
+            ${scoreRow(sc)}
+          </div>
+        </div>`;
+    });
+
+    containerEl.innerHTML = `
+      <div style="margin-bottom:14px;font-size:12px;color:#555">
+        ${scored.length} annoncer analyseret &nbsp;·&nbsp;
+        Gennemsnitlig overall score: <strong style="color:#ddd">${Math.round(scored.reduce((s,a)=>s+a._sc.overall,0)/scored.length)}</strong> &nbsp;·&nbsp;
+        Bedste: <strong style="color:${scoreColor(topScore)}">${topScore}</strong>
+      </div>
+      <div class="rzpa-ci-grid">${cards.join('')}</div>`;
+  }
+
+  // ════════════════════════════════════════════════════
   // PAGE: SNAPCHAT
   // ════════════════════════════════════════════════════
 
   async function initSnap() {
-    let days = 30;
+    let days    = 30;
+    let snapData = [];
+    let creativeSortKey = 'score';
+
     initDateFilter('rzpa-date-filter', d => { days = d; loadSnap(d); });
     loadSnap(days);
+
     el('rzpa-sync-snap')?.addEventListener('click', async () => {
+      const btn = el('rzpa-sync-snap');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Synkroniserer…'; }
+      clearCache('/snap/');
       await api('/snap/sync', { method: 'POST', body: JSON.stringify({days}) });
-      loadSnap(days);
+      await loadSnap(days);
+      if (btn) { btn.disabled = false; btn.textContent = '⟳ Hent data'; }
     });
 
-    el('snap-load-ads')?.addEventListener('click', async () => {
-      const btn = el('snap-load-ads');
-      const content = el('snap-ads-content');
-      const card = el('snap-ads-card');
+    // Creative sort buttons
+    document.querySelectorAll('#snap-creative-sort [data-csort]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#snap-creative-sort [data-csort]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        creativeSortKey = btn.dataset.csort;
+        const content = el('snap-creatives-content');
+        if (content && snapData.length) {
+          renderCreativeGallery(content, snapData, { platform:'snap', accent:'#FFFC00', noThumb:'👻', sortKey: creativeSortKey });
+        }
+      });
+    });
+
+    // Load Creatives button
+    el('snap-load-creatives')?.addEventListener('click', async () => {
+      const btn     = el('snap-load-creatives');
+      const content = el('snap-creatives-content');
       if (btn) { btn.disabled = true; btn.textContent = '⏳ Henter…'; }
-      const r = await api('/snap/ads');
-      if (btn) { btn.disabled = false; btn.textContent = '📋 Hent annoncer'; }
-      const ads = r.data || [];
-      if (!ads.length) {
-        if (content) content.innerHTML = '<span style="color:#555">Ingen aktive annoncer fundet.</span>';
-        return;
-      }
-      if (content) {
-        content.innerHTML = `<div class="rzpa-ads-grid">${ads.map((ad, i) => `
-          <div class="rzpa-ad-card">
-            <div class="rzpa-ad-card-thumb"><div class="rzpa-top-ad-no-thumb">👻</div></div>
-            <div class="rzpa-ad-card-body">
-              <div class="rzpa-ad-card-rank">#${i+1}</div>
-              <div class="rzpa-ad-card-name" title="${ad.ad_name}">${ad.ad_name}</div>
-              <div class="rzpa-ad-card-badges"><span class="fmt-badge fmt-video">📱 ${ad.format || 'Snap Ad'}</span></div>
-            </div>
-          </div>`).join('')}</div>`;
+      if (content) content.innerHTML = '<div class="rzpa-loading">Analyserer Snapchat-annoncer…</div>';
+      try {
+        const r = await api(`/snap/ads?days=${days}`, { timeout: 20 });
+        snapData = r.data || [];
+        renderCreativeGallery(content, snapData, { platform:'snap', accent:'#FFFC00', noThumb:'👻', sortKey: creativeSortKey });
+      } catch(e) {
+        if (content) content.innerHTML = `<div style="color:#ef4444;padding:24px">⚠️ ${e.message}</div>`;
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '📊 Hent creatives'; }
       }
     });
-    // Show card if snap is configured
-    if (el('snap-ads-card')) el('snap-ads-card').style.display = 'block';
+
+    // AI Analyse
+    el('snap-ai-refresh')?.addEventListener('click', async () => {
+      const btn     = el('snap-ai-refresh');
+      const content = el('snap-ai-content');
+      if (!btn || !content) return;
+      btn.disabled = true; btn.textContent = '⏳ Analyserer…';
+      content.innerHTML = '<div class="rzpa-loading">AI-specialist analyserer dine Snapchat-kampagner…</div>';
+      try {
+        const r = await api(`/snap/ai-analysis?days=${days}`, { timeout: 45 });
+        const txt = r.data?.analysis || r.analysis || 'Ingen analyse tilgængelig.';
+        content.innerHTML = `<div class="rzpa-ai-response">${txt.replace(/\n/g,'<br>')}</div>`;
+      } catch(e) {
+        content.innerHTML = `<div style="color:#ef4444">⚠️ AI-analyse fejlede: ${e.message}</div>`;
+      } finally {
+        btn.disabled = false; btn.textContent = '✨ Analysér nu';
+      }
+    });
   }
 
   async function loadSnap(days) {
@@ -2787,7 +3260,8 @@ const RZPA_App = (() => {
       api(`/snap/summary?days=${days}`),
       api(`/snap/campaigns?days=${days}`),
     ]);
-    const s = sum.data || {}, data = camps.data || [];
+    const s    = sum.data   || {};
+    const data = camps.data || [];
 
     if (s.configured === false) {
       const app = el('rzpa-app');
@@ -2798,31 +3272,91 @@ const RZPA_App = (() => {
       return;
     }
 
-    renderKPI('kpi_spend',      fmt(s.total_spend,0) + ' kr');
+    // Period label
+    const pl = el('snap-period-label');
+    if (pl) { el('snap-period-days').textContent = days; pl.style.display = 'block'; }
+
+    // KPI v2
+    renderKPI('kpi_spend',      fmt(s.total_spend, 0) + ' kr');
     renderKPI('kpi_swipes',     fmt(s.total_swipe_ups));
     renderKPI('kpi_impr',       fmt(s.total_impressions));
-    renderKPI('kpi_engagement', fmt(s.avg_engagement_rate,2) + '%');
+    const eng = parseFloat(s.avg_engagement_rate) || 0;
+    renderKPI('kpi_engagement', fmt(eng, 2) + '%');
+    const engPill = el('kpi_engagement_sub');
+    if (engPill) {
+      if (eng >= 1)   { engPill.className = 'k2-status pill-good';  engPill.textContent = '✓ Over 1% — godt'; }
+      else if (eng >= 0.3) { engPill.className = 'k2-status pill-mid'; engPill.textContent = '~ Middel'; }
+      else if (eng > 0)    { engPill.className = 'k2-status pill-bad'; engPill.textContent = '↓ Under 0,3%'; }
+    }
 
-    const labels = data.slice(0,6).map(c => c.campaign_name.replace('Rezponz – ','').slice(0,20));
+    // Performance summary
+    const good = data.filter(c => (parseFloat(c.engagement_rate)||0) >= 1).length;
+    const mid  = data.filter(c => { const v = parseFloat(c.engagement_rate)||0; return v >= 0.3 && v < 1; }).length;
+    const bad  = data.filter(c => (parseFloat(c.engagement_rate)||0) < 0.3 && parseFloat(c.spend||0) > 0).length;
+    const ps   = el('snap-perf-summary');
+    if (ps && data.length) {
+      setText('snap_perf_good', good); setText('snap_perf_mid', mid); setText('snap_perf_bad', bad);
+      ps.style.display = 'flex';
+    }
+
+    // Charts
+    const top6   = data.slice(0, 6);
+    const labels = top6.map(c => c.campaign_name.replace(/Rezponz\s*[–-]\s*/i,'').slice(0, 20));
     barChart('chart_spend', labels,
-      [{ data: data.slice(0,6).map(c=>Math.round(c.spend)), backgroundColor: '#FFFC00', borderRadius: 5 }]
+      [{ data: top6.map(c => Math.round(c.spend || 0)), backgroundColor: '#FFFC00', borderRadius: 5 }],
+      { yTick: v => Math.round(v/1000)+'k kr' }
     );
     barChart('chart_engagement', labels,
-      [{ data: data.slice(0,6).map(c=>c.engagement_rate), backgroundColor: '#CCFF00', borderRadius: 5 }]
+      [{ data: top6.map(c => parseFloat(c.engagement_rate)||0),
+         backgroundColor: top6.map(c => (parseFloat(c.engagement_rate)||0) >= 1 ? '#CCFF00' : (parseFloat(c.engagement_rate)||0) >= 0.3 ? '#f5a623' : '#cc4400'),
+         borderRadius: 5 }],
+      { yTick: v => v + '%' }
     );
 
-    const tbody = el('snap_tbody');
-    if (tbody) tbody.innerHTML = data.map(c => `
-      <tr>
-        <td style="color:#ddd;font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis">${c.campaign_name}</td>
-        <td>${badgeHtml(c.status)}</td>
-        <td>${fmt(c.spend,0)} kr</td>
-        <td>${fmt(c.impressions)}</td>
-        <td style="color:var(--neon);font-weight:700">${fmt(c.swipe_ups)}</td>
-        <td>${fmt(c.conversions)}</td>
-        <td>${fmt(c.cpm,2)} kr</td>
-        <td>${fmt(c.engagement_rate,2)}%</td>
-      </tr>`).join('');
+    // Campaign table with filter
+    let snapAllData = data;
+    const renderSnapTable = (rows) => {
+      const tbody = el('snap_tbody');
+      const noRes = el('snap-no-results');
+      if (!tbody) return;
+      if (!rows.length) {
+        tbody.innerHTML = '';
+        if (noRes) noRes.style.display = 'block';
+        return;
+      }
+      if (noRes) noRes.style.display = 'none';
+      tbody.innerHTML = rows.map(c => {
+        const eng = parseFloat(c.engagement_rate) || 0;
+        const rating = eng >= 1 ? '<span class="perf-pill good">🟢 Godt</span>' : eng >= 0.3 ? '<span class="perf-pill mid">🟡 Middel</span>' : '<span class="perf-pill bad">🔴 Svagt</span>';
+        return `<tr>
+          <td style="color:#ddd;font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${c.campaign_name}">${c.campaign_name}</td>
+          <td>${badgeHtml(c.status)}</td>
+          <td>${fmt(c.spend,0)} kr</td>
+          <td>${fmt(c.impressions)}</td>
+          <td style="color:#FFFC00;font-weight:700">${fmt(c.swipe_ups)}</td>
+          <td>${fmt(c.conversions)}</td>
+          <td>${fmt(c.cpm,0)} kr</td>
+          <td>${fmt(eng,2)}%</td>
+          <td>${rating}</td>
+        </tr>`;
+      }).join('');
+    };
+
+    renderSnapTable(snapAllData);
+
+    // Filter bar
+    document.querySelectorAll('#snap-filter-bar .filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#snap-filter-bar .filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const f = btn.dataset.filter;
+        if (f === 'all')    renderSnapTable(snapAllData);
+        else if (f === 'good') renderSnapTable(snapAllData.filter(c=>(parseFloat(c.engagement_rate)||0)>=1));
+        else if (f === 'mid')  renderSnapTable(snapAllData.filter(c=>{const v=parseFloat(c.engagement_rate)||0;return v>=0.3&&v<1;}));
+        else if (f === 'bad')  renderSnapTable(snapAllData.filter(c=>(parseFloat(c.engagement_rate)||0)<0.3&&parseFloat(c.spend||0)>0));
+        else renderSnapTable(snapAllData.filter(c => c.status?.toUpperCase() === f));
+      });
+    });
   }
 
   // ════════════════════════════════════════════════════
@@ -2830,38 +3364,69 @@ const RZPA_App = (() => {
   // ════════════════════════════════════════════════════
 
   async function initTikTok() {
-    let days = 30;
+    let days   = 30;
+    let ttData = [];
+    let creativeSortKey = 'score';
+
     initDateFilter('rzpa-date-filter', d => { days = d; loadTikTok(d); });
     loadTikTok(days);
+
     el('rzpa-sync-tiktok')?.addEventListener('click', async () => {
+      const btn = el('rzpa-sync-tiktok');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Synkroniserer…'; }
+      clearCache('/tiktok/');
       await api('/tiktok/sync', { method: 'POST', body: JSON.stringify({days}) });
-      loadTikTok(days);
+      await loadTikTok(days);
+      if (btn) { btn.disabled = false; btn.textContent = '⟳ Hent data'; }
     });
 
-    el('tiktok-load-ads')?.addEventListener('click', async () => {
-      const btn = el('tiktok-load-ads');
-      const content = el('tiktok-ads-content');
+    // Creative sort buttons
+    document.querySelectorAll('#tiktok-creative-sort [data-csort]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#tiktok-creative-sort [data-csort]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        creativeSortKey = btn.dataset.csort;
+        const content = el('tiktok-creatives-content');
+        if (content && ttData.length) {
+          renderCreativeGallery(content, ttData, { platform:'tiktok', accent:'#ff0050', noThumb:'🎵', sortKey: creativeSortKey });
+        }
+      });
+    });
+
+    // Load Creatives button
+    el('tiktok-load-creatives')?.addEventListener('click', async () => {
+      const btn     = el('tiktok-load-creatives');
+      const content = el('tiktok-creatives-content');
       if (btn) { btn.disabled = true; btn.textContent = '⏳ Henter…'; }
-      const r = await api('/tiktok/ads');
-      if (btn) { btn.disabled = false; btn.textContent = '📋 Hent annoncer'; }
-      const ads = r.data || [];
-      if (!ads.length) {
-        if (content) content.innerHTML = '<span style="color:#555">Ingen aktive annoncer fundet.</span>';
-        return;
-      }
-      if (content) {
-        content.innerHTML = `<div class="rzpa-ads-grid">${ads.map((ad, i) => `
-          <div class="rzpa-ad-card">
-            <div class="rzpa-ad-card-thumb">${ad.thumbnail_url ? `<img src="${ad.thumbnail_url}" alt="" loading="lazy">` : '<div class="rzpa-top-ad-no-thumb">🎵</div>'}</div>
-            <div class="rzpa-ad-card-body">
-              <div class="rzpa-ad-card-rank">#${i+1}</div>
-              <div class="rzpa-ad-card-name" title="${ad.ad_name}">${ad.ad_name}</div>
-              <div class="rzpa-ad-card-badges"><span class="fmt-badge fmt-${ad.format}">${ad.format === 'video' ? '▶ Video' : '🖼 Billede'}</span></div>
-            </div>
-          </div>`).join('')}</div>`;
+      if (content) content.innerHTML = '<div class="rzpa-loading">Analyserer TikTok-videoer…</div>';
+      try {
+        const r = await api(`/tiktok/ads?days=${days}`, { timeout: 20 });
+        ttData = r.data || [];
+        renderCreativeGallery(content, ttData, { platform:'tiktok', accent:'#ff0050', noThumb:'🎵', sortKey: creativeSortKey });
+      } catch(e) {
+        if (content) content.innerHTML = `<div style="color:#ef4444;padding:24px">⚠️ ${e.message}</div>`;
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '📊 Hent creatives'; }
       }
     });
-    if (el('tiktok-ads-card')) el('tiktok-ads-card').style.display = 'block';
+
+    // AI Analyse
+    el('tiktok-ai-refresh')?.addEventListener('click', async () => {
+      const btn     = el('tiktok-ai-refresh');
+      const content = el('tiktok-ai-content');
+      if (!btn || !content) return;
+      btn.disabled = true; btn.textContent = '⏳ Analyserer…';
+      content.innerHTML = '<div class="rzpa-loading">AI-specialist analyserer dine TikTok-kampagner…</div>';
+      try {
+        const r = await api(`/tiktok/ai-analysis?days=${days}`, { timeout: 45 });
+        const txt = r.data?.analysis || r.analysis || 'Ingen analyse tilgængelig.';
+        content.innerHTML = `<div class="rzpa-ai-response">${txt.replace(/\n/g,'<br>')}</div>`;
+      } catch(e) {
+        content.innerHTML = `<div style="color:#ef4444">⚠️ AI-analyse fejlede: ${e.message}</div>`;
+      } finally {
+        btn.disabled = false; btn.textContent = '✨ Analysér nu';
+      }
+    });
   }
 
   async function loadTikTok(days) {
@@ -2869,7 +3434,8 @@ const RZPA_App = (() => {
       api(`/tiktok/summary?days=${days}`),
       api(`/tiktok/campaigns?days=${days}`),
     ]);
-    const s = sum.data || {}, data = camps.data || [];
+    const s    = sum.data   || {};
+    const data = camps.data || [];
 
     if (s.configured === false) {
       const app = el('rzpa-app');
@@ -2880,34 +3446,99 @@ const RZPA_App = (() => {
       return;
     }
 
-    renderKPI('kpi_spend',  fmt(s.total_spend,0) + ' kr');
-    renderKPI('kpi_views',  fmt(s.total_video_views));
-    renderKPI('kpi_roas',   fmt(s.avg_roas,2) + 'x');
-    renderKPI('kpi_clicks', fmt(s.total_clicks));
+    // Period label
+    const pl = el('tiktok-period-label');
+    if (pl) { el('tiktok-period-days').textContent = days; pl.style.display = 'block'; }
 
-    const labels = data.slice(0,6).map(c => c.campaign_name.replace('Rezponz – ','').slice(0,22));
+    // KPI v2
+    renderKPI('kpi_spend', fmt(s.total_spend, 0) + ' kr');
+    renderKPI('kpi_views', fmt(s.total_video_views));
+    const roas = parseFloat(s.avg_roas) || 0;
+    renderKPI('kpi_roas',  fmt(roas, 2) + 'x');
+    const roasPill = el('kpi_roas_pill');
+    if (roasPill) {
+      if (roas >= 2.5)  { roasPill.className = 'k2-status pill-good';  roasPill.textContent = '✓ Over 2,5x — stærkt'; }
+      else if (roas >= 1.5) { roasPill.className = 'k2-status pill-mid'; roasPill.textContent = '~ Ok'; }
+      else if (roas > 0)    { roasPill.className = 'k2-status pill-bad'; roasPill.textContent = '↓ Under 1,5x'; }
+    }
+    // Hook rate = total video views / total impressions (approx)
+    const impr     = parseInt(s.total_impressions) || 1;
+    const vviews   = parseInt(s.total_video_views)  || 0;
+    const hookRate = Math.min(100, Math.round(vviews / impr * 100));
+    renderKPI('kpi_hook', hookRate + '%');
+    const hookPill = el('kpi_hook_sub');
+    if (hookPill) {
+      if (hookRate >= 25)  { hookPill.className = 'k2-status pill-good';  hookPill.textContent = '✓ Over 25% — godt'; }
+      else if (hookRate >= 10) { hookPill.className = 'k2-status pill-mid'; hookPill.textContent = '~ Middel'; }
+      else if (hookRate > 0)   { hookPill.className = 'k2-status pill-bad'; hookPill.textContent = '↓ Under 10%'; }
+    }
+
+    // Perf summary (ROAS-based for TikTok)
+    const good = data.filter(c => (parseFloat(c.roas)||0) >= 2.5).length;
+    const mid  = data.filter(c => { const v=parseFloat(c.roas)||0; return v>=1.5&&v<2.5; }).length;
+    const bad  = data.filter(c => (parseFloat(c.roas)||0) < 1.5 && parseFloat(c.spend||0) > 0).length;
+    const ps   = el('tiktok-perf-summary');
+    if (ps && data.length) {
+      setText('tiktok_perf_good', good); setText('tiktok_perf_mid', mid); setText('tiktok_perf_bad', bad);
+      ps.style.display = 'flex';
+    }
+
+    // Charts
+    const top6   = data.slice(0, 6);
+    const labels = top6.map(c => c.campaign_name.replace(/Rezponz\s*[–-]\s*/i,'').slice(0, 22));
     barChart('chart_views', labels,
-      [{ data: data.slice(0,6).map(c=>c.video_views), backgroundColor: '#ff0050', borderRadius: 5 }],
+      [{ data: top6.map(c => parseInt(c.video_views)||0), backgroundColor: '#ff0050', borderRadius: 5 }],
       { yTick: v => (v/1000).toFixed(0)+'k' }
     );
     barChart('chart_roas', labels,
-      [{ data: data.slice(0,6).map(c=>c.roas),
-         backgroundColor: data.slice(0,6).map(c => c.roas>=2.5?'#CCFF00':c.roas>=1.5?'#88cc00':'#cc4400'),
+      [{ data: top6.map(c => parseFloat(c.roas)||0),
+         backgroundColor: top6.map(c => (parseFloat(c.roas)||0)>=2.5?'#CCFF00':(parseFloat(c.roas)||0)>=1.5?'#88cc00':'#cc4400'),
          borderRadius: 5 }]
     );
 
-    const tbody = el('tiktok_tbody');
-    if (tbody) tbody.innerHTML = data.map(c => `
-      <tr>
-        <td style="color:#ddd;font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis">${c.campaign_name}</td>
-        <td>${badgeHtml(c.status)}</td>
-        <td>${fmt(c.spend,0)} kr</td>
-        <td>${fmt(c.video_views)}</td>
-        <td>${fmt(c.clicks)}</td>
-        <td>${fmt(c.conversions)}</td>
-        <td class="${roasClass(c.roas)}">${fmt(c.roas,2)}x</td>
-        <td>${fmt(c.cost_per_view,4)} kr</td>
-      </tr>`).join('');
+    // Campaign table with filter
+    let ttAllData = data;
+    const renderTTTable = (rows) => {
+      const tbody = el('tiktok_tbody');
+      const noRes = el('tiktok-no-results');
+      if (!tbody) return;
+      if (!rows.length) {
+        tbody.innerHTML = '';
+        if (noRes) noRes.style.display = 'block';
+        return;
+      }
+      if (noRes) noRes.style.display = 'none';
+      tbody.innerHTML = rows.map(c => {
+        const r = parseFloat(c.roas) || 0;
+        const rating = r >= 2.5 ? '<span class="perf-pill good">🟢 Stærkt</span>' : r >= 1.5 ? '<span class="perf-pill mid">🟡 Middel</span>' : '<span class="perf-pill bad">🔴 Svagt</span>';
+        return `<tr>
+          <td style="color:#ddd;font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${c.campaign_name}">${c.campaign_name}</td>
+          <td>${badgeHtml(c.status)}</td>
+          <td>${fmt(c.spend,0)} kr</td>
+          <td>${fmt(c.video_views)}</td>
+          <td>${fmt(c.clicks)}</td>
+          <td>${fmt(c.conversions)}</td>
+          <td class="${roasClass(r)}">${fmt(r,2)}x</td>
+          <td>${fmt(c.cost_per_view,4)} kr</td>
+          <td>${rating}</td>
+        </tr>`;
+      }).join('');
+    };
+
+    renderTTTable(ttAllData);
+
+    document.querySelectorAll('#tiktok-filter-bar .filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#tiktok-filter-bar .filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const f = btn.dataset.filter;
+        if (f === 'all')    renderTTTable(ttAllData);
+        else if (f === 'good') renderTTTable(ttAllData.filter(c=>(parseFloat(c.roas)||0)>=2.5));
+        else if (f === 'mid')  renderTTTable(ttAllData.filter(c=>{const v=parseFloat(c.roas)||0;return v>=1.5&&v<2.5;}));
+        else if (f === 'bad')  renderTTTable(ttAllData.filter(c=>(parseFloat(c.roas)||0)<1.5&&parseFloat(c.spend||0)>0));
+        else renderTTTable(ttAllData.filter(c => c.status?.toUpperCase() === f));
+      });
+    });
   }
 
   // ════════════════════════════════════════════════════
@@ -2921,40 +3552,57 @@ const RZPA_App = (() => {
       const days   = parseInt(document.querySelector('[data-days].active')?.dataset.days || 30);
 
       btn.disabled = true;
-      btn.textContent = 'Genererer…';
+      btn.textContent = '⏳ Genererer PDF…';
+      notice.style.display = 'none';
 
       try {
-        const r = await api('/pdf/generate', {
-          method: 'POST',
-          body: JSON.stringify({ days }),
-        });
+        // Hent PDF direkte som binær blob fra server-side DomPDF endpoint
+        const url = RZPA.adminPostUrl
+          + '?action=rzpa_pdf_download'
+          + '&days=' + days
+          + '&_wpnonce=' + RZPA.pdfNonce;
 
-        if (r.success && r.html) {
-          // Brug Blob URL for at undgå popup-blocker
-          const blob = new Blob([r.html], { type: 'text/html;charset=utf-8' });
-          const url  = URL.createObjectURL(blob);
-          const win  = window.open(url, '_blank');
-          if (win) {
-            win.addEventListener('load', () => {
-              setTimeout(() => { win.print(); URL.revokeObjectURL(url); }, 800);
-            });
-            notice.className = 'rzpa-notice success';
-            notice.textContent = 'Rapport åbnet i nyt vindue – brug Ctrl+P / Cmd+P til at gemme som PDF.';
-          } else {
-            // Popup blev blokeret – tilbyd download i stedet
-            const a = document.createElement('a');
-            a.href = url; a.download = 'rezponz-rapport.html'; a.click();
-            notice.className = 'rzpa-notice success';
-            notice.textContent = 'Rapport downloadet som HTML – åbn filen og tryk Ctrl+P for at gemme som PDF.';
+        const res = await fetch(url, { credentials: 'same-origin' });
+        if (!res.ok) {
+          let errMsg = 'PDF-generering fejlede (HTTP ' + res.status + ')';
+          try {
+            const errData = await res.clone().json();
+            if (errData.error) errMsg = errData.error + (errData.in ? ' [' + errData.in + ']' : '');
+          } catch(_) {
+            const txt = await res.text().catch(() => '');
+            if (txt && !txt.includes('<!DOCTYPE')) errMsg += ': ' + txt.slice(0, 300);
           }
-          notice.style.display = 'block';
+          throw new Error(errMsg);
         }
+
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/pdf')) {
+          let errMsg = 'Uventet svartype: ' + contentType;
+          try { const j = await res.clone().json(); if (j.error) errMsg = j.error; } catch(_) {}
+          throw new Error(errMsg);
+        }
+
+        const blob   = await res.blob();
+        const objUrl = URL.createObjectURL(blob);
+        const a      = document.createElement('a');
+        const today  = new Date().toISOString().slice(0, 10);
+        a.href     = objUrl;
+        a.download = 'rezponz-rapport-' + today + '.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(objUrl), 10000);
+
+        notice.className   = 'rzpa-notice success';
+        notice.textContent = '✅ PDF downloadet – tjek din downloads-mappe.';
+        notice.style.display = 'block';
+
       } catch(e) {
-        notice.className = 'rzpa-notice error';
-        notice.textContent = 'Fejl: ' + e.message;
+        notice.className   = 'rzpa-notice error';
+        notice.textContent = '❌ Fejl: ' + e.message;
         notice.style.display = 'block';
       } finally {
-        btn.disabled = false;
+        btn.disabled    = false;
         btn.textContent = 'Generer & Åbn Rapport';
       }
     });
@@ -3114,9 +3762,9 @@ const RZPA_App = (() => {
             <thead>
               <tr>
                 <th>Blogindlæg</th>
-                <th class="num">Pos.</th>
+                <th class="num" title="Gennemsnitlig placering på Google (lavere = bedre). #1 = øverst på Google.">Google placering ↕</th>
                 <th class="num">Klik</th>
-                <th class="num">Visn.</th>
+                <th class="num">Visninger</th>
                 <th class="num">CTR</th>
                 <th>AI</th>
                 <th>Anbefaling</th>
@@ -3126,7 +3774,7 @@ const RZPA_App = (() => {
 
       posts.forEach(post => {
         const pos     = post.position;
-        const posLabel = pos !== null ? pos.toFixed(1) : '–';
+        const posLabel = pos !== null ? 'Side ' + Math.ceil(pos / 10) : '–';
         const date    = post.date ? post.date.substring(0, 10) : '';
         const thumb   = post.thumbnail
           ? `<img src="${post.thumbnail}" alt="" class="rzpa-blog-thumb" loading="lazy">`
@@ -3194,6 +3842,91 @@ const RZPA_App = (() => {
     }
 
     loadBlogInsights(days);
+
+    // ── AI Blog Strategi ──────────────────────────────────────────────────
+    const aiBtn    = el('rzpa-blog-ai-btn');
+    const aiResult = el('rzpa-blog-ai-result');
+
+    aiBtn?.addEventListener('click', async () => {
+      if (!aiBtn || !aiResult) return;
+
+      aiBtn.disabled    = true;
+      aiBtn.textContent = '⏳ Analyserer…';
+      aiResult.style.display = 'none';
+
+      try {
+        const r = await api('/blog/ai-suggestions', {
+          method: 'POST',
+          body: JSON.stringify({ days }),
+        });
+
+        const suggestions = r.data ?? r;
+        if (!Array.isArray(suggestions) || !suggestions.length) {
+          throw new Error('Ingen forslag modtaget fra AI.');
+        }
+
+        aiResult.innerHTML = renderAISuggestions(suggestions);
+        aiResult.style.display = 'block';
+
+      } catch(e) {
+        aiResult.innerHTML = `<div style="color:#ef4444;padding:20px 0;font-size:13px">❌ ${e.message}</div>`;
+        aiResult.style.display = 'block';
+      } finally {
+        aiBtn.disabled    = false;
+        aiBtn.textContent = '✨ Generér igen';
+      }
+    });
+
+    function renderAISuggestions(suggestions) {
+      const volClass  = v => v === 'høj' ? 'rzpa-ai-vol-high'   : v === 'medium' ? 'rzpa-ai-vol-medium'  : 'rzpa-ai-vol-low';
+      const compClass = c => c === 'lav' ? 'rzpa-ai-comp-low'   : c === 'medium' ? 'rzpa-ai-comp-medium' : 'rzpa-ai-comp-high';
+      const volLabel  = v => ({ 'høj': '📈 Høj søgevolumen', 'medium': '📊 Medium søgevolumen', 'lav': '📉 Lav søgevolumen' })[v] || v;
+      const compLabel = c => ({ 'lav': '🟢 Lav konkurrence', 'medium': '🟡 Medium konkurrence', 'høj': '🔴 Høj konkurrence' })[c] || c;
+      const rankClass = n => n === 1 ? 'rank-1' : n === 2 ? 'rank-2' : n === 3 ? 'rank-3' : 'rank-other';
+
+      const items = suggestions.map(s => {
+        const n    = parseInt(s.priority) || 0;
+        const vol  = (s.search_volume || '').toLowerCase();
+        const comp = (s.competition   || '').toLowerCase();
+        const score = parseInt(s.value_score) || 0;
+        const searches = s.estimated_monthly_searches || '';
+
+        return `
+        <div class="rzpa-ai-sug-item">
+          <div class="rzpa-ai-sug-rank ${rankClass(n)}">${n}</div>
+
+          <div class="rzpa-ai-sug-body">
+            <div class="rzpa-ai-sug-title">${s.title || '–'}</div>
+            <div class="rzpa-ai-sug-keyword">🔑 ${s.keyword || '–'}</div>
+
+            <div class="rzpa-ai-sug-desc">
+              <strong style="color:#ccc">Søgeintention:</strong> ${s.search_intent || '–'}
+              <br><br>
+              <strong style="color:#ccc">Rezponz-værdi:</strong> ${s.rezponz_value || '–'}
+            </div>
+
+            ${s.content_angle ? `<div class="rzpa-ai-sug-angle">💡 Vinkel: ${s.content_angle}</div>` : ''}
+          </div>
+
+          <div class="rzpa-ai-sug-meta">
+            <div>
+              <div class="rzpa-ai-score">${score}<span style="font-size:14px;color:#888">/10</span></div>
+              <div class="rzpa-ai-score-lbl">Værdi</div>
+            </div>
+            ${vol  ? `<span class="rzpa-ai-badge ${volClass(vol)}">${volLabel(vol)}</span>`   : ''}
+            ${comp ? `<span class="rzpa-ai-badge ${compClass(comp)}">${compLabel(comp)}</span>` : ''}
+            ${searches ? `<span style="font-size:11px;color:#555">~${searches}/md</span>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+
+      const generatedAt = new Date().toLocaleString('da-DK', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' });
+      return `
+        <div class="rzpa-ai-suggestions">${items}</div>
+        <div class="rzpa-ai-strat-info">
+          🤖 Genereret af GPT-4o mini · ${generatedAt} · Baseret på dine eksisterende blogindlæg og Rezponz' rekrutteringsfokus
+        </div>`;
+    }
   }
 
   // ── Section init map (IIFE-scoped so PJAX can reach it) ─────────────────
@@ -3411,39 +4144,68 @@ const RZPA_App = (() => {
     if (!content) return;
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Henter…'; }
     content.innerHTML = '<div class="rzpa-loading">Henter aktive Google Ads-annoncer…</div>';
+    console.log('[RZPA v2.0.8] loadGadsAds: starting API call...');
 
-    const res = await api('/google-ads/ads');
+    let res;
+    try {
+      res = await api('/google-ads/ads');
+      console.log('[RZPA v2.0.8] loadGadsAds: API response:', res);
+    } catch(e) {
+      console.error('[RZPA v2.0.8] loadGadsAds: API error:', e);
+      if (btn) { btn.disabled = false; btn.textContent = '📢 Hent annoncer'; }
+      content.innerHTML = `<span style="color:#ff6b6b">⚠️ Netværksfejl: ${e.message}</span>`;
+      return;
+    }
     if (btn) { btn.disabled = false; btn.textContent = '📢 Hent annoncer'; }
-    const d = res.data || [];
+    const d = res?.data ?? [];
+    console.log('[RZPA v2.0.8] loadGadsAds: data:', d);
 
-    if (d.error) {
+    if (d && d.error) {
       content.innerHTML = `<span style="color:#ff6b6b">⚠️ ${d.error}</span>`;
       return;
     }
-    if (!d.length) {
-      content.innerHTML = '<span style="color:#555">Ingen aktive annoncer fundet. Kontrollér at Google Ads er forbundet og har aktive kampagner.</span>';
+    if (!Array.isArray(d) || !d.length) {
+      content.innerHTML = '<span style="color:#555">Ingen aktive annoncer fundet. Kontrollér at Google Ads er forbundet og har aktive kampagner med tekst-annoncer (RSA).</span>';
       return;
     }
 
     content.innerHTML = `<div class="gads-ads-grid">${d.map(ad => {
-      const hl = ad.headlines || [];
-      const ds = ad.descriptions || [];
-      const displayUrl = ad.final_url ? (new URL(ad.final_url).hostname).replace('www.', '') : '';
-      return `<div class="gads-ad-card">
-        <div class="gads-ad-top">
-          <div class="gads-ad-badge">Annonce · ${displayUrl}</div>
+      const hl  = ad.headlines || [];
+      const ds  = ad.descriptions || [];
+      const host = ad.final_url ? (new URL(ad.final_url).hostname).replace('www.', '') : '';
+      const ctrColor = ad.ctr >= 2 ? '#4ade80' : ad.ctr >= 1 ? '#f59e0b' : '#ef4444';
+      return `<div class="gads-ad-card" style="display:flex;flex-direction:column;gap:0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span class="gads-ad-badge" style="background:rgba(66,133,244,.15);padding:2px 8px;border-radius:4px">RSA · Google Søgning</span>
+          <span style="font-size:10px;color:#555;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${ad.ad_group}">${ad.ad_group || ad.campaign || ''}</span>
         </div>
-        <div class="gads-ad-headline">${hl.slice(0,3).join(' | ')}</div>
-        <div class="gads-ad-display-url" style="color:#4ade80;font-size:12px;margin:3px 0">${displayUrl}</div>
-        <div class="gads-ad-desc">${ds.join(' ')}</div>
-        <div class="gads-ad-meta">
-          <span>📢 ${num(ad.impressions)} vis.</span>
-          <span>🖱 ${num(ad.clicks)} klik</span>
-          ${ad.spend > 0 ? `<span>💰 ${fmt(ad.spend,0)} kr</span>` : ''}
-          ${ad.ctr > 0 ? `<span>📊 ${fmt(ad.ctr,2)}% CTR</span>` : ''}
+        <div style="background:#0d0d0d;border:1px solid #1e3a5f;border-radius:8px;padding:12px 14px;margin-bottom:10px">
+          <div style="color:#4ade80;font-size:11px;margin-bottom:3px">📢 Annonce · ${host}</div>
+          <div style="color:#4285F4;font-size:15px;font-weight:700;line-height:1.4;margin-bottom:6px">${hl.slice(0,3).join(' | ')}</div>
+          <div style="color:#aaa;font-size:12px;line-height:1.6">${ds.slice(0,2).join(' · ')}</div>
         </div>
-        <div class="gads-ad-campaign" title="Kampagne: ${ad.campaign}">${ad.campaign}</div>
-        ${ad.final_url ? `<a href="${ad.final_url}" target="_blank" rel="noopener" style="font-size:11px;color:#4285F4;text-decoration:none;margin-top:4px;display:block">Åbn landingsside →</a>` : ''}
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
+          <div style="background:#111;border-radius:6px;padding:6px 8px;text-align:center">
+            <div style="font-size:9px;color:#555;text-transform:uppercase;margin-bottom:2px">Visninger</div>
+            <div style="font-size:13px;font-weight:700;color:#ccc">${fmt(ad.impressions,0)}</div>
+          </div>
+          <div style="background:#111;border-radius:6px;padding:6px 8px;text-align:center">
+            <div style="font-size:9px;color:#555;text-transform:uppercase;margin-bottom:2px">Klik</div>
+            <div style="font-size:13px;font-weight:700;color:#ccc">${fmt(ad.clicks,0)}</div>
+          </div>
+          <div style="background:#111;border-radius:6px;padding:6px 8px;text-align:center">
+            <div style="font-size:9px;color:#555;text-transform:uppercase;margin-bottom:2px">CTR</div>
+            <div style="font-size:13px;font-weight:700;color:${ctrColor}">${fmt(ad.ctr,2)}%</div>
+          </div>
+          <div style="background:#111;border-radius:6px;padding:6px 8px;text-align:center">
+            <div style="font-size:9px;color:#555;text-transform:uppercase;margin-bottom:2px">Forbrug</div>
+            <div style="font-size:13px;font-weight:700;color:#ccc">${fmt(ad.spend,0)} kr</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:auto">
+          ${ad.gads_url ? `<a href="${ad.gads_url}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:rgba(66,133,244,.12);border:1px solid rgba(66,133,244,.3);border-radius:6px;padding:6px 10px;font-size:11px;color:#4285F4;text-decoration:none">🔗 Se i Google Ads</a>` : ''}
+          ${ad.final_url ? `<a href="${ad.final_url}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:6px;padding:6px 10px;font-size:11px;color:#4ade80;text-decoration:none">↗ Landingsside</a>` : ''}
+        </div>
       </div>`;
     }).join('')}</div>`;
   }

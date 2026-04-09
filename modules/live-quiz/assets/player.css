@@ -1,0 +1,378 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=Fredoka:wght@400;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+#rzlq-player-root {
+  font-family: 'Fredoka', 'Segoe UI', sans-serif;
+  background: #0f1117;
+  color: #fff;
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Phase container ──────────────────────────────────────────────────────── */
+.rp-phase {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px 40px;
+  animation: rp-fade .3s ease both;
+}
+@keyframes rp-fade { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   JOIN — PIN entry
+══════════════════════════════════════════════════════════════════════════════ */
+.rp-logo {
+  font-family: 'Outfit', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  color: #738991;
+  margin-bottom: 32px;
+  letter-spacing: -.5px;
+}
+.rp-card {
+  background: rgba(255,255,255,.05);
+  border: 1.5px solid rgba(255,255,255,.09);
+  border-radius: 22px;
+  padding: 32px 28px;
+  width: 100%;
+  max-width: 380px;
+}
+.rp-card-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 6px;
+}
+.rp-card-sub { font-size: 14px; color: rgba(255,255,255,.45); text-align: center; margin-bottom: 24px; }
+
+.rp-input-group { margin-bottom: 16px; }
+.rp-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .7px; color: rgba(255,255,255,.45); display: block; margin-bottom: 7px; }
+.rp-input {
+  width: 100%;
+  background: rgba(255,255,255,.07);
+  border: 1.5px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  padding: 14px 16px;
+  outline: none;
+  text-align: center;
+  font-family: 'Outfit', sans-serif;
+  transition: border-color .18s;
+}
+.rp-input.nickname { font-size: 17px; letter-spacing: 0; text-align: left; }
+.rp-input::placeholder { color: rgba(255,255,255,.2); letter-spacing: 0; }
+.rp-input:focus { border-color: #738991; background: rgba(115,137,145,.08); }
+
+.rp-btn {
+  width: 100%;
+  background: #738991;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 15px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+  margin-top: 4px;
+}
+.rp-btn:hover { background: #8a9ea7; transform: translateY(-1px); }
+.rp-btn:active { transform: scale(.97); }
+.rp-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+.rp-error {
+  background: rgba(239,68,68,.12);
+  border: 1px solid rgba(239,68,68,.3);
+  color: #fca5a5;
+  font-size: 13px;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  text-align: center;
+  display: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   WAITING ROOM
+══════════════════════════════════════════════════════════════════════════════ */
+.rp-waiting {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+.rp-nickname-badge {
+  background: #738991;
+  color: #fff;
+  border-radius: 999px;
+  padding: 10px 24px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+}
+.rp-waiting-title { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 700; }
+.rp-waiting-sub   { font-size: 15px; color: rgba(255,255,255,.45); }
+
+.rp-dots span {
+  display: inline-block;
+  width: 10px; height: 10px;
+  background: #738991;
+  border-radius: 50%;
+  margin: 0 4px;
+  animation: rp-dot 1.2s ease-in-out infinite;
+}
+.rp-dots span:nth-child(2) { animation-delay: .2s; }
+.rp-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes rp-dot { 0%,80%,100%{transform:scale(.6);opacity:.4} 40%{transform:scale(1);opacity:1} }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   QUESTION
+══════════════════════════════════════════════════════════════════════════════ */
+.rp-q-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 480px;
+}
+
+/* Progress */
+.rp-progress {
+  height: 4px;
+  background: rgba(255,255,255,.1);
+  border-radius: 2px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.rp-progress-fill {
+  height: 100%;
+  background: #738991;
+  border-radius: 2px;
+  transition: width .4s ease;
+}
+
+/* Timer */
+.rp-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.rp-timer-circle {
+  position: relative;
+  width: 56px; height: 56px;
+}
+.rp-timer-svg { transform: rotate(-90deg); }
+.rp-timer-track { fill: none; stroke: rgba(255,255,255,.08); stroke-width: 4; }
+.rp-timer-arc   { fill: none; stroke: #738991; stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset .8s linear, stroke .3s; }
+.rp-timer-text  {
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+/* Question text + image */
+.rp-q-text-area {
+  text-align: center;
+  margin-bottom: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.rp-q-image { max-width: 100%; max-height: 160px; border-radius: 12px; object-fit: contain; }
+.rp-q-counter { font-size: 12px; color: rgba(255,255,255,.35); font-weight: 600; letter-spacing: .5px; }
+.rp-q-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(17px, 4vw, 22px);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+/* Answered state */
+.rp-answered-state {
+  background: rgba(255,255,255,.05);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.rp-answered-icon { font-size: 48px; margin-bottom: 8px; }
+.rp-answered-text { font-size: 16px; color: rgba(255,255,255,.55); }
+
+/* Answer buttons (2x2 grid) */
+.rp-answers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.rp-answer {
+  border: none;
+  border-radius: 16px;
+  padding: 18px 12px;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 80px;
+  transition: all .15s;
+  text-align: center;
+  line-height: 1.3;
+}
+.rp-answer:hover { filter: brightness(1.12); transform: scale(1.02); }
+.rp-answer:active { transform: scale(.96); }
+.rp-answer:disabled { opacity: .35; cursor: not-allowed; transform: none; filter: none; }
+.rp-answer-shape { font-size: 22px; line-height: 1; }
+.rp-answer-text { font-size: 14px; }
+
+/* Slider */
+.rp-slider-wrap { margin-bottom: 20px; }
+.rp-slider {
+  width: 100%;
+  accent-color: #738991;
+  height: 6px;
+}
+.rp-slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: rgba(255,255,255,.4);
+  margin-top: 6px;
+}
+.rp-slider-val {
+  text-align: center;
+  font-family: 'Outfit', sans-serif;
+  font-size: 36px;
+  font-weight: 900;
+  color: #738991;
+  margin: 12px 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   RESULT (after each question)
+══════════════════════════════════════════════════════════════════════════════ */
+.rp-result-wrap {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: rp-fade .35s ease both;
+  width: 100%;
+  max-width: 380px;
+}
+.rp-result-icon {
+  font-size: 72px;
+  animation: rp-pop .5s cubic-bezier(.175,.885,.32,1.275) both;
+}
+@keyframes rp-pop { from { transform:scale(.3);opacity:0; } to { transform:scale(1);opacity:1; } }
+.rp-result-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+}
+.rp-points-gained {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #738991;
+}
+.rp-total-score {
+  font-size: 14px;
+  color: rgba(255,255,255,.4);
+}
+.rp-streak {
+  background: rgba(250,204,21,.15);
+  border: 1px solid rgba(250,204,21,.3);
+  border-radius: 999px;
+  padding: 6px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fde68a;
+}
+.rp-waiting-for-host { font-size: 14px; color: rgba(255,255,255,.35); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   LEADERBOARD (between questions)
+══════════════════════════════════════════════════════════════════════════════ */
+.rp-lb-wrap {
+  width: 100%;
+  max-width: 400px;
+  animation: rp-fade .3s ease both;
+}
+.rp-lb-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  text-align: center;
+  margin-bottom: 20px;
+}
+.rp-lb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 6px;
+}
+.rp-lb-row:nth-child(1) { background: rgba(250,204,21,.15); }
+.rp-lb-row:nth-child(2) { background: rgba(156,163,175,.1); }
+.rp-lb-row:nth-child(3) { background: rgba(180,83,9,.12); }
+.rp-lb-row:nth-child(n+4) { background: rgba(255,255,255,.04); }
+.rp-lb-row.is-me { border: 1.5px solid #738991; }
+
+.rp-lb-rank  { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+.rp-lb-name  { flex: 1; font-size: 15px; font-weight: 600; }
+.rp-lb-score { font-family: 'Outfit', sans-serif; font-size: 17px; font-weight: 900; color: #738991; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PODIUM
+══════════════════════════════════════════════════════════════════════════════ */
+.rp-podium {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 380px;
+}
+.rp-podium-icon { font-size: 80px; animation: rp-pop .6s cubic-bezier(.175,.885,.32,1.275) both; }
+.rp-podium-title { font-family: 'Outfit', sans-serif; font-size: 28px; font-weight: 900; }
+.rp-my-rank {
+  font-size: 16px;
+  color: rgba(255,255,255,.55);
+}
+.rp-my-rank strong {
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  color: #738991;
+}
+
+@media (max-width: 340px) {
+  .rp-answers { grid-template-columns: 1fr; }
+  .rp-answer  { min-height: 56px; flex-direction: row; padding: 12px; }
+}

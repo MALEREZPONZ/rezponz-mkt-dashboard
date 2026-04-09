@@ -128,6 +128,18 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        // ── Rekruttering ─────────────────────────────────────────────────────
+        register_rest_route( self::NS, '/rekruttering/stats', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'rekruttering_stats' ],
+            'permission_callback' => $cap,
+        ] );
+        register_rest_route( self::NS, '/rekruttering/pipeline', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'rekruttering_pipeline_save' ],
+            'permission_callback' => $cap,
+        ] );
+
         register_rest_route( self::NS, '/meta/ai-analysis', [
             'methods'             => 'POST',
             'callback'            => [ __CLASS__, 'meta_ai_analysis' ],
@@ -189,10 +201,24 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        // Snap AI analysis
+        register_rest_route( self::NS, '/snap/ai-analysis', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'snap_ai_analysis' ],
+            'permission_callback' => $cap,
+        ] );
+
         // TikTok ads (ad-level)
         register_rest_route( self::NS, '/tiktok/ads', [
             'methods'             => 'GET',
             'callback'            => [ __CLASS__, 'tiktok_ads' ],
+            'permission_callback' => $cap,
+        ] );
+
+        // TikTok AI analysis
+        register_rest_route( self::NS, '/tiktok/ai-analysis', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'tiktok_ai_analysis' ],
             'permission_callback' => $cap,
         ] );
 
@@ -251,6 +277,11 @@ class RZPA_REST_API {
             'callback'            => [ __CLASS__, 'blog_insights' ],
             'permission_callback' => $cap,
         ] );
+        register_rest_route( self::NS, '/blog/ai-suggestions', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'blog_ai_suggestions' ],
+            'permission_callback' => $cap,
+        ] );
     }
 
     private static function days( WP_REST_Request $r ) : int {
@@ -302,6 +333,103 @@ class RZPA_REST_API {
         $days = (int) ( $r->get_param( 'days' ) ?? 30 );
         $days = in_array( $days, [ 7, 30, 90 ], true ) ? $days : 30;
         return self::ok( RZPA_Database::get_blog_insights( $days ) );
+    }
+
+    /**
+     * AI Blog Strategi: Analysér hvilke blogindlæg Rezponz bør skrive for at
+     * ranke på jobrelevante søgeord. Bruger OpenAI gpt-4o-mini.
+     */
+    public static function blog_ai_suggestions( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['openai_api_key'] ) ) {
+            return new WP_Error( 'no_api_key', 'OpenAI API key er ikke konfigureret under Indstillinger.', [ 'status' => 400 ] );
+        }
+
+        $days   = (int) ( $r->get_json_params()['days'] ?? 30 );
+        $days   = in_array( $days, [ 7, 30, 90 ], true ) ? $days : 30;
+        $posts  = RZPA_Database::get_blog_insights( $days );
+
+        // Byg kontekstliste af eksisterende blogindlæg
+        $existing_context = '';
+        foreach ( $posts as $p ) {
+            $pos   = $p['position'] !== null ? '#' . $p['position'] : 'ikke indekseret';
+            $klik  = $p['clicks'] > 0 ? $p['clicks'] . ' klik' : '0 klik';
+            $existing_context .= "- \"{$p['title']}\" ({$pos}, {$klik})\n";
+        }
+        if ( ! $existing_context ) {
+            $existing_context = "- Ingen eksisterende blogindlæg fundet endnu.\n";
+        }
+
+        $prompt = <<<PROMPT
+Du er en dansk SEO-strateg med speciale i jobmarkedet og rekruttering.
+
+VIRKSOMHEDSKONTEKST:
+Rezponz er et dansk salgshus (Aalborg) der rekrutterer sælgere og kundeservicemedarbejdere til bl.a. Telenor, Norlys, NRGI og CBB. De ønsker at rangere på Google når danskere aktivt søger job inden for salg, telekommunikation og energi.
+
+EKSISTERENDE BLOGINDLÆG (med Google-placering og klik de seneste {$days} dage):
+{$existing_context}
+
+OPGAVE:
+Analyser og identificér de 8 mest værdifulde blogindlæg Rezponz BØR skrive — blogs der endnu IKKE eksisterer eller er svagt dækket. Fokus på søgeord hvor jobsøgere aktivt leder efter muligheder, råd om jobsøgning, eller information om specifikke brancher/stillinger.
+
+Prioritér efter: høj søgevolumen × lav/medium konkurrence × høj kommerciel relevans for Rezponz.
+
+SVAR KUN med et JSON-array i dette format (ingen anden tekst):
+[
+  {
+    "priority": 1,
+    "title": "Den foreslåede blogtitel (klikvenlig og SEO-optimeret)",
+    "keyword": "det primære target-søgeord på dansk",
+    "search_volume": "lav/medium/høj",
+    "competition": "lav/medium/høj",
+    "value_score": 1-10,
+    "search_intent": "Kort beskrivelse af hvad søgeren ønsker",
+    "rezponz_value": "Konkret forklaring af hvorfor dette blogindlæg er værdifuldt for Rezponz",
+    "content_angle": "Den specifikke vinkel/hook der differentierer dette indlæg",
+    "estimated_monthly_searches": "fx 500-1.000"
+  }
+]
+PROMPT;
+
+        $res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $opts['openai_api_key'],
+                'Content-Type'  => 'application/json',
+            ],
+            'body'    => wp_json_encode( [
+                'model'       => 'gpt-4o-mini',
+                'messages'    => [ [ 'role' => 'user', 'content' => $prompt ] ],
+                'max_tokens'  => 2500,
+                'temperature' => 0.6,
+            ] ),
+            'timeout' => 60,
+        ] );
+
+        if ( is_wp_error( $res ) ) {
+            return new WP_Error( 'openai_error', $res->get_error_message(), [ 'status' => 500 ] );
+        }
+
+        $http = wp_remote_retrieve_response_code( $res );
+        if ( $http !== 200 ) {
+            $err = json_decode( wp_remote_retrieve_body( $res ), true );
+            $msg = $err['error']['message'] ?? 'OpenAI fejl HTTP ' . $http;
+            return new WP_Error( 'openai_http', $msg, [ 'status' => 500 ] );
+        }
+
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
+        $text = trim( $body['choices'][0]['message']['content'] ?? '' );
+
+        // Ekstraher JSON-arrayet fra svaret (robust mod markdown-blokke)
+        if ( preg_match( '/\[.*\]/s', $text, $m ) ) {
+            $suggestions = json_decode( $m[0], true );
+            if ( is_array( $suggestions ) && ! empty( $suggestions ) ) {
+                // Sortér efter priority (lavest = højest prioritet)
+                usort( $suggestions, fn( $a, $b ) => ( (int)( $a['priority'] ?? 99 ) ) <=> ( (int)( $b['priority'] ?? 99 ) ) );
+                return self::ok( $suggestions );
+            }
+        }
+
+        return new WP_Error( 'parse_error', 'Kunne ikke parse AI-svaret. Prøv igen.', [ 'status' => 500 ] );
     }
     public static function seo_sync( $r ) {
         $rows  = RZPA_Google_SEO::fetch( 90 );
@@ -548,6 +676,25 @@ class RZPA_REST_API {
         $data = RZPA_Meta_Ads::fetch_invoices( $since, $until );
         if ( ! isset( $data['error'] ) ) set_transient( $key, $data, 30 * MINUTE_IN_SECONDS );
         return self::ok( $data );
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // REKRUTTERING
+    // ════════════════════════════════════════════════════════════════════════
+
+    public static function rekruttering_stats( WP_REST_Request $r ) {
+        $days  = (int) ( $r->get_param( 'days' ) ?? 30 );
+        $force = ! empty( $r->get_param( 'force' ) );
+        if ( $force ) RZPA_Rekruttering::clear_cache( $days );
+        $data  = RZPA_Rekruttering::get_stats( $days );
+        return self::ok( $data );
+    }
+
+    public static function rekruttering_pipeline_save( WP_REST_Request $r ) {
+        $body = $r->get_json_params();
+        if ( empty( $body ) ) return new WP_Error( 'bad_request', 'Ingen data', [ 'status' => 400 ] );
+        $ok = RZPA_Rekruttering::save_pipeline( $body );
+        return self::ok( [ 'saved' => $ok ] );
     }
 
     /**
@@ -1034,6 +1181,157 @@ class RZPA_REST_API {
         return self::ok( $data );
     }
 
+    public static function snap_ai_analysis( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        $key  = $opts['openai_api_key'] ?? '';
+        if ( ! $key ) return self::ok( [ 'error' => 'Ingen OpenAI API-nøgle — tilføj den i Indstillinger' ] );
+
+        $days      = self::days( $r );
+        $summary   = RZPA_Database::get_snap_summary( $days );
+        $campaigns = RZPA_Database::get_snap_campaigns( $days );
+
+        if ( empty( $summary['total_spend'] ) || (float) $summary['total_spend'] === 0.0 ) {
+            return self::ok( [ 'error' => 'Ingen Snapchat-data — klik "Hent data" først' ] );
+        }
+
+        $spend   = round( (float) ( $summary['total_spend']      ?? 0 ) );
+        $impr    = (int)          ( $summary['total_impressions'] ?? 0 );
+        $swipes  = (int)          ( $summary['total_swipe_ups']   ?? 0 );
+        $eng_rate = $impr > 0 ? round( $swipes / $impr * 100, 2 ) : 0;
+
+        $campText = implode( "\n", array_map( fn($c) =>
+            sprintf( '- %s [%s]: %s kr, %s vist, %s swipe-ups, %.2f%% eng.',
+                $c['campaign_name'], $c['status'] ?? 'UNKNOWN',
+                number_format( (float) $c['spend'], 0, ',', '.' ),
+                number_format( (int) ( $c['impressions'] ?? 0 ), 0, ',', '.' ),
+                number_format( (int) ( $c['swipe_ups'] ?? 0 ), 0, ',', '.' ),
+                $impr > 0 ? ( (int) ( $c['swipe_ups'] ?? 0 ) / max( 1, (int) ( $c['impressions'] ?? 1 ) ) * 100 ) : 0
+            ),
+            array_slice( $campaigns, 0, 15 )
+        ) );
+
+        $cache_key = 'rzpa_snap_ai_' . md5( $days . $spend . $swipes . $eng_rate );
+        $cached    = get_transient( $cache_key );
+        if ( $cached !== false ) return self::ok( [ 'analysis' => $cached, 'cached' => true ] );
+
+        $prompt = "Du er en erfaren Snapchat Ads-specialist. Analyser disse annonce-data for Rezponz.dk — en dansk B2B kundeservice-virksomhed.\n\n"
+            . "PERIODE: Seneste {$days} dage\n"
+            . "TOTAL: {$spend} kr brugt · {$impr} visninger · {$swipes} swipe-ups · {$eng_rate}% engagement rate\n"
+            . "BENCHMARK: Snapchat engagement rate over 1% er godt for B2B, under 0,3% kræver handling\n\n"
+            . "KAMPAGNER:\n{$campText}\n\n"
+            . "Giv en struktureret analyse med disse 5 sektioner:\n\n"
+            . "1. OVERORDNET VURDERING\n"
+            . "Vurder samlet performance. Er engagement rate tilfredsstillende? Hvad koster en swipe-up?\n\n"
+            . "2. TOP PRIORITET NU\n"
+            . "Ét konkret tiltag med størst effekt lige nu. Vær meget specifik.\n\n"
+            . "3. KAMPAGNE-ANBEFALINGER\n"
+            . "Gennemgå aktive kampagner: skalér, optimér eller pausér? Konkrete årsager.\n\n"
+            . "4. KREATIVT OG FORMAT\n"
+            . "Konkrete forslag til Snap-annoncer der virker: format (Collection, Single Image, Story), hook-tekst, CTA-knap, varighed.\n\n"
+            . "5. MÅLGRUPPE OG BUDGET\n"
+            . "Snapchats målgruppe er typisk 18-34 år — passer det til Rezponz? Forslag til bedre targeting og budget-fordeling.\n\n"
+            . "Skriv på dansk. Brug tal fra data. Max 600 ord.";
+
+        $ai_res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
+            'timeout' => 45,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $key,
+                'Content-Type'  => 'application/json',
+            ],
+            'body' => wp_json_encode( [
+                'model'      => 'gpt-4o-mini',
+                'messages'   => [ [ 'role' => 'user', 'content' => $prompt ] ],
+                'max_tokens' => 1200,
+            ] ),
+        ] );
+
+        if ( is_wp_error( $ai_res ) ) return self::ok( [ 'error' => $ai_res->get_error_message() ] );
+
+        $ai_body = json_decode( wp_remote_retrieve_body( $ai_res ), true );
+        $text    = $ai_body['choices'][0]['message']['content'] ?? '';
+        if ( ! $text ) return self::ok( [ 'error' => $ai_body['error']['message'] ?? 'Ingen svar fra OpenAI' ] );
+
+        set_transient( $cache_key, $text, 4 * HOUR_IN_SECONDS );
+        return self::ok( [ 'analysis' => $text ] );
+    }
+
+    public static function tiktok_ai_analysis( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        $key  = $opts['openai_api_key'] ?? '';
+        if ( ! $key ) return self::ok( [ 'error' => 'Ingen OpenAI API-nøgle — tilføj den i Indstillinger' ] );
+
+        $days      = self::days( $r );
+        $summary   = RZPA_Database::get_tiktok_summary( $days );
+        $campaigns = RZPA_Database::get_tiktok_campaigns( $days );
+
+        if ( empty( $summary['total_spend'] ) || (float) $summary['total_spend'] === 0.0 ) {
+            return self::ok( [ 'error' => 'Ingen TikTok-data — klik "Hent data" først' ] );
+        }
+
+        $spend     = round( (float) ( $summary['total_spend']       ?? 0 ) );
+        $views     = (int)          ( $summary['total_video_views']  ?? 0 );
+        $clicks    = (int)          ( $summary['total_clicks']       ?? 0 );
+        $roas      = round( (float) ( $summary['avg_roas']           ?? 0 ), 2 );
+        $hook_rate = $views > 0 && isset( $summary['total_three_sec_views'] )
+            ? round( (int) $summary['total_three_sec_views'] / $views * 100, 1 )
+            : 0;
+
+        $campText = implode( "\n", array_map( fn($c) =>
+            sprintf( '- %s [%s]: %s kr, %s views, %s klik, %.2fx ROAS',
+                $c['campaign_name'], $c['status'] ?? 'UNKNOWN',
+                number_format( (float) $c['spend'], 0, ',', '.' ),
+                number_format( (int) ( $c['video_views'] ?? 0 ), 0, ',', '.' ),
+                number_format( (int) ( $c['clicks'] ?? 0 ), 0, ',', '.' ),
+                (float) ( $c['roas'] ?? 0 )
+            ),
+            array_slice( $campaigns, 0, 15 )
+        ) );
+
+        $cache_key = 'rzpa_tiktok_ai_' . md5( $days . $spend . $views . $roas );
+        $cached    = get_transient( $cache_key );
+        if ( $cached !== false ) return self::ok( [ 'analysis' => $cached, 'cached' => true ] );
+
+        $prompt = "Du er en erfaren TikTok Ads-specialist. Analyser disse annonce-data for Rezponz.dk — en dansk B2B kundeservice-virksomhed.\n\n"
+            . "PERIODE: Seneste {$days} dage\n"
+            . "TOTAL: {$spend} kr brugt · {$views} video views · {$clicks} klik · {$roas}x ROAS · {$hook_rate}% hook rate\n"
+            . "BENCHMARK: TikTok hook rate (3s) over 25% er godt · ROAS over 2,5x er stærkt for e-com/B2B\n\n"
+            . "KAMPAGNER:\n{$campText}\n\n"
+            . "Giv en struktureret analyse med disse 5 sektioner:\n\n"
+            . "1. OVERORDNET VURDERING\n"
+            . "Vurder samlet performance. Er hook rate og ROAS tilfredsstillende? Hvad koster et view?\n\n"
+            . "2. TOP PRIORITET NU\n"
+            . "Ét konkret tiltag med størst effekt lige nu. Vær meget specifik.\n\n"
+            . "3. KAMPAGNE-ANBEFALINGER\n"
+            . "Gennemgå aktive kampagner: skalér, optimér eller pausér? Konkrete årsager baseret på ROAS.\n\n"
+            . "4. VIDEO-KREATIVT\n"
+            . "Konkrete forslag til TikTok-videoer der fanger: hook-tekst i første 3 sekunder, format (UGC, talking head, product demo), musik, CTA. Hvad virker for B2B rekruttering på TikTok?\n\n"
+            . "5. MÅLGRUPPE OG SKALERING\n"
+            . "TikTok-målgrupper for B2B: Custom Audiences, Lookalike, interesser. Hvornår skal man skalere budget?\n\n"
+            . "Skriv på dansk. Brug tal fra data. Max 600 ord.";
+
+        $ai_res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
+            'timeout' => 45,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $key,
+                'Content-Type'  => 'application/json',
+            ],
+            'body' => wp_json_encode( [
+                'model'      => 'gpt-4o-mini',
+                'messages'   => [ [ 'role' => 'user', 'content' => $prompt ] ],
+                'max_tokens' => 1200,
+            ] ),
+        ] );
+
+        if ( is_wp_error( $ai_res ) ) return self::ok( [ 'error' => $ai_res->get_error_message() ] );
+
+        $ai_body = json_decode( wp_remote_retrieve_body( $ai_res ), true );
+        $text    = $ai_body['choices'][0]['message']['content'] ?? '';
+        if ( ! $text ) return self::ok( [ 'error' => $ai_body['error']['message'] ?? 'Ingen svar fra OpenAI' ] );
+
+        set_transient( $cache_key, $text, 4 * HOUR_IN_SECONDS );
+        return self::ok( [ 'analysis' => $text ] );
+    }
+
     // Trends
     public static function ads_trends( $r ) {
         return self::ok( RZPA_Database::get_ads_daily_trends( self::days( $r ) ) );
@@ -1168,8 +1466,14 @@ class RZPA_REST_API {
      */
     public static function google_ads_ads( WP_REST_Request $r ) {
         $cache_key = 'rzpa_gads_ads';
-        $cached    = get_transient( $cache_key );
-        if ( $cached !== false ) return self::ok( $cached );
+        $force     = (bool) ( $r->get_param( 'force' ) );
+        if ( $force ) delete_transient( $cache_key );
+
+        $cached = get_transient( $cache_key );
+        // Only use cache if it's a non-empty array (never cache error arrays or empty results)
+        if ( $cached !== false && is_array( $cached ) && ! empty( $cached ) && ! isset( $cached['error'] ) ) {
+            return self::ok( $cached );
+        }
 
         $opts = get_option( 'rzpa_settings', [] );
         if ( empty( $opts['google_ads_refresh_token'] ) || empty( $opts['google_ads_customer_id'] ) ) {
@@ -1177,7 +1481,10 @@ class RZPA_REST_API {
         }
 
         $data = RZPA_Google_Ads::fetch_ads();
-        if ( $data ) set_transient( $cache_key, $data, HOUR_IN_SECONDS );
+        // Only cache successful non-empty results
+        if ( is_array( $data ) && ! empty( $data ) && ! isset( $data['error'] ) ) {
+            set_transient( $cache_key, $data, HOUR_IN_SECONDS );
+        }
         return self::ok( $data );
     }
 
