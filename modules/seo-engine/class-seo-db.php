@@ -241,7 +241,7 @@ class RZPA_SEO_DB {
      * @param array<string, mixed> $data
      * @return int|false  New row ID on success, false on failure.
      */
-    public static function insert_template( array $data ) : int|false {
+    public static function insert_template( array $data ) {
         global $wpdb;
         $row = [
             'type'            => sanitize_text_field( $data['type']            ?? 'pseo' ),
@@ -381,7 +381,7 @@ class RZPA_SEO_DB {
      * @param array<string, mixed> $data
      * @return int|false
      */
-    public static function insert_dataset( array $data ) : int|false {
+    public static function insert_dataset( array $data ) {
         global $wpdb;
 
         $row = self::sanitize_dataset( $data );
@@ -583,7 +583,7 @@ class RZPA_SEO_DB {
      * @param array<string, mixed> $data
      * @return int|false
      */
-    public static function insert_brief( array $data ) : int|false {
+    public static function insert_brief( array $data ) {
         global $wpdb;
         $row = self::sanitize_brief( $data );
         if ( empty( $row['primary_keyword'] ) ) {
@@ -853,7 +853,7 @@ class RZPA_SEO_DB {
      * @param array<string, mixed> $data
      * @return int|false
      */
-    public static function insert_rule( array $data ) : int|false {
+    public static function insert_rule( array $data ) {
         global $wpdb;
         $row = [
             'rule_name'   => sanitize_text_field( $data['rule_name']   ?? '' ),

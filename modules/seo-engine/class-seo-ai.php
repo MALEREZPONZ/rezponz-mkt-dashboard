@@ -233,7 +233,7 @@ class RZPA_SEO_AI {
      * @param int    $max_tokens  Maximum response tokens.
      * @return string|WP_Error  Raw response text, or WP_Error on failure.
      */
-    public static function call_api( string $prompt, int $max_tokens = 1000 ) : string|WP_Error {
+    public static function call_api( string $prompt, int $max_tokens = 1000 ) {
         $settings = get_option( self::SETTINGS_OPTION, [] );
         $api_key  = $settings['rzpa_ai_api_key'] ?? '';
 
@@ -322,7 +322,7 @@ class RZPA_SEO_AI {
      * @param int    $max_tokens
      * @return string|WP_Error
      */
-    private static function call_openai( string $prompt, string $api_key, int $max_tokens ) : string|WP_Error {
+    private static function call_openai( string $prompt, string $api_key, int $max_tokens ) {
         $settings = get_option( self::SETTINGS_OPTION, [] );
         $model    = $settings['rzpa_ai_model'] ?? 'gpt-4o-mini';
 
@@ -356,7 +356,7 @@ class RZPA_SEO_AI {
      * @param int    $max_tokens
      * @return string|WP_Error
      */
-    private static function call_claude( string $prompt, string $api_key, int $max_tokens ) : string|WP_Error {
+    private static function call_claude( string $prompt, string $api_key, int $max_tokens ) {
         $settings = get_option( self::SETTINGS_OPTION, [] );
         $model    = $settings['rzpa_ai_model'] ?? 'claude-3-5-haiku-20241022';
 
@@ -388,7 +388,7 @@ class RZPA_SEO_AI {
      * @param string                        $provider  'openai' | 'claude'
      * @return string|WP_Error
      */
-    private static function extract_response_text( $response, string $provider ) : string|WP_Error {
+    private static function extract_response_text( $response, string $provider ) {
         if ( is_wp_error( $response ) ) {
             return new WP_Error( 'http_error', 'HTTP-fejl: ' . $response->get_error_message() );
         }
