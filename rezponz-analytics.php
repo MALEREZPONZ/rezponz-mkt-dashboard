@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      2.4.4
+ * Version:      2.4.5
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '2.4.4' );
+define( 'RZPA_VERSION',     '2.4.5' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -57,18 +57,27 @@ require_once RZPA_DIR . 'modules/live-quiz/class-live-quiz-api.php';
 require_once RZPA_DIR . 'modules/live-quiz/class-live-quiz-admin.php';
 require_once RZPA_DIR . 'modules/live-quiz/class-live-quiz.php';
 
-// ── SEO Engine Module ────────────────────────────────────────────────────────
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-db.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-template.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-meta.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-quality.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-ai.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-blog.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-generator.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-linking.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-csv.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-engine.php';
-require_once RZPA_DIR . 'modules/seo-engine/class-seo-admin.php';
+// ── SEO Engine Module (med fejl-diagnostik) ──────────────────────────────────
+define( 'RZPA_SEO_ENGINE_ENABLED', false ); // sættes til true nedenfor hvis load lykkes
+$rzpa_seo_load_error = null;
+$rzpa_seo_files = [
+    'class-seo-db.php', 'class-seo-template.php', 'class-seo-meta.php',
+    'class-seo-quality.php', 'class-seo-ai.php', 'class-seo-blog.php',
+    'class-seo-generator.php', 'class-seo-linking.php', 'class-seo-csv.php',
+    'class-seo-engine.php', 'class-seo-admin.php',
+];
+foreach ( $rzpa_seo_files as $_rzpa_f ) {
+    try {
+        require_once RZPA_DIR . 'modules/seo-engine/' . $_rzpa_f;
+    } catch ( \Throwable $e ) {
+        $rzpa_seo_load_error = 'SEO Engine load fejl i ' . $_rzpa_f . ': ' . $e->getMessage() . ' (linje ' . $e->getLine() . ')';
+        error_log( '[Rezponz] ' . $rzpa_seo_load_error );
+        break;
+    }
+}
+if ( ! $rzpa_seo_load_error ) {
+    define( 'RZPA_SEO_ENGINE_ENABLED', true );
+}
 
 // ── Profil-Quiz Module ───────────────────────────────────────────────────────
 require_once RZPA_DIR . 'modules/quiz/class-quiz-db.php';
@@ -175,12 +184,29 @@ add_action( 'plugins_loaded', function () {
     RZLQ_Quiz::init();
 
     // SEO Engine module
-    if ( get_option( RZPA_SEO_DB::DB_VERSION_KEY ) !== RZPA_SEO_DB::DB_VERSION ) {
-        RZPA_SEO_DB::install();
+    global $rzpa_seo_load_error;
+    if ( $rzpa_seo_load_error ) {
+        // Vis fejl i WP admin så vi kan se præcis hvad der fejler
+        add_action( 'admin_notices', function() use ( $rzpa_seo_load_error ) {
+            echo '<div class="notice notice-error"><p><strong>Rezponz SEO Engine fejl:</strong> '
+                . esc_html( $rzpa_seo_load_error ) . '</p></div>';
+        } );
+    } elseif ( defined( 'RZPA_SEO_ENGINE_ENABLED' ) && RZPA_SEO_ENGINE_ENABLED ) {
+        try {
+            if ( get_option( RZPA_SEO_DB::DB_VERSION_KEY ) !== RZPA_SEO_DB::DB_VERSION ) {
+                RZPA_SEO_DB::install();
+            }
+            RZPA_SEO_Engine::init();
+            RZPA_SEO_Meta::init();
+            RZPA_SEO_Admin::init();
+        } catch ( \Throwable $e ) {
+            $msg = 'SEO Engine init fejl: ' . $e->getMessage() . ' i ' . basename( $e->getFile() ) . ':' . $e->getLine();
+            error_log( '[Rezponz] ' . $msg );
+            add_action( 'admin_notices', function() use ( $msg ) {
+                echo '<div class="notice notice-error"><p><strong>Rezponz SEO Engine:</strong> ' . esc_html( $msg ) . '</p></div>';
+            } );
+        }
     }
-    RZPA_SEO_Engine::init();
-    RZPA_SEO_Meta::init();
-    RZPA_SEO_Admin::init();
 
     // ── Auto-opdatering via GitHub ──────────────────────────────────────────
     $opts  = get_option( 'rzpa_settings', [] );
