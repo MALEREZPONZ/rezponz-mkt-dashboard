@@ -236,12 +236,24 @@ $profileNames = [
     </div>
   </div>
 
+  <!-- ── CTA ── -->
+  <div style="background:#111827;border-radius:12px;padding:20px 24px;margin-bottom:28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#6b7280;margin-bottom:4px">Klar til næste skridt?</div>
+      <div style="font-size:15px;font-weight:800;color:#fff;line-height:1.3">Din profil passer perfekt til et job hos Rezponz</div>
+    </div>
+    <a href="https://rezponz.dk/karriere-stillinger/"
+       style="background:#f97316;color:#fff;text-decoration:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:800;white-space:nowrap;letter-spacing:.2px;display:inline-block">
+      Søg jobbet hos Rezponz →
+    </a>
+  </div>
+
   <!-- ── Strengths / Trives med / Udviklingsområder ── -->
   <div class="two-col">
     <div>
       <?php if ( $strengths ) : ?>
       <div class="card" style="margin-bottom:16px">
-        <div class="card-title">Styrker</div>
+        <div class="card-title">Styrker – og hvorfor de passer til Rezponz</div>
         <ul class="bullet-list">
           <?php foreach ( $strengths as $s ) : ?>
           <li><?php echo esc_html( $s ); ?></li>
@@ -252,7 +264,7 @@ $profileNames = [
 
       <?php if ( $thrives_with ) : ?>
       <div class="card">
-        <div class="card-title">Trives med</div>
+        <div class="card-title">Du trives med – det har vi hos Rezponz</div>
         <ul class="bullet-list">
           <?php foreach ( $thrives_with as $t ) : ?>
           <li><?php echo esc_html( $t ); ?></li>
@@ -265,7 +277,7 @@ $profileNames = [
     <div>
       <?php if ( $develop ) : ?>
       <div class="card" style="margin-bottom:16px">
-        <div class="card-title">Udviklingsområder</div>
+        <div class="card-title">Det kan udfordre dig – men det hjælper vi dig med</div>
         <ul class="bullet-list">
           <?php foreach ( $develop as $d2 ) : ?>
           <li><?php echo esc_html( $d2 ); ?></li>
@@ -310,12 +322,18 @@ $profileNames = [
     <div>GDPR: <?php echo $data['consent'] ? 'Samtykke givet' : 'Intet samtykke'; ?></div>
   </div>
 
-  <!-- Print button (hidden in print) -->
+  <!-- Download button (hidden in print) -->
   <div class="no-print" style="text-align:center;margin-top:32px">
-    <button onclick="window.print()"
-            style="background:#111827;color:#fff;border:none;border-radius:8px;padding:12px 28px;font-size:14px;font-weight:700;cursor:pointer">
-      🖨️ Print / Gem som PDF
-    </button>
+    <?php
+    $download_url = wp_nonce_url(
+        admin_url( 'admin-post.php?action=rzpa_quiz_download_pdf&submission_id=' . (int) $data['id'] ),
+        'rzpa_quiz_download_pdf'
+    );
+    ?>
+    <a href="<?php echo esc_url( $download_url ); ?>"
+       style="display:inline-block;background:#111827;color:#fff;text-decoration:none;border-radius:8px;padding:12px 28px;font-size:14px;font-weight:700">
+      📄 Download PDF
+    </a>
     <button onclick="window.close()"
             style="background:#f3f4f6;color:#374151;border:none;border-radius:8px;padding:12px 20px;font-size:14px;font-weight:600;cursor:pointer;margin-left:10px">
       Luk
@@ -323,9 +341,5 @@ $profileNames = [
   </div>
 
 </div>
-<script>
-  // Auto-trigger print dialog on load
-  window.addEventListener('load', function() { window.print(); });
-</script>
 </body>
 </html>

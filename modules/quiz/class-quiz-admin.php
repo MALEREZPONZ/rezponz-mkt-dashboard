@@ -4,11 +4,12 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class RZPA_Quiz_Admin {
 
     public static function init(): void {
-        add_action( 'admin_menu',                           [ __CLASS__, 'add_menu' ] );
-        add_action( 'admin_post_rzpa_quiz_save_question',   [ __CLASS__, 'handle_save_question' ] );
-        add_action( 'admin_post_rzpa_quiz_delete_question', [ __CLASS__, 'handle_delete_question' ] );
-        add_action( 'admin_post_rzpa_quiz_toggle_question', [ __CLASS__, 'handle_toggle_question' ] );
-        add_action( 'admin_post_rzpa_quiz_save_email_cfg',  [ __CLASS__, 'handle_save_email_cfg' ] );
+        add_action( 'admin_menu',                             [ __CLASS__, 'add_menu' ] );
+        add_action( 'admin_post_rzpa_quiz_save_question',     [ __CLASS__, 'handle_save_question' ] );
+        add_action( 'admin_post_rzpa_quiz_delete_question',   [ __CLASS__, 'handle_delete_question' ] );
+        add_action( 'admin_post_rzpa_quiz_toggle_question',   [ __CLASS__, 'handle_toggle_question' ] );
+        add_action( 'admin_post_rzpa_quiz_save_email_cfg',    [ __CLASS__, 'handle_save_email_cfg' ] );
+        add_action( 'admin_post_rzpa_quiz_download_pdf',      [ __CLASS__, 'handle_download_pdf' ] );
     }
 
     public static function add_menu(): void {
@@ -172,6 +173,46 @@ class RZPA_Quiz_Admin {
 
         wp_redirect( admin_url( 'admin.php?page=rzpa-quiz-submissions&tab=email&saved=1' ) );
         exit;
+    }
+
+    // ── PDF download (server-side DomPDF) ────────────────────────────────────
+
+    public static function handle_download_pdf(): void {
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Adgang nægtet' );
+        check_admin_referer( 'rzpa_quiz_download_pdf' );
+
+        $id   = (int) ( $_GET['submission_id'] ?? 0 );
+        $data = $id ? RZPA_Quiz_DB::get_submission_detail( $id ) : null;
+        if ( ! $data ) wp_die( 'Besvarelse ikke fundet.' );
+
+        // Writable dir for DomPDF font cache (uploads dir is guaranteed writable)
+        $upload_info = wp_upload_dir();
+        $tmp_dir     = trailingslashit( $upload_info['basedir'] ) . 'rzpa-pdf-tmp/';
+        if ( ! file_exists( $tmp_dir ) ) {
+            wp_mkdir_p( $tmp_dir );
+            file_put_contents( $tmp_dir . '.htaccess', 'Deny from all' );
+        }
+
+        try {
+            $pdf_bytes = RZPA_Quiz_PDF_Generator::generate( $data, $tmp_dir );
+        } catch ( \Throwable $e ) {
+            error_log( '[RZPA Quiz PDF] Admin download fejlede: ' . $e->getMessage() );
+            wp_die( 'PDF-generering fejlede: ' . esc_html( $e->getMessage() ) );
+        }
+
+        $safe_name = preg_replace( '/[^a-z0-9æøåÆØÅ]/iu', '-', $data['name'] );
+        $safe_name = strtolower( preg_replace( '/[^a-z0-9\-]/i', '', $safe_name ) );
+        $safe_name = trim( $safe_name, '-' ) ?: 'profil';
+        $filename  = 'profil-rapport-' . $safe_name . '-' . $id . '.pdf';
+
+        header( 'Content-Type: application/pdf' );
+        header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+        header( 'Content-Length: ' . strlen( $pdf_bytes ) );
+        header( 'Cache-Control: no-cache, no-store' );
+        header( 'Pragma: no-cache' );
+        // phpcs:ignore WordPress.Security.EscapeOutput
+        echo $pdf_bytes;
+        exit();
     }
 
     // ── DB helpers ────────────────────────────────────────────────────────────

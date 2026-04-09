@@ -55,8 +55,9 @@ class RZPA_Quiz {
         if ( $done ) return;
         $done = true;
 
-        $base = RZPA_URL . 'modules/quiz/assets/';
-        $ver  = RZPA_VERSION;
+        $base    = RZPA_URL . 'modules/quiz/assets/';
+        $js_file = RZPA_DIR . 'modules/quiz/assets/quiz.js';
+        $ver     = file_exists( $js_file ) ? filemtime( $js_file ) : RZPA_VERSION;
 
         wp_enqueue_style(
             'rzpa-quiz-css',

@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class RZPA_Quiz_DB {
 
     const DB_VERSION_KEY = 'rzpa_quiz_db_ver';
-    const DB_VERSION     = '1';
+    const DB_VERSION     = '3';
 
     // ── Install / upgrade ──────────────────────────────────────────────────────
 
@@ -64,6 +64,7 @@ class RZPA_Quiz_DB {
             scores               LONGTEXT,
             answers_data         LONGTEXT,
             consent              TINYINT(1) DEFAULT 0,
+            contact_consent      TINYINT(1) DEFAULT 0,
             withdraw_token       VARCHAR(64),
             ip_address           VARCHAR(45),
             created_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -77,6 +78,9 @@ class RZPA_Quiz_DB {
         // Seed only if profiles table is empty
         if ( 0 === (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$pt}" ) ) {
             self::seed();
+        } else {
+            // Always refresh profile texts when DB version bumps
+            self::refresh_profiles();
         }
     }
 
@@ -93,45 +97,109 @@ class RZPA_Quiz_DB {
             [
                 'slug'         => 'empatisk',
                 'title'        => 'Den Empatiske Lytter',
-                'description'  => 'Du er den, folk søger, når de har brug for at blive forstået. Din evne til at lytte og skabe ægte kontakt er din superpower som Customer Success Advisor.',
+                'description'  => 'Du er den, folk søger, når de har brug for at blive forstået. Din evne til at lytte og skabe ægte kontakt er din superpower som Customer Success Advisor. Hos Rezponz arbejder vi med salg og service for Danmarks største brands – og det er præcis din evne til at skabe tillid og tryghed, der gør dig uundværlig. Her sælger du ikke bare – du bygger relationer der holder.',
                 'icon_emoji'   => '💛',
                 'color'        => '#ec4899',
-                'strengths'    => wp_json_encode(['Stærk lytteevne', 'Skaber tillid og tryghed', 'Empatisk kommunikation', 'Forstår de uskrevne behov', 'Holder folk i hånden']),
-                'thrives_with' => wp_json_encode(['Dybe kundedialoge', 'Problemløsning med mennesker', 'Psykologisk trygge teams', 'Langvarige kunderelationer']),
-                'develop_areas'=> wp_json_encode(['Assertivitet og tydelighed', 'Sige nej når det er nødvendigt', 'Drive samtalen fremad', 'Stå ved egne behov']),
+                'strengths'    => wp_json_encode([
+                    'Stærk lytteevne – kunder føler sig forstået fra første sekund',
+                    'Skaber tillid og tryghed – det fundament al god salg bygger på',
+                    'Empatisk kommunikation – du tilpasser dig kunden, ikke omvendt',
+                    'Forstår de uskrevne behov – og løser dem inden kunden selv ved det',
+                    'Holder folk i hånden – den omsorg skaber loyale kunder der kommer tilbage',
+                ]),
+                'thrives_with' => wp_json_encode([
+                    'Dybe kundedialoge – vi sætter tid af til samtaler der gør en forskel',
+                    'Problemløsning med mennesker i centrum – det er vores kerneopgave',
+                    'Psykologisk trygt team – vi passer på hinanden og fejrer hinanden hos Rezponz',
+                    'Langvarige kunderelationer – vi bygger ikke for en dag, men for livet',
+                ]),
+                'develop_areas'=> wp_json_encode([
+                    'At sige nej og sætte grænser kan føles svært – vi træner dig i at stå ved dig selv',
+                    'At drive samtalen fremad udfordrer dig – men det er en konkret teknik vi lærer dig',
+                    'Assertivitet og tydelighed kræver øvelse – du udvikler den muskel stærkt hos os',
+                    'At stå ved egne behov – vi skaber rum til åben dialog om hvad du har brug for',
+                ]),
                 'sort_order'   => 1,
             ],
             [
                 'slug'         => 'energisk',
                 'title'        => 'Energibomben',
-                'description'  => 'Du er drivkraften i rummet. Din entusiasme er smitsom, og du når mål andre bare drømmer om. Kunder køber din energi – og det er en sjælden gave.',
+                'description'  => 'Du er drivkraften i rummet. Din entusiasme er smitsom, og du når mål andre bare drømmer om. Kunder køber din energi – og det er en sjælden gave. Hos Rezponz elsker vi din type: vi belønner resultater, fejrer mål højlydt og skaber en kultur hvor din drive aldrig bremses. Du vil elske at komme på arbejde.',
                 'icon_emoji'   => '⚡',
                 'color'        => '#f97316',
-                'strengths'    => wp_json_encode(['Smitsom entusiasme', 'Drives af mål og resultater', 'Hurtig til handling', 'Motiverer de andre', 'Lukker aftaler']),
-                'thrives_with' => wp_json_encode(['Klare mål og KPI\'er', 'Frihed til at agere selvstændigt', 'Konkurrencepræget og højt tempo', 'Synlige resultater']),
-                'develop_areas'=> wp_json_encode(['Tålmodighed i processen', 'Lytte mere end du taler', 'Langsigtet planlægning', 'Fordybe dig i detaljer']),
+                'strengths'    => wp_json_encode([
+                    'Smitsom entusiasme – du sætter tonen og løfter hele holdet',
+                    'Drives af mål og resultater – vi sørger for du altid har klare KPI\'er at jagte',
+                    'Hurtig til handling – hos Rezponz er der aldrig langt fra tanke til handling',
+                    'Motiverer de andre – din energi gør holdet bedre, ikke kun dig selv',
+                    'Lukker aftaler – den evne er guld i vores branche',
+                ]),
+                'thrives_with' => wp_json_encode([
+                    'Klare mål og KPI\'er – vi har transparente systemer så du altid ved præcis hvor du er',
+                    'Frihed til at agere selvstændigt – vi stoler på dig og giver dig plads',
+                    'Konkurrencepræget og højt tempo – vores miljø er designet til din type',
+                    'Synlige resultater – vi fejrer dine sejre, store som små',
+                ]),
+                'develop_areas'=> wp_json_encode([
+                    'Tålmodighed i processen kan udfordre dig – vi hjælper dig med at finde de smarte genveje',
+                    'At lytte mere end du taler booster dine resultater – det er en teknik vi arbejder med',
+                    'Langsigtet planlægning kan føles kedeligt – vi viser dig hvad strategisk tænkning giver dig',
+                    'At fordybe dig i detaljer kræver øvelse – vi har systemer der hjælper dig med det',
+                ]),
                 'sort_order'   => 2,
             ],
             [
                 'slug'         => 'analytisk',
                 'title'        => 'Problemknuseren',
-                'description'  => 'Du ser mønstre ingen andre opdager. Din strukturerede tilgang og evne til at finde den smarteste løsning gør dig uundværlig når det virkelig gælder.',
+                'description'  => 'Du ser mønstre ingen andre opdager. Din strukturerede tilgang og evne til at finde den smarteste løsning gør dig uundværlig når det virkelig gælder. Hos Rezponz er vi altid på udkig efter folk der ikke bare følger scriptet – men forstår hvorfor det virker. Din analytiske tilgang til kundeoplevelser gør dig til en af vores mest værdifulde typer.',
                 'icon_emoji'   => '🧩',
                 'color'        => '#8b5cf6',
-                'strengths'    => wp_json_encode(['Analytisk tilgang til udfordringer', 'Finder mønstre og sammenhænge', 'Struktureret problemløsning', 'Evidensbaseret kommunikation', 'Strategisk tænkning']),
-                'thrives_with' => wp_json_encode(['Komplekse udfordringer', 'Data og indsigter', 'Systemer og processer', 'Klare frameworks og metoder']),
-                'develop_areas'=> wp_json_encode(['Emotionel forbindelse med kunder', 'Kommunikere simpelt og direkte', 'Fleksibilitet og improvisation', 'Handling frem for analyse']),
+                'strengths'    => wp_json_encode([
+                    'Analytisk tilgang til udfordringer – du finder den bedste løsning, ikke bare den hurtigste',
+                    'Finder mønstre og sammenhænge – du ser hvad andre overser',
+                    'Struktureret problemløsning – du skaber klarhed i kaos',
+                    'Evidensbaseret kommunikation – kunder stoler på dig fordi du ved hvad du taler om',
+                    'Strategisk tænkning – du optimerer konstant, og det mærker kunder og kolleger',
+                ]),
+                'thrives_with' => wp_json_encode([
+                    'Komplekse udfordringer – vi har masser af dem, og du er den der løser dem',
+                    'Data og indsigter – vi giver dig adgang til performance-data så du kan optimere',
+                    'Systemer og processer – vi bygger de strukturer du arbejder bedst inden for',
+                    'Klare frameworks og metoder – vi har opbygget de bedste salgsteknikker til din type',
+                ]),
+                'develop_areas'=> wp_json_encode([
+                    'Den emotionelle forbindelse med kunder kan udfordre dig – vi lærer dig at kombinere hjerte og hoved',
+                    'At kommunikere simpelt og direkte kræver øvelse – vi coacher dig i at ramme kunden præcist',
+                    'Fleksibilitet og improvisation arbejder vi aktivt med – det giver dig et kæmpe forspring',
+                    'Handling frem for analyse – vi hjælper dig med at tage springet, selv med ufuldstændig info',
+                ]),
                 'sort_order'   => 3,
             ],
             [
                 'slug'         => 'social',
                 'title'        => 'Netværksmesteren',
-                'description'  => 'Du er limet der holder folk sammen. Din naturlige evne til at skabe relationer og forbinde mennesker giver dig et netværk ingen kan konkurrere med.',
+                'description'  => 'Du er limet der holder folk sammen. Din naturlige evne til at skabe relationer og forbinde mennesker giver dig et netværk ingen kan konkurrere med. Hos Rezponz er relationer fundamentet for alt vi gør – vi sælger ikke produkter, vi bygger forbindelser. Her er din sociale intelligens ikke bare ønsket – den er nødvendig.',
                 'icon_emoji'   => '🌐',
                 'color'        => '#10b981',
-                'strengths'    => wp_json_encode(['Bygger relationer naturligt og hurtigt', 'Forbinder de rette mennesker', 'Skaber fællesskab og tilhørighed', 'Sælger gennem relationer', 'Husker alle og deres historier']),
-                'thrives_with' => wp_json_encode(['Sociale events og netværk', 'Tværfagligt samarbejde', 'Dynamiske og skiftende miljøer', 'At repræsentere virksomheden udadtil']),
-                'develop_areas'=> wp_json_encode(['Dybde frem for bredde i relationer', 'Fokus og prioritering', 'Gennemføre opgaver selvstændigt', 'Sige nej til nye ting']),
+                'strengths'    => wp_json_encode([
+                    'Bygger relationer naturligt og hurtigt – fra dag ét skaber du tillid med kunder og kolleger',
+                    'Forbinder de rette mennesker – du ser potentialet i enhver kontakt',
+                    'Skaber fællesskab og tilhørighed – vores kultur er stærkere fordi du er der',
+                    'Sælger gennem relationer – den tilgang slår alle scripts',
+                    'Husker alle og deres historier – det gør dig til den alle vil snakke med igen',
+                ]),
+                'thrives_with' => wp_json_encode([
+                    'Sociale events og kampagner – vi afholder dem løbende og du er skabt til dem',
+                    'Tværfagligt samarbejde – du samler trådene og får holdet til at fungere',
+                    'Dynamiske og skiftende miljøer – ingen dage er ens hos Rezponz',
+                    'At repræsentere virksomheden udadtil – vi sætter dig gerne i forreste række',
+                ]),
+                'develop_areas'=> wp_json_encode([
+                    'Dybde frem for bredde i relationer kan udfordre dig – vi hjælper dig med at prioritere de vigtigste kunder',
+                    'Fokus og prioritering er noget vi arbejder aktivt med – du lærer at vinde de rigtige kampe',
+                    'At gennemføre opgaver selvstændigt kræver struktur – vi giver dig de rammer du har brug for',
+                    'At sige nej til nye ting er en muskel du træner hos os – det giver dig mere energi til det der tæller',
+                ]),
                 'sort_order'   => 4,
             ],
         ];
@@ -141,6 +209,8 @@ class RZPA_Quiz_DB {
         }
 
         // ── Questions + Answers ───────────────────────────────────────────────
+        // (seed data continues below)
+        // ── End seed profiles – see refresh_profiles() for updates ──
         // Weights use profile slugs as keys
         $questions_data = [
             [
@@ -368,6 +438,7 @@ class RZPA_Quiz_DB {
             'scores'               => wp_json_encode( $d['scores'] ),
             'answers_data'         => wp_json_encode( $d['answers'] ),
             'consent'              => $d['consent'] ? 1 : 0,
+            'contact_consent'      => $d['contact_consent'] ? 1 : 0,
             'withdraw_token'       => $d['withdraw_token'],
             'ip_address'           => $d['ip'] ?? '',
         ] );
@@ -436,6 +507,108 @@ class RZPA_Quiz_DB {
     public static function count_submissions(): int {
         global $wpdb;
         return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}rzpa_quiz_submissions" );
+    }
+
+    // ── Refresh profile texts (called on DB version bump) ──────────────────────
+
+    public static function refresh_profiles(): void {
+        global $wpdb;
+        $pt = $wpdb->prefix . 'rzpa_quiz_profiles';
+
+        $updates = [
+            'empatisk' => [
+                'description'  => 'Du er den, folk søger, når de har brug for at blive forstået. Din evne til at lytte og skabe ægte kontakt er din superpower som Customer Success Advisor. Hos Rezponz arbejder vi med salg og service for Danmarks største brands – og det er præcis din evne til at skabe tillid og tryghed, der gør dig uundværlig. Her sælger du ikke bare – du bygger relationer der holder.',
+                'strengths'    => wp_json_encode([
+                    'Stærk lytteevne – kunder føler sig forstået fra første sekund',
+                    'Skaber tillid og tryghed – det fundament al god salg bygger på',
+                    'Empatisk kommunikation – du tilpasser dig kunden, ikke omvendt',
+                    'Forstår de uskrevne behov – og løser dem inden kunden selv ved det',
+                    'Holder folk i hånden – den omsorg skaber loyale kunder der kommer tilbage',
+                ]),
+                'thrives_with' => wp_json_encode([
+                    'Dybe kundedialoge – vi sætter tid af til samtaler der gør en forskel',
+                    'Problemløsning med mennesker i centrum – det er vores kerneopgave',
+                    'Psykologisk trygt team – vi passer på hinanden og fejrer hinanden hos Rezponz',
+                    'Langvarige kunderelationer – vi bygger ikke for en dag, men for livet',
+                ]),
+                'develop_areas' => wp_json_encode([
+                    'At sige nej og sætte grænser kan føles svært – vi træner dig i at stå ved dig selv',
+                    'At drive samtalen fremad udfordrer dig – men det er en konkret teknik vi lærer dig',
+                    'Assertivitet og tydelighed kræver øvelse – du udvikler den muskel stærkt hos os',
+                    'At stå ved egne behov – vi skaber rum til åben dialog om hvad du har brug for',
+                ]),
+            ],
+            'energisk' => [
+                'description'  => 'Du er drivkraften i rummet. Din entusiasme er smitsom, og du når mål andre bare drømmer om. Kunder køber din energi – og det er en sjælden gave. Hos Rezponz elsker vi din type: vi belønner resultater, fejrer mål højlydt og skaber en kultur hvor din drive aldrig bremses. Du vil elske at komme på arbejde.',
+                'strengths'    => wp_json_encode([
+                    'Smitsom entusiasme – du sætter tonen og løfter hele holdet',
+                    'Drives af mål og resultater – vi sørger for du altid har klare KPI\'er at jagte',
+                    'Hurtig til handling – hos Rezponz er der aldrig langt fra tanke til handling',
+                    'Motiverer de andre – din energi gør holdet bedre, ikke kun dig selv',
+                    'Lukker aftaler – den evne er guld i vores branche',
+                ]),
+                'thrives_with' => wp_json_encode([
+                    'Klare mål og KPI\'er – vi har transparente systemer så du altid ved præcis hvor du er',
+                    'Frihed til at agere selvstændigt – vi stoler på dig og giver dig plads',
+                    'Konkurrencepræget og højt tempo – vores miljø er designet til din type',
+                    'Synlige resultater – vi fejrer dine sejre, store som små',
+                ]),
+                'develop_areas' => wp_json_encode([
+                    'Tålmodighed i processen kan udfordre dig – vi hjælper dig med at finde de smarte genveje',
+                    'At lytte mere end du taler booster dine resultater – det er en teknik vi arbejder med',
+                    'Langsigtet planlægning kan føles kedeligt – vi viser dig hvad strategisk tænkning giver dig',
+                    'At fordybe dig i detaljer kræver øvelse – vi har systemer der hjælper dig med det',
+                ]),
+            ],
+            'analytisk' => [
+                'description'  => 'Du ser mønstre ingen andre opdager. Din strukturerede tilgang og evne til at finde den smarteste løsning gør dig uundværlig når det virkelig gælder. Hos Rezponz er vi altid på udkig efter folk der ikke bare følger scriptet – men forstår hvorfor det virker. Din analytiske tilgang til kundeoplevelser gør dig til en af vores mest værdifulde typer.',
+                'strengths'    => wp_json_encode([
+                    'Analytisk tilgang til udfordringer – du finder den bedste løsning, ikke bare den hurtigste',
+                    'Finder mønstre og sammenhænge – du ser hvad andre overser',
+                    'Struktureret problemløsning – du skaber klarhed i kaos',
+                    'Evidensbaseret kommunikation – kunder stoler på dig fordi du ved hvad du taler om',
+                    'Strategisk tænkning – du optimerer konstant, og det mærker kunder og kolleger',
+                ]),
+                'thrives_with' => wp_json_encode([
+                    'Komplekse udfordringer – vi har masser af dem, og du er den der løser dem',
+                    'Data og indsigter – vi giver dig adgang til performance-data så du kan optimere',
+                    'Systemer og processer – vi bygger de strukturer du arbejder bedst inden for',
+                    'Klare frameworks og metoder – vi har opbygget de bedste salgsteknikker til din type',
+                ]),
+                'develop_areas' => wp_json_encode([
+                    'Den emotionelle forbindelse med kunder kan udfordre dig – vi lærer dig at kombinere hjerte og hoved',
+                    'At kommunikere simpelt og direkte kræver øvelse – vi coacher dig i at ramme kunden præcist',
+                    'Fleksibilitet og improvisation arbejder vi aktivt med – det giver dig et kæmpe forspring',
+                    'Handling frem for analyse – vi hjælper dig med at tage springet, selv med ufuldstændig info',
+                ]),
+            ],
+            'social' => [
+                'description'  => 'Du er limet der holder folk sammen. Din naturlige evne til at skabe relationer og forbinde mennesker giver dig et netværk ingen kan konkurrere med. Hos Rezponz er relationer fundamentet for alt vi gør – vi sælger ikke produkter, vi bygger forbindelser. Her er din sociale intelligens ikke bare ønsket – den er nødvendig.',
+                'strengths'    => wp_json_encode([
+                    'Bygger relationer naturligt og hurtigt – fra dag ét skaber du tillid med kunder og kolleger',
+                    'Forbinder de rette mennesker – du ser potentialet i enhver kontakt',
+                    'Skaber fællesskab og tilhørighed – vores kultur er stærkere fordi du er der',
+                    'Sælger gennem relationer – den tilgang slår alle scripts',
+                    'Husker alle og deres historier – det gør dig til den alle vil snakke med igen',
+                ]),
+                'thrives_with' => wp_json_encode([
+                    'Sociale events og kampagner – vi afholder dem løbende og du er skabt til dem',
+                    'Tværfagligt samarbejde – du samler trådene og får holdet til at fungere',
+                    'Dynamiske og skiftende miljøer – ingen dage er ens hos Rezponz',
+                    'At repræsentere virksomheden udadtil – vi sætter dig gerne i forreste række',
+                ]),
+                'develop_areas' => wp_json_encode([
+                    'Dybde frem for bredde i relationer kan udfordre dig – vi hjælper dig med at prioritere de vigtigste kunder',
+                    'Fokus og prioritering er noget vi arbejder aktivt med – du lærer at vinde de rigtige kampe',
+                    'At gennemføre opgaver selvstændigt kræver struktur – vi giver dig de rammer du har brug for',
+                    'At sige nej til nye ting er en muskel du træner hos os – det giver dig mere energi til det der tæller',
+                ]),
+            ],
+        ];
+
+        foreach ( $updates as $slug => $data ) {
+            $wpdb->update( $pt, $data, [ 'slug' => $slug ] );
+        }
     }
 
     public static function get_profile_distribution(): array {

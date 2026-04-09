@@ -69,15 +69,18 @@ class RZPA_Quiz_API {
         }
 
         // Validate required fields
-        $name    = sanitize_text_field( $body['name'] ?? '' );
-        $phone   = sanitize_text_field( $body['phone'] ?? '' );
-        $email   = sanitize_email( $body['email'] ?? '' );
-        $consent = ! empty( $body['consent'] );
-        $answers = $body['answers'] ?? [];
+        $name            = sanitize_text_field( $body['name'] ?? '' );
+        $phone           = sanitize_text_field( $body['phone'] ?? '' );
+        $email           = sanitize_email( $body['email'] ?? '' );
+        $consent         = ! empty( $body['consent'] );
+        $contact_consent = ! empty( $body['contact_consent'] );
+        $answers         = $body['answers'] ?? [];
 
-        if ( ! $name )    return self::err( 'Navn er påkrævet' );
-        if ( ! $email )   return self::err( 'Email er påkrævet' );
-        if ( ! $consent ) return self::err( 'Du skal acceptere GDPR-vilkårene' );
+        if ( ! $name )            return self::err( 'Navn er påkrævet' );
+        if ( ! $email )           return self::err( 'Email er påkrævet' );
+        if ( ! $phone )           return self::err( 'Telefonnummer er påkrævet' );
+        if ( ! $consent )         return self::err( 'Du skal acceptere GDPR-vilkårene' );
+        if ( ! $contact_consent ) return self::err( 'Du skal give tilladelse til at vi må kontakte dig' );
         if ( ! is_array( $answers ) || count( $answers ) < 1 ) return self::err( 'Ingen svar registreret' );
 
         // Normalize phone → +45XXXXXXXX
@@ -142,13 +145,14 @@ class RZPA_Quiz_API {
             'scores'               => $scores,
             'answers'              => $answers,
             'consent'              => $consent,
+            'contact_consent'      => $contact_consent,
             'withdraw_token'       => $withdraw_token,
             'ip'                   => $ip,
         ] );
 
         // Send emails
         if ( $sub_id ) {
-            RZPA_Quiz_Mailer::send_user_email( $name, $email, $winner, $secondary, $ranked, $scores );
+            RZPA_Quiz_Mailer::send_user_email( $name, $email, $winner, $secondary, $ranked, $scores, (int) $sub_id );
             RZPA_Quiz_Mailer::send_admin_email( $name, $phone, $email, $winner, $scores, (int) $sub_id );
         }
 

@@ -460,12 +460,10 @@
         </div>
 
         <div class="rzq-form-group">
-          <label class="rzq-form-label" for="rzq-phone">
-            Telefon
-            <span style="color:rgba(255,255,255,.35);font-weight:400;text-transform:none;font-size:10px;margin-left:4px">(valgfri — hvis du vil have et hurtigt svar)</span>
-          </label>
+          <label class="rzq-form-label" for="rzq-phone">Telefonnummer <span class="rzq-required-star">*</span></label>
           <input class="rzq-form-input" type="tel" id="rzq-phone"
                  placeholder="Dit nummer" autocomplete="tel">
+          <div class="rzq-field-msg" id="rzq-phone-msg"></div>
         </div>
 
         <div class="rzq-honeypot">
@@ -476,7 +474,14 @@
         <label class="rzq-consent-wrap">
           <input type="checkbox" id="rzq-consent">
           <span class="rzq-consent-label">
-            Jeg accepterer at Rezponz må sende mig min profil og kontakte mig om relevante muligheder. GDPR — vi deler aldrig dine data.
+            Jeg accepterer Rezponz's behandling af mine personoplysninger i overensstemmelse med GDPR og privatlivspolitikken. <span class="rzq-required-star">*</span>
+          </span>
+        </label>
+
+        <label class="rzq-consent-wrap" style="margin-top:10px">
+          <input type="checkbox" id="rzq-contact-consent">
+          <span class="rzq-consent-label">
+            Jeg giver Rezponz tilladelse til at kontakte mig om relevante jobmuligheder og karrieretilbud. <span class="rzq-required-star">*</span>
           </span>
         </label>
 
@@ -508,6 +513,11 @@
         validate: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()),
         errMsg: 'Tjek din email', okMsg: '✓',
       },
+      {
+        id: 'rzq-phone', msgId: 'rzq-phone-msg',
+        validate: v => /^[\d\s\+\-\(\)]{7,}$/.test(v.trim()),
+        errMsg: 'Skriv dit telefonnummer', okMsg: '✓',
+      },
     ];
     rules.forEach(rule => {
       const input = document.getElementById(rule.id);
@@ -526,18 +536,21 @@
   }
 
   async function handleSubmit() {
-    const name    = document.getElementById('rzq-name').value.trim();
-    const email   = document.getElementById('rzq-email').value.trim();
-    const phone   = document.getElementById('rzq-phone').value.trim();
-    const consent = document.getElementById('rzq-consent').checked;
-    const errEl   = document.getElementById('rzq-form-err');
-    const btn     = document.getElementById('rzq-submit-btn');
-    const label   = document.getElementById('rzq-submit-label');
+    const name           = document.getElementById('rzq-name').value.trim();
+    const email          = document.getElementById('rzq-email').value.trim();
+    const phone          = document.getElementById('rzq-phone').value.trim();
+    const consent        = document.getElementById('rzq-consent').checked;
+    const contactConsent = document.getElementById('rzq-contact-consent').checked;
+    const errEl          = document.getElementById('rzq-form-err');
+    const btn            = document.getElementById('rzq-submit-btn');
+    const label          = document.getElementById('rzq-submit-label');
 
     errEl.style.display = 'none';
-    if (!name)                                        return showErr(errEl, 'Skriv dit navn.');
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showErr(errEl, 'Skriv en gyldig email.');
-    if (!consent)                                     return showErr(errEl, 'Du skal acceptere betingelserne.');
+    if (!name)                                                  return showErr(errEl, 'Skriv dit navn.');
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))   return showErr(errEl, 'Skriv en gyldig email.');
+    if (!phone || !/^[\d\s\+\-\(\)]{7,}$/.test(phone))         return showErr(errEl, 'Skriv dit telefonnummer.');
+    if (!consent)                                               return showErr(errEl, 'Du skal acceptere GDPR-vilkårene.');
+    if (!contactConsent)                                        return showErr(errEl, 'Du skal give tilladelse til at vi må kontakte dig.');
 
     if (S.submitting) return;
     S.submitting = true;
@@ -549,7 +562,7 @@
         method:  'POST',
         headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': root.dataset.nonce || '' },
         body: JSON.stringify({
-          name, email, phone, consent,
+          name, email, phone, consent, contact_consent: contactConsent,
           website: document.getElementById('rzq-hp-web').value,
           company: document.getElementById('rzq-hp-co').value,
           answers: S.answers.map(a => ({ questionId: a.questionId, answerId: a.answerId })),
@@ -600,9 +613,9 @@
     }).join('');
 
     const traits = [
-      { icon: '💪', label: 'Det er du god til',  key: 'strengths',     accentColor: w.color },
-      { icon: '🚀', label: 'Du trives med',       key: 'thrives_with',  accentColor: '#6366f1' },
-      { icon: '📈', label: 'Her kan du vækste',   key: 'develop_areas', accentColor: '#10b981' },
+      { icon: '💪', label: 'Dine styrker – og hvorfor de passer til Rezponz', key: 'strengths',     accentColor: w.color },
+      { icon: '🚀', label: 'Du trives med – det har vi hos Rezponz',          key: 'thrives_with',  accentColor: '#6366f1' },
+      { icon: '📈', label: 'Det kan udfordre dig – men det hjælper vi dig med', key: 'develop_areas', accentColor: '#10b981' },
     ].map(tc => {
       const items = (w[tc.key] || []).map(item =>
         `<li class="rzq-trait-item">
@@ -663,21 +676,21 @@
           <div class="rzq-cta-emoji">${esc(w.icon_emoji)}</div>
           <div class="rzq-cta-eyebrow">Næste skridt</div>
           <h3 class="rzq-cta-title">
-            Vil du vide mere<br>
-            <em class="rzq-cta-profile">om hvad du kan?</em>
+            Din profil passer perfekt<br>
+            <em class="rzq-cta-profile">til et job hos Rezponz</em>
           </h3>
           <p class="rzq-cta-sub">
-            Vi finder de jobs der passer til din ${esc(w.title)}-type — og giver dig en uforpligtende snak om mulighederne
+            Se vores åbne stillinger og søg det job der matcher din ${esc(w.title)}-type
           </p>
           <div class="rzq-result-urgency">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-            Vi svarer inden for 24 timer
+            Vi ser frem til at høre fra dig
           </div>
-          <a href="/book-en-samtale" class="rzq-cta-btn" id="rzq-cta-anchor">
-            Ja, vis mig mulighederne
+          <a href="https://rezponz.dk/karriere-stillinger/" class="rzq-cta-btn" id="rzq-cta-anchor">
+            Søg dit nye job hos Rezponz her
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </a>
-          <div class="rzq-cta-note">Gratis · Uforpligtende · ~20 min</div>
+          <div class="rzq-cta-note">Gratis · Uforpligtende · Find dit match</div>
         </div>
 
       </div>
@@ -686,8 +699,8 @@
     </div></div>
 
     <div class="rzq-sticky-cta" id="rzq-sticky-cta">
-      <a href="/book-en-samtale" class="rzq-sticky-cta-inner">
-        ${esc(w.icon_emoji)} Se mine muligheder
+      <a href="https://rezponz.dk/karriere-stillinger/" class="rzq-sticky-cta-inner">
+        ${esc(w.icon_emoji)} Søg dit nye job hos Rezponz her
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
       </a>
     </div>`;

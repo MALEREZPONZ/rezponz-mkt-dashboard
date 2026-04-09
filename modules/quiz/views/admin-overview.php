@@ -36,6 +36,28 @@ $tab = $tab ?? 'submissions';
   <!-- ══════════════════════════════════════════════════════════════════════
        TAB: BESVARELSER
   ══════════════════════════════════════════════════════════════════════ -->
+  <?php
+  // Vis PDF-fejl fra seneste email-forsøg (gemmes som transient)
+  $pdf_err = get_transient( 'rzpa_quiz_pdf_error' );
+  if ( $pdf_err ) :
+      delete_transient( 'rzpa_quiz_pdf_error' );
+  ?>
+  <div style="background:#2d0a0a;color:#f87171;border:1px solid #f8717140;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-family:monospace">
+    ⚠️ <strong>PDF-fejl (seneste besvarelse):</strong><br><br><?php echo esc_html( $pdf_err ); ?>
+  </div>
+  <?php endif; ?>
+
+  <?php
+  $mail_err = get_transient( 'rzpa_quiz_mail_error' );
+  if ( $mail_err ) :
+      delete_transient( 'rzpa_quiz_mail_error' );
+  ?>
+  <div style="background:#1a1a2e;color:#93c5fd;border:1px solid #3b82f640;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-family:monospace">
+    📧 <strong>Mail-fejl (seneste besvarelse):</strong><br><br><?php echo esc_html( $mail_err ); ?><br><br>
+    <span style="color:#6b7280">Konfigurér SMTP under <a href="<?php echo esc_url( admin_url( 'admin.php?page=rzpa-settings' ) ); ?>" style="color:#60a5fa">Indstillinger → SMTP</a> for pålidelig email-afsendelse.</span>
+  </div>
+  <?php endif; ?>
+
   <?php if ( $tab === 'submissions' ) :
 
     $per_page    = 20;
@@ -131,8 +153,10 @@ $tab = $tab ?? 'submissions';
 
     <?php /* REST nonce for JS */ ?>
     <script>
-    var rzpaRestNonce = '<?php echo esc_js( wp_create_nonce( 'wp_rest' ) ); ?>';
-    var rzpaAdminUrl  = '<?php echo esc_js( admin_url( 'admin.php' ) ); ?>';
+    var rzpaRestNonce    = '<?php echo esc_js( wp_create_nonce( 'wp_rest' ) ); ?>';
+    var rzpaAdminUrl     = '<?php echo esc_js( admin_url( 'admin.php' ) ); ?>';
+    var rzpaAdminPostUrl = '<?php echo esc_js( admin_url( 'admin-post.php' ) ); ?>';
+    var rzpaPdfNonce     = '<?php echo esc_js( wp_create_nonce( 'rzpa_quiz_download_pdf' ) ); ?>';
 
     function rzpaToggleDetail(id) {
       var row  = document.getElementById('rzpa-detail-' + id);
@@ -186,7 +210,7 @@ $tab = $tab ?? 'submissions';
           + '</div>';
       });
 
-      var pdfUrl = rzpaAdminUrl + '?page=rzpa-quiz-pdf&submission_id=' + d.id;
+      var pdfUrl = rzpaAdminPostUrl + '?action=rzpa_quiz_download_pdf&submission_id=' + d.id + '&_wpnonce=' + rzpaPdfNonce;
 
       return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">'
 
