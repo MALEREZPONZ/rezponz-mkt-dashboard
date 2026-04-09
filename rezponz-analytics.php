@@ -39,7 +39,7 @@ require_once RZPA_DIR . 'includes/class-admin.php';
 
 // ── Rekruttering Module ──────────────────────────────────────────────────────
 require_once RZPA_DIR . 'modules/rekruttering/class-rekruttering.php';
-RZPA_Rekruttering::init();
+// NOTE: init() called inside plugins_loaded below to ensure correct hook order
 
 // ── Crew Module ─────────────────────────────────────────────────────────────
 require_once RZPA_DIR . 'modules/crew/class-crew-db.php';
@@ -130,6 +130,7 @@ add_action( 'plugins_loaded', function () {
     RZPA_Admin::init();
     RZPA_REST_API::init();
     RZPA_Scheduler::init();
+    RZPA_Rekruttering::init();
 
     // Crew module – auto-install tables if missing or outdated
     if ( get_option( RZPZ_Crew_DB::DB_VERSION_KEY ) !== RZPZ_Crew_DB::DB_VERSION ) {
