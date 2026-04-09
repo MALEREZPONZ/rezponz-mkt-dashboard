@@ -118,12 +118,8 @@ $base_url = admin_url( 'admin.php' );
           <thead><tr><th>Tid</th><th>Type</th><th>Besked</th></tr></thead>
           <tbody>
           <?php foreach ( $recent_logs as $log ) :
-            $sev_class = match( $log['severity'] ) {
-              'success' => 'badge-active',
-              'warning' => 'badge-paused',
-              'error'   => 'badge-error',
-              default   => '',
-            };
+            $sev_map   = [ 'success' => 'badge-active', 'warning' => 'badge-paused', 'error' => 'badge-error' ];
+            $sev_class = $sev_map[ $log['severity'] ] ?? '';
           ?>
             <tr>
               <td style="white-space:nowrap;color:var(--text-muted);font-size:11px;">

@@ -516,12 +516,12 @@ class RZPA_SEO_Linking {
      * @return string[]
      */
     private static function resolve_post_types( string $type ) : array {
-        return match ( $type ) {
-            'pseo'  => [ 'rzpa_pseo' ],
-            'blog'  => [ 'post' ],
-            'page'  => [ 'page' ],
-            default => [ 'rzpa_pseo', 'post', 'page' ],
-        };
+        switch ( $type ) {
+            case 'pseo': return [ 'rzpa_pseo' ];
+            case 'blog': return [ 'post' ];
+            case 'page': return [ 'page' ];
+            default:     return [ 'rzpa_pseo', 'post', 'page' ];
+        }
     }
 
     /**

@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      2.4.3
+ * Version:      2.4.4
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '2.4.3' );
+define( 'RZPA_VERSION',     '2.4.4' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -57,7 +57,18 @@ require_once RZPA_DIR . 'modules/live-quiz/class-live-quiz-api.php';
 require_once RZPA_DIR . 'modules/live-quiz/class-live-quiz-admin.php';
 require_once RZPA_DIR . 'modules/live-quiz/class-live-quiz.php';
 
-// ── SEO Engine Module (deaktiveret – debugges separat) ───────────────────────
+// ── SEO Engine Module ────────────────────────────────────────────────────────
+require_once RZPA_DIR . 'modules/seo-engine/class-seo-db.php';
+require_once RZPA_DIR . 'modules/seo-engine/class-seo-template.php';
+require_once RZPA_DIR . 'modules/seo-engine/class-seo-meta.php';
+require_once RZPA_DIR . 'modules/seo-engine/class-seo-quality.php';
+require_once RZPA_DIR . 'modules/seo-engine/class-seo-ai.php';
+require_once RZPA_DIR . 'modules/seo-engine/class-seo-blog.php';
+require_once RZPA_DIR . 'modules/seo-engine/class-seo-generator.php';
+require_once RZPA_DIR . 'modules/seo-engine/class-seo-linking.php';
+require_once RZPA_DIR . 'modules/seo-engine/class-seo-csv.php';
+require_once RZPA_DIR . 'modules/seo-engine/class-seo-engine.php';
+require_once RZPA_DIR . 'modules/seo-engine/class-seo-admin.php';
 
 // ── Profil-Quiz Module ───────────────────────────────────────────────────────
 require_once RZPA_DIR . 'modules/quiz/class-quiz-db.php';
@@ -74,6 +85,7 @@ register_activation_hook( __FILE__, function () {
     RZPA_Quiz_DB::install();
     RZLQ_DB::install();
     RZLQ_Dept::install();
+    RZPA_SEO_DB::install();
 } );
 register_deactivation_hook( __FILE__, [ 'RZPA_Scheduler', 'clear_crons' ] );
 
@@ -161,6 +173,14 @@ add_action( 'plugins_loaded', function () {
     RZLQ_API::init();
     RZLQ_Admin::init();
     RZLQ_Quiz::init();
+
+    // SEO Engine module
+    if ( get_option( RZPA_SEO_DB::DB_VERSION_KEY ) !== RZPA_SEO_DB::DB_VERSION ) {
+        RZPA_SEO_DB::install();
+    }
+    RZPA_SEO_Engine::init();
+    RZPA_SEO_Meta::init();
+    RZPA_SEO_Admin::init();
 
     // ── Auto-opdatering via GitHub ──────────────────────────────────────────
     $opts  = get_option( 'rzpa_settings', [] );

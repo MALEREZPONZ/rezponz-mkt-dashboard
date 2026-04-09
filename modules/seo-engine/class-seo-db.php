@@ -280,12 +280,19 @@ class RZPA_SEO_DB {
             if ( ! array_key_exists( $key, $data ) ) {
                 continue;
             }
-            $update[ $key ] = match ( $key ) {
-                'template_config' => is_array( $data[ $key ] ) ? ( wp_json_encode( $data[ $key ] ) ?: '{}' ) : $data[ $key ],
-                'version'         => absint( $data[ $key ] ),
-                'slug'            => sanitize_title( $data[ $key ] ),
-                default           => sanitize_text_field( $data[ $key ] ),
-            };
+            switch ( $key ) {
+                case 'template_config':
+                    $update[ $key ] = is_array( $data[ $key ] ) ? ( wp_json_encode( $data[ $key ] ) ?: '{}' ) : $data[ $key ];
+                    break;
+                case 'version':
+                    $update[ $key ] = absint( $data[ $key ] );
+                    break;
+                case 'slug':
+                    $update[ $key ] = sanitize_title( $data[ $key ] );
+                    break;
+                default:
+                    $update[ $key ] = sanitize_text_field( $data[ $key ] );
+            }
         }
 
         if ( empty( $update ) ) {
@@ -888,12 +895,19 @@ class RZPA_SEO_DB {
             if ( ! array_key_exists( $key, $data ) ) {
                 continue;
             }
-            $update[ $key ] = match ( $key ) {
-                'match_logic' => is_array( $data[ $key ] ) ? ( wp_json_encode( $data[ $key ] ) ?: '{}' ) : $data[ $key ],
-                'is_active'   => (int) (bool) $data[ $key ],
-                'priority'    => absint( $data[ $key ] ),
-                default       => sanitize_text_field( $data[ $key ] ),
-            };
+            switch ( $key ) {
+                case 'match_logic':
+                    $update[ $key ] = is_array( $data[ $key ] ) ? ( wp_json_encode( $data[ $key ] ) ?: '{}' ) : $data[ $key ];
+                    break;
+                case 'is_active':
+                    $update[ $key ] = (int) (bool) $data[ $key ];
+                    break;
+                case 'priority':
+                    $update[ $key ] = absint( $data[ $key ] );
+                    break;
+                default:
+                    $update[ $key ] = sanitize_text_field( $data[ $key ] );
+            }
         }
 
         if ( empty( $update ) ) {
