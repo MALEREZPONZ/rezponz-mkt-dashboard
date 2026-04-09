@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      2.4.6
+ * Version:      2.4.7
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '2.4.6' );
+define( 'RZPA_VERSION',     '2.4.7' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -57,8 +57,7 @@ require_once RZPA_DIR . 'modules/live-quiz/class-live-quiz-api.php';
 require_once RZPA_DIR . 'modules/live-quiz/class-live-quiz-admin.php';
 require_once RZPA_DIR . 'modules/live-quiz/class-live-quiz.php';
 
-// ── SEO Engine Module (med fejl-diagnostik) ──────────────────────────────────
-define( 'RZPA_SEO_ENGINE_ENABLED', false ); // sættes til true nedenfor hvis load lykkes
+// ── SEO Engine Module ────────────────────────────────────────────────────────
 $rzpa_seo_load_error = null;
 $rzpa_seo_files = [
     'class-seo-db.php', 'class-seo-template.php', 'class-seo-meta.php',
@@ -75,8 +74,11 @@ foreach ( $rzpa_seo_files as $_rzpa_f ) {
         break;
     }
 }
+// Definer kun konstanten hvis alle filer loadede OK (define() kan ikke overskrives)
 if ( ! $rzpa_seo_load_error ) {
     define( 'RZPA_SEO_ENGINE_ENABLED', true );
+} else {
+    define( 'RZPA_SEO_ENGINE_ENABLED', false );
 }
 
 // ── Profil-Quiz Module ───────────────────────────────────────────────────────
