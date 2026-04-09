@@ -40,6 +40,10 @@ class RZPA_SEO_Admin {
         add_action( 'admin_post_rzpa_seo_csv_export',           [ __CLASS__, 'handle_csv_export' ] );
         add_action( 'admin_post_rzpa_seo_download_csv_template',[ __CLASS__, 'handle_download_csv_template' ] );
         add_action( 'admin_post_rzpa_seo_save_settings',        [ __CLASS__, 'handle_save_settings' ] );
+        add_action( 'admin_post_rzpa_seo_flush_permalinks',     [ __CLASS__, 'handle_flush_permalinks' ] );
+        add_action( 'admin_post_rzpa_seo_clear_cache',          [ __CLASS__, 'handle_clear_cache' ] );
+        add_action( 'admin_post_rzpa_seo_delete_all_pseo',      [ __CLASS__, 'handle_delete_all_pseo' ] );
+        add_action( 'admin_post_rzpa_seo_clear_logs',           [ __CLASS__, 'handle_clear_logs' ] );
 
         // AJAX handlers
         add_action( 'wp_ajax_rzpa_seo_preview_template',     [ __CLASS__, 'ajax_preview_template' ] );
@@ -612,6 +616,55 @@ class RZPA_SEO_Admin {
         } else {
             wp_send_json_error( 'Blog-generering fejlede' );
         }
+    }
+
+    public static function handle_flush_permalinks() : void {
+        self::verify_nonce();
+        if ( ! current_user_can( 'manage_options' ) ) wp_die();
+        flush_rewrite_rules();
+        self::redirect_back( 'rzpa-seo-settings', [ 'updated' => 'permalinks' ] );
+    }
+
+    public static function handle_clear_cache() : void {
+        self::verify_nonce();
+        if ( ! current_user_can( 'manage_options' ) ) wp_die();
+        // Clear any generation-related transients
+        global $wpdb;
+        $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_rzpa_seo_%' OR option_name LIKE '_transient_timeout_rzpa_seo_%'" );
+        if ( function_exists( 'wpfc_clear_all_cache' ) ) wpfc_clear_all_cache( true );
+        self::redirect_back( 'rzpa-seo-settings', [ 'updated' => 'cache' ] );
+    }
+
+    public static function handle_delete_all_pseo() : void {
+        self::verify_nonce();
+        if ( ! current_user_can( 'manage_options' ) ) wp_die();
+
+        // Require confirmation text
+        $confirm = sanitize_text_field( $_POST['confirm_delete'] ?? '' );
+        if ( 'SLET ALT' !== $confirm ) {
+            self::redirect_back( 'rzpa-seo-settings', [ 'error' => rawurlencode( 'Skriv SLET ALT for at bekræfte.' ) ] );
+            return;
+        }
+
+        $posts = get_posts( [ 'post_type' => 'rzpa_pseo', 'numberposts' => -1, 'fields' => 'ids', 'post_status' => 'any' ] );
+        foreach ( $posts as $id ) {
+            wp_delete_post( $id, true );
+        }
+        // Reset generation_status in datasets table
+        global $wpdb;
+        $t = RZPA_SEO_DB::get_table( 'datasets' );
+        $wpdb->query( "UPDATE {$t} SET generation_status='pending', linked_post_id=NULL, quality_score=NULL, quality_status=NULL" ); // phpcs:ignore
+        self::redirect_back( 'rzpa-seo-settings', [ 'updated' => 'deleted_pseo', 'count' => count( $posts ) ] );
+    }
+
+    public static function handle_clear_logs() : void {
+        self::verify_nonce();
+        if ( ! current_user_can( 'manage_options' ) ) wp_die();
+        $days = absint( $_POST['older_than_days'] ?? 90 );
+        global $wpdb;
+        $t = RZPA_SEO_DB::get_table( 'gen_logs' );
+        $wpdb->query( $wpdb->prepare( "DELETE FROM {$t} WHERE created_at < DATE_SUB(NOW(), INTERVAL %d DAY)", $days ) ); // phpcs:ignore
+        self::redirect_back( 'rzpa-seo-logs', [ 'updated' => 1 ] );
     }
 
     // ── Utility ───────────────────────────────────────────────────────────────
