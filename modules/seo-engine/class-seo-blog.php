@@ -510,7 +510,7 @@ class RZPA_SEO_Blog {
                 'apply'     => sprintf( 'Søg stillingen som %s nu og hør fra os inden for 24 timer.', esc_html( $keyword ) ),
                 'subscribe' => sprintf( 'Abonnér på vores nyhedsbrev og få de seneste nyheder om %s.', esc_html( $keyword ) ),
                 'download'  => sprintf( 'Download vores gratis guide om %s.', esc_html( $keyword ) ),
-                default     => sprintf( 'Interesseret i %s? Tag det næste skridt i dag.', esc_html( $keyword ) ),
+                'default'   => sprintf( 'Interesseret i %s? Tag det næste skridt i dag.', esc_html( $keyword ) ),
             ];
             $text = $cta_texts[ $cta_type ] ?? $cta_texts['default'];
         }
