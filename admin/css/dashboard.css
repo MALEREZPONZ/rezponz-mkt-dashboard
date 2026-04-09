@@ -1464,4 +1464,190 @@ body.wp-admin #wpbody-content { overflow-x: hidden; }
   color: var(--text-muted);
   font-size: 14px;
 }
+
+/* ═══════════════════════════════════════════════
+   Creative Intelligence – superads.ai-style
+   ═══════════════════════════════════════════════ */
+
+/* ── Performance pill (inline benchmark label) ── */
+.perf-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 700;
+  padding: 3px 10px; border-radius: 20px;
+  white-space: nowrap;
+}
+.perf-pill.good    { background:rgba(204,255,0,.12); color:#CCFF00; border:1px solid rgba(204,255,0,.25); }
+.perf-pill.warn    { background:rgba(255,170,51,.12); color:#ffaa33; border:1px solid rgba(255,170,51,.25); }
+.perf-pill.bad     { background:rgba(255,85,85,.12);  color:#ff5555; border:1px solid rgba(255,85,85,.25); }
+.perf-pill.neutral { background:var(--bg-300); color:var(--text-muted); border:1px solid var(--border); }
+
+/* ── AI response content area ─────────────────── */
+.rzpa-ai-response {
+  font-size: 13px;
+  color: #ccc;
+  line-height: 1.85;
+}
+.rzpa-ai-response h3 {
+  font-size: 14px; font-weight: 700; color: #fff;
+  margin: 18px 0 6px;
+}
+.rzpa-ai-response ul { padding-left: 18px; margin: 6px 0 12px; }
+.rzpa-ai-response li { margin-bottom: 5px; }
+.rzpa-ai-response strong { color: #fff; }
+.rzpa-ai-response em { color: #aaa; font-style: normal; }
+.rzpa-ai-loading {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: #777;
+}
+.rzpa-ai-loading::before {
+  content: '';
+  display: block; width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.1);
+  border-top-color: var(--neon, #ccff00);
+  animation: rzpa-spin .7s linear infinite;
+}
+
+/* ── Creative Intelligence grid ───────────────── */
+.rzpa-ci-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+@media (max-width: 900px) { .rzpa-ci-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .rzpa-ci-grid { grid-template-columns: 1fr; } }
+
+/* ── Individual creative card ─────────────────── */
+.rzpa-ci-card {
+  background: var(--bg-200, #1a1a20);
+  border: 1px solid var(--border, rgba(255,255,255,.08));
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color .2s, transform .15s;
+  position: relative;
+}
+.rzpa-ci-card:hover { border-color: rgba(204,255,0,.3); transform: translateY(-2px); }
+.rzpa-ci-card.ci-rank-1 { border-color: rgba(255,215,0,.4); }
+.rzpa-ci-card.ci-rank-2 { border-color: rgba(192,192,192,.35); }
+.rzpa-ci-card.ci-rank-3 { border-color: rgba(205,127,50,.35); }
+
+/* ── Thumbnail area ───────────────────────────── */
+.rzpa-ci-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  background: var(--bg-300, #111116);
+  overflow: hidden;
+}
+.rzpa-ci-thumb img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.rzpa-ci-no-thumb {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px; color: #444;
+}
+.rzpa-ci-no-thumb svg { opacity: .3; }
+.rzpa-ci-no-thumb span { font-size: 11px; color: #555; }
+
+/* ── Overall score overlay on thumbnail ──────── */
+.rzpa-ci-overall {
+  position: absolute;
+  bottom: 8px; right: 8px;
+  background: rgba(0,0,0,.72);
+  backdrop-filter: blur(4px);
+  border-radius: 8px;
+  padding: 4px 8px;
+  display: flex; flex-direction: column; align-items: center;
+  border: 1px solid rgba(255,255,255,.12);
+  min-width: 44px;
+}
+.rzpa-ci-overall .ci-score-num {
+  font-size: 18px; font-weight: 800; color: #fff; line-height: 1;
+}
+.rzpa-ci-overall .ci-score-lbl {
+  font-size: 9px; color: rgba(255,255,255,.5); text-transform: uppercase; letter-spacing: .04em;
+}
+.rzpa-ci-overall.score-great .ci-score-num { color: #CCFF00; }
+.rzpa-ci-overall.score-good  .ci-score-num { color: #4ade80; }
+.rzpa-ci-overall.score-mid   .ci-score-num { color: #ffaa33; }
+.rzpa-ci-overall.score-bad   .ci-score-num { color: #ff5555; }
+
+/* ── Crown / rank badge on thumbnail ─────────── */
+.rzpa-ci-crown {
+  position: absolute; top: 8px; left: 8px;
+  font-size: 18px; line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.8));
+}
+
+/* ── Fatigue badge on thumbnail ──────────────── */
+.rzpa-ci-fatigue {
+  position: absolute; top: 8px; right: 8px;
+  background: rgba(255,85,85,.85);
+  color: #fff; font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 20px;
+  letter-spacing: .03em;
+}
+
+/* ── Card body ────────────────────────────────── */
+.rzpa-ci-body {
+  padding: 12px;
+}
+.rzpa-ci-rank {
+  font-size: 10px; font-weight: 700; color: var(--text-muted, #666);
+  text-transform: uppercase; letter-spacing: .06em;
+  margin-bottom: 4px;
+}
+.rzpa-ci-name {
+  font-size: 12px; font-weight: 600; color: #ddd;
+  margin-bottom: 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Metrics mini-grid inside card ───────────── */
+.rzpa-ci-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 10px;
+  margin-bottom: 10px;
+}
+.rzpa-ci-metric { display: flex; flex-direction: column; }
+.rzpa-ci-metric .cm-lbl { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: .04em; }
+.rzpa-ci-metric .cm-val { font-size: 13px; font-weight: 700; color: #ccc; }
+
+/* ── Score rings row inside card ─────────────── */
+.rzpa-ci-scores {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-top: 1px solid var(--border, rgba(255,255,255,.06));
+  padding-top: 10px;
+  gap: 2px;
+}
+.ci-ring-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  flex: 1;
+}
+.ci-ring-lbl {
+  font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: .04em;
+  white-space: nowrap;
+}
+.ci-ring-svg { display: block; }
+.ci-ring-val {
+  font-size: 10px; font-weight: 700; color: #aaa;
+}
+
+/* ── Score ring color helpers ────────────────── */
+.ci-ring-great { stroke: #CCFF00; }
+.ci-ring-good  { stroke: #4ade80; }
+.ci-ring-mid   { stroke: #ffaa33; }
+.ci-ring-bad   { stroke: #ff5555; }
+
+/* ── Spinning loader ──────────────────────────── */
+@keyframes rzpa-spin {
+  to { transform: rotate(360deg); }
+}
 .gads-ad-campaign{font-size:10px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid rgba(255,255,255,.04);padding-top:6px;margin-top:4px}

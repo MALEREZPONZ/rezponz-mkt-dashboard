@@ -7,7 +7,7 @@ $has_openai      = ! empty( $gads_opts['openai_api_key'] );
 <div id="rzpa-app" data-rzpa-page="google-ads">
 
   <div class="rzpa-logo-bar">
-    <img src="<?php echo esc_url( RZPA_URL . 'assets/logo.svg' ); ?>" alt="Rezponz" />
+    <img src="<?php echo esc_url( RZPA_URL . 'assets/Rezponz-logo.png' ); ?>" alt="Rezponz" />
     <span class="rzpa-logo-badge" style="background:rgba(66,133,244,.15);color:#4285F4">Google Ads</span>
   </div>
 
@@ -191,6 +191,83 @@ $has_openai      = ! empty( $gads_opts['openai_api_key'] );
       Klik <strong style="color:#888">"Hent annoncer"</strong> for at se dine aktive Google Ads-annoncer.
     </div>
   </div>
+<?php /* Inline patch – bypasses cached dashboard.js */ ?>
+<script>
+(function(){
+  function initGadsAdsPatch(){
+    var btn     = document.getElementById('gads-ads-load');
+    var content = document.getElementById('gads-ads-content');
+    if(!btn||!content) return;
+    // Replace button to strip old cached event listeners
+    var nb = btn.cloneNode(true);
+    btn.parentNode.replaceChild(nb, btn);
+    nb.addEventListener('click', function(){
+      nb.disabled = true; nb.textContent = '⏳ Henter…';
+      content.innerHTML = '<div style="color:#555;text-align:center;padding:20px">Henter aktive Google Ads-annoncer…</div>';
+      fetch('<?php echo esc_js( rest_url( 'rzpa/v1/google-ads/ads' ) ); ?>?force=1', {
+        headers: {'Content-Type':'application/json','X-WP-Nonce':'<?php echo esc_js( wp_create_nonce( 'wp_rest' ) ); ?>'}
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        nb.disabled = false; nb.textContent = '📢 Hent annoncer';
+        var d = res.data || [];
+        if(d && d.error){ content.innerHTML='<span style="color:#ff6b6b">⚠️ '+d.error+'</span>'; return; }
+        if(!Array.isArray(d)||!d.length){ content.innerHTML='<span style="color:#555">Ingen aktive RSA-annoncer fundet de seneste 30 dage.</span>'; return; }
+        var fmtNum = function(n){ return Number(n||0).toLocaleString('da-DK'); };
+        var fmtKr  = function(n){ return Number(n||0).toLocaleString('da-DK',{minimumFractionDigits:0,maximumFractionDigits:0})+' kr'; };
+        content.innerHTML = '<div class="gads-ads-grid">'+d.map(function(ad){
+          var hl=ad.headlines||[], ds=ad.descriptions||[], url=ad.final_url||'', host='';
+          try{ host=new URL(url).hostname.replace('www.',''); }catch(e){}
+          var ctrColor = (ad.ctr>=2)?'#4ade80':(ad.ctr>=1)?'#f59e0b':'#ef4444';
+          return '<div class="gads-ad-card" style="display:flex;flex-direction:column;gap:0">'+
+            // Badge + kampagne
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
+              '<span class="gads-ad-badge" style="background:rgba(66,133,244,.15);padding:2px 8px;border-radius:4px">RSA · Google Søgning</span>'+
+              '<span style="font-size:10px;color:#555;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+ad.ad_group+'">'+(ad.ad_group||ad.campaign||'')+'</span>'+
+            '</div>'+
+            // Google ad preview
+            '<div style="background:#0d0d0d;border:1px solid #1e3a5f;border-radius:8px;padding:12px 14px;margin-bottom:10px">'+
+              '<div style="color:#4ade80;font-size:11px;margin-bottom:3px">📢 Annonce · '+host+'</div>'+
+              '<div style="color:#4285F4;font-size:15px;font-weight:700;line-height:1.4;margin-bottom:6px">'+hl.slice(0,3).join(' | ')+'</div>'+
+              '<div style="color:#aaa;font-size:12px;line-height:1.6">'+ds.slice(0,2).join(' · ')+'</div>'+
+            '</div>'+
+            // KPI-række
+            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">'+
+              '<div style="background:#111;border-radius:6px;padding:6px 8px;text-align:center">'+
+                '<div style="font-size:9px;color:#555;text-transform:uppercase;margin-bottom:2px">Visninger</div>'+
+                '<div style="font-size:13px;font-weight:700;color:#ccc">'+fmtNum(ad.impressions)+'</div>'+
+              '</div>'+
+              '<div style="background:#111;border-radius:6px;padding:6px 8px;text-align:center">'+
+                '<div style="font-size:9px;color:#555;text-transform:uppercase;margin-bottom:2px">Klik</div>'+
+                '<div style="font-size:13px;font-weight:700;color:#ccc">'+fmtNum(ad.clicks)+'</div>'+
+              '</div>'+
+              '<div style="background:#111;border-radius:6px;padding:6px 8px;text-align:center">'+
+                '<div style="font-size:9px;color:#555;text-transform:uppercase;margin-bottom:2px">CTR</div>'+
+                '<div style="font-size:13px;font-weight:700;color:'+ctrColor+'">'+Number(ad.ctr||0).toFixed(2)+'%</div>'+
+              '</div>'+
+              '<div style="background:#111;border-radius:6px;padding:6px 8px;text-align:center">'+
+                '<div style="font-size:9px;color:#555;text-transform:uppercase;margin-bottom:2px">Forbrug</div>'+
+                '<div style="font-size:13px;font-weight:700;color:#ccc">'+fmtKr(ad.spend)+'</div>'+
+              '</div>'+
+            '</div>'+
+            // Links
+            '<div style="display:flex;gap:8px;margin-top:auto">'+
+              (ad.gads_url ? '<a href="'+ad.gads_url+'" target="_blank" rel="noopener" style="flex:1;text-align:center;background:rgba(66,133,244,.12);border:1px solid rgba(66,133,244,.3);border-radius:6px;padding:6px 10px;font-size:11px;color:#4285F4;text-decoration:none">🔗 Se i Google Ads</a>' : '')+
+              (url ? '<a href="'+url+'" target="_blank" rel="noopener" style="flex:1;text-align:center;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:6px;padding:6px 10px;font-size:11px;color:#4ade80;text-decoration:none">↗ Landingsside</a>' : '')+
+            '</div>'+
+          '</div>';
+        }).join('')+'</div>';
+      })
+      .catch(function(e){
+        nb.disabled=false; nb.textContent='📢 Hent annoncer';
+        content.innerHTML='<span style="color:#ff6b6b">⚠️ Fejl: '+e.message+'</span>';
+      });
+    });
+  }
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',initGadsAdsPatch); }
+  else { initGadsAdsPatch(); }
+})();
+</script>
 
   <!-- Fakturaer -->
   <div class="rzpa-card" id="gads-invoices-card">

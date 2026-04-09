@@ -24,7 +24,7 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
 <div id="rzpa-app">
 
   <div class="rzpa-logo-bar">
-    <img src="<?php echo esc_url( RZPA_URL . 'assets/logo.svg' ); ?>" alt="Rezponz" />
+    <img src="<?php echo esc_url( RZPA_URL . 'assets/Rezponz-logo.png' ); ?>" alt="Rezponz" />
     <span class="rzpa-logo-badge">Indstillinger</span>
   </div>
 
@@ -514,6 +514,69 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
         <?php endif; ?>
 
       </div>
+
+    <!-- ══ SMTP ══════════════════════════════════════════════════════════════ -->
+    <div class="rzpa-card rzpa-settings-section">
+      <h2>📧 Email / SMTP</h2>
+      <p style="font-size:12px;color:#6b7280;margin-bottom:16px">
+        Som standard bruger WordPress serverens PHP <code>mail()</code>-funktion, som ofte er blokeret af hosting-udbydere og derfor ikke leverer emails pålideligt.
+        Konfigurér SMTP nedenfor for at sikre at quiz-resultater, henvis-notifikationer og øvrige mails faktisk ankommer.
+      </p>
+      <div class="rzpa-settings-grid">
+        <div class="rzpa-field" style="grid-column:1/-1">
+          <label>Aktiver SMTP</label>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:4px;cursor:pointer">
+            <input type="checkbox" name="smtp_enabled" value="1" <?php checked( ! empty( $opts['smtp_enabled'] ) ); ?>>
+            <span style="font-size:12px;color:#9ca3af">Brug SMTP i stedet for PHP mail()</span>
+          </label>
+        </div>
+        <div class="rzpa-field">
+          <label>SMTP Host</label>
+          <input type="text" name="smtp_host"
+                 value="<?php echo esc_attr( $opts['smtp_host'] ?? '' ); ?>"
+                 placeholder="smtp.gmail.com" />
+        </div>
+        <div class="rzpa-field">
+          <label>SMTP Port</label>
+          <input type="text" name="smtp_port"
+                 value="<?php echo esc_attr( $opts['smtp_port'] ?? '587' ); ?>"
+                 placeholder="587" style="max-width:120px" />
+        </div>
+        <div class="rzpa-field">
+          <label>Kryptering</label>
+          <select name="smtp_encryption">
+            <option value="tls"  <?php selected( ( $opts['smtp_encryption'] ?? 'tls' ), 'tls'  ); ?>>TLS — anbefalet (port 587)</option>
+            <option value="ssl"  <?php selected( ( $opts['smtp_encryption'] ?? 'tls' ), 'ssl'  ); ?>>SSL (port 465)</option>
+            <option value="none" <?php selected( ( $opts['smtp_encryption'] ?? 'tls' ), 'none' ); ?>>Ingen kryptering</option>
+          </select>
+        </div>
+        <div class="rzpa-field">
+          <label>Brugernavn / Login-email</label>
+          <input type="text" name="smtp_username"
+                 value="<?php echo esc_attr( $opts['smtp_username'] ?? '' ); ?>"
+                 placeholder="noreply@rezponz.dk" />
+        </div>
+        <div class="rzpa-field">
+          <label>Adgangskode</label>
+          <input type="password" name="smtp_password"
+                 value="<?php echo esc_attr( $opts['smtp_password'] ?? '' ); ?>"
+                 placeholder="App-adgangskode" />
+          <p style="font-size:11px;color:#6b7280;margin:4px 0 0">Gmail: brug en <em>App Password</em> (ikke din normale adgangskode)</p>
+        </div>
+        <div class="rzpa-field">
+          <label>Afsender-email (From)</label>
+          <input type="text" name="smtp_from_email"
+                 value="<?php echo esc_attr( $opts['smtp_from_email'] ?? '' ); ?>"
+                 placeholder="noreply@rezponz.dk" />
+        </div>
+        <div class="rzpa-field">
+          <label>Afsender-navn (From Name)</label>
+          <input type="text" name="smtp_from_name"
+                 value="<?php echo esc_attr( $opts['smtp_from_name'] ?? 'Rezponz' ); ?>"
+                 placeholder="Rezponz" />
+        </div>
+      </div>
+    </div>
 
     <button type="submit" class="btn-primary" style="font-size:14px;padding:10px 24px">
       💾 Gem indstillinger

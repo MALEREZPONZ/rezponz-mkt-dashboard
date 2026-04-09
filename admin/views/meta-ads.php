@@ -6,7 +6,7 @@ $has_openai = ! empty( $meta_opts['openai_api_key'] );
 <div id="rzpa-app" data-rzpa-page="meta">
 
   <div class="rzpa-logo-bar">
-    <img src="<?php echo esc_url( RZPA_URL . 'assets/logo.svg' ); ?>" alt="Rezponz" />
+    <img src="<?php echo esc_url( RZPA_URL . 'assets/Rezponz-logo.png' ); ?>" alt="Rezponz" />
     <span class="rzpa-logo-badge">Meta Annoncer</span>
   </div>
 
