@@ -7,7 +7,7 @@ $cpt_ok     = post_type_exists( 'rzpa_pseo' );
 $db_version = defined( 'RZPA_SEO_DB::DB_VERSION' ) ? RZPA_SEO_DB::DB_VERSION : get_option( RZPA_SEO_DB::DB_VERSION_KEY, '—' );
 
 // Saved API key hint
-$api_key_saved = ! empty( $seo_opts['ai_api_key'] );
+$api_key_saved = ! empty( $seo_opts['rzpa_ai_api_key'] );
 ?>
 <div class="rzpa-wrap">
 
@@ -162,9 +162,9 @@ $api_key_saved = ! empty( $seo_opts['ai_api_key'] );
             <label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-muted);">AI Udbyder</label>
             <select name="seo_settings[ai_provider]" id="ai-provider-select"
                     style="width:100%;max-width:320px;background:var(--bg-300);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius);">
-              <option value=""       <?php selected( $seo_opts['ai_provider'] ?? '', '' ); ?>>Ingen AI</option>
-              <option value="openai" <?php selected( $seo_opts['ai_provider'] ?? '', 'openai' ); ?>>OpenAI (GPT-4o)</option>
-              <option value="claude" <?php selected( $seo_opts['ai_provider'] ?? '', 'claude' ); ?>>Claude (Anthropic)</option>
+              <option value=""       <?php selected( $seo_opts['rzpa_ai_provider'] ?? '', '' ); ?>>Ingen AI</option>
+              <option value="openai" <?php selected( $seo_opts['rzpa_ai_provider'] ?? '', 'openai' ); ?>>OpenAI (GPT-4o)</option>
+              <option value="claude" <?php selected( $seo_opts['rzpa_ai_provider'] ?? '', 'claude' ); ?>>Claude (Anthropic)</option>
             </select>
           </div>
 

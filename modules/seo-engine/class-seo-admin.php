@@ -321,7 +321,12 @@ class RZPA_SEO_Admin {
         $publish_status = sanitize_text_field( $_POST['publish_status'] ?? 'draft' );
 
         $result = RZPA_SEO_Generator::generate_page( $dataset_id, $publish_status );
-        self::redirect_back( 'rzpa-seo-generate', $result ? [ 'updated' => 1 ] : [ 'error' => 'generate_failed' ] );
+        if ( ! empty( $result['success'] ) || ! empty( $result['skipped'] ) ) {
+            self::redirect_back( 'rzpa-seo-generate', [ 'updated' => 1 ] );
+        } else {
+            $err = ! empty( $result['errors'] ) ? implode( ' ', $result['errors'] ) : 'generate_failed';
+            self::redirect_back( 'rzpa-seo-generate', [ 'error' => rawurlencode( $err ) ] );
+        }
     }
 
     public static function handle_bulk_generate() : void {
@@ -530,7 +535,12 @@ class RZPA_SEO_Admin {
         self::verify_nonce();
         if ( ! current_user_can( 'manage_options' ) ) wp_die();
 
-        $post     = wp_unslash( $_POST );
+        // Settings view wraps fields in seo_settings[...] — unwrap if present
+        $raw      = wp_unslash( $_POST );
+        $post     = ! empty( $raw['seo_settings'] ) && is_array( $raw['seo_settings'] )
+                    ? $raw['seo_settings']
+                    : $raw;
+
         $settings = get_option( 'rzpa_seo_settings', [] );
 
         $old_base = $settings['rewrite_base'] ?? 'job';
@@ -539,7 +549,7 @@ class RZPA_SEO_Admin {
         $settings['rewrite_base']                   = $new_base;
         $settings['auto_link_on_generate']          = isset( $post['auto_link_on_generate'] ) ? 1 : 0;
         $settings['default_publish_status']         = sanitize_text_field( $post['default_publish_status'] ?? 'draft' );
-        $settings['ai_provider']                    = sanitize_text_field( $post['ai_provider']            ?? 'none' );
+        $settings['rzpa_ai_provider']               = sanitize_text_field( $post['ai_provider']            ?? 'none' );
         $settings['quality_min_words']              = absint( $post['quality_min_words']                   ?? 300 );
         $settings['quality_min_h2']                 = absint( $post['quality_min_h2']                      ?? 2 );
         $settings['sitemap_include_pseo']           = isset( $post['sitemap_include_pseo'] ) ? 1 : 0;
@@ -553,7 +563,7 @@ class RZPA_SEO_Admin {
             $settings['rzpa_ai_api_key'] = sanitize_text_field( $post['ai_api_key'] );
         }
         if ( isset( $post['ai_model'] ) ) {
-            $settings['ai_model'] = sanitize_text_field( $post['ai_model'] );
+            $settings['rzpa_ai_model'] = sanitize_text_field( $post['ai_model'] );
         }
 
         update_option( 'rzpa_seo_settings', $settings );
@@ -596,10 +606,11 @@ class RZPA_SEO_Admin {
         $status     = sanitize_text_field( $_POST['status'] ?? 'draft' );
 
         $result = RZPA_SEO_Generator::generate_page( $dataset_id, $status );
-        if ( $result ) {
+        if ( ! empty( $result['success'] ) || ! empty( $result['skipped'] ) ) {
             wp_send_json_success( $result );
         } else {
-            wp_send_json_error( 'Generering fejlede' );
+            $err = ! empty( $result['errors'] ) ? implode( ', ', $result['errors'] ) : 'Generering fejlede';
+            wp_send_json_error( $err );
         }
     }
 
@@ -653,7 +664,7 @@ class RZPA_SEO_Admin {
         // Reset generation_status in datasets table
         global $wpdb;
         $t = RZPA_SEO_DB::get_table( 'datasets' );
-        $wpdb->query( "UPDATE {$t} SET generation_status='pending', linked_post_id=NULL, quality_score=NULL, quality_status=NULL" ); // phpcs:ignore
+        $wpdb->query( "UPDATE {$t} SET generation_status='pending', linked_post_id=NULL, quality_status='unchecked'" ); // phpcs:ignore
         self::redirect_back( 'rzpa-seo-settings', [ 'updated' => 'deleted_pseo', 'count' => count( $posts ) ] );
     }
 
