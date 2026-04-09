@@ -486,9 +486,9 @@ class RZPA_Meta_Ads {
             $cre_url = self::API_BASE
                 . '?access_token=' . rawurlencode( $token )
                 . '&ids=' . implode( ',', $unique_cre_ids )
-                . '&fields=id,thumbnail_url,image_url,picture,video_id,body,title,call_to_action_type,link_url,'
+                . '&fields=id,thumbnail_url.thumbnail_width(300).thumbnail_height(300),image_url,picture,video_id,body,title,call_to_action_type,link_url,'
                 . 'object_story_spec{link_data{picture,image_url,message,child_attachments{picture}},'
-                . 'video_data{image_url,message},photo_data{images{original{uri}},caption}}';
+                . 'video_data{image_url,thumbnail_url,message},photo_data{images{original{uri}},caption}}';
 
             $cre_res = wp_remote_get( $cre_url, [ 'timeout' => 10 ] );
             if ( ! is_wp_error( $cre_res ) ) {
@@ -527,22 +527,22 @@ class RZPA_Meta_Ads {
             }
         }
         if ( $video_thumbs ) {
+            // Brug kun `picture`-feltet – thumbnails{uri,width} edge-expansion
+            // fejler i Meta's batch ids-endpoint og returnerer tomt svar.
             $vid_ids = array_unique( array_values( $video_thumbs ) );
             $vid_url = self::API_BASE
                 . '?access_token=' . rawurlencode( $token )
                 . '&ids=' . implode( ',', $vid_ids )
-                . '&fields=id,thumbnails{uri,width},picture';
+                . '&fields=id,picture';
 
             $vres = wp_remote_get( $vid_url, [ 'timeout' => 8 ] );
             if ( ! is_wp_error( $vres ) ) {
                 $vbody = json_decode( wp_remote_retrieve_body( $vres ), true );
-                foreach ( $video_thumbs as $ad_id => $vid_id ) {
-                    $thumbs = $vbody[ $vid_id ]['thumbnails']['data'] ?? [];
-                    if ( $thumbs ) {
-                        usort( $thumbs, fn($a,$b) => ( $b['width'] ?? 0 ) - ( $a['width'] ?? 0 ) );
-                        $ads_data[ $ad_id ]['_video_thumb'] = $thumbs[0]['uri'] ?? '';
-                    } elseif ( ! empty( $vbody[ $vid_id ]['picture'] ) ) {
-                        $ads_data[ $ad_id ]['_video_thumb'] = $vbody[ $vid_id ]['picture'];
+                if ( is_array( $vbody ) && empty( $vbody['error'] ) ) {
+                    foreach ( $video_thumbs as $ad_id => $vid_id ) {
+                        if ( ! empty( $vbody[ $vid_id ]['picture'] ) ) {
+                            $ads_data[ $ad_id ]['_video_thumb'] = $vbody[ $vid_id ]['picture'];
+                        }
                     }
                 }
             }
@@ -563,11 +563,12 @@ class RZPA_Meta_Ads {
                 $format = 'carousel';
             }
 
-            $img = $spec['link_data']['picture']                  ?? ''
+            $img = $creative['thumbnail_url']                      ?? ''
+                ?: ( $spec['link_data']['picture']                ?? '' )
                 ?: ( $spec['link_data']['image_url']              ?? '' )
+                ?: ( $spec['video_data']['thumbnail_url']         ?? '' )
                 ?: ( $spec['video_data']['image_url']             ?? '' )
                 ?: ( $spec['photo_data']['images']['original']['uri'] ?? '' )
-                ?: ( $creative['thumbnail_url']                   ?? '' )
                 ?: ( $creative['picture']                         ?? '' )
                 ?: ( $creative['image_url']                       ?? '' )
                 ?: ( $ad['_video_thumb']                          ?? '' );

@@ -170,7 +170,7 @@ class RZPZ_Crew {
         $link_id   = (int) ( $_POST['link_id']   ?? 0 );
         $member_id = (int) ( $_POST['member_id'] ?? 0 );
         RZPZ_Crew_DB::delete_link( $link_id );
-        wp_redirect( admin_url( 'admin.php?page=rezponz-crew-member&id=' . $member_id . '&link_deleted=1' ) );
+        wp_redirect( admin_url( 'admin.php?page=rezponz-crew&member_id=' . $member_id . '&link_deleted=1' ) );
         exit;
     }
 
@@ -220,7 +220,7 @@ class RZPZ_Crew {
         check_admin_referer( 'rzpz_crew_update_boost' );
 
         $boost_id = (int) ( $_POST['boost_id'] ?? 0 );
-        if ( $_POST['action_type'] ?? '' === 'create' ) {
+        if ( ( $_POST['action_type'] ?? '' ) === 'create' ) {
             $link_id   = (int) ( $_POST['link_id']        ?? 0 );
             $member_id = (int) ( $_POST['crew_member_id'] ?? 0 );
             $notes     = sanitize_textarea_field( $_POST['notes'] ?? '' );

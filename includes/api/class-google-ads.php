@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class RZPA_Google_Ads {
 
-    const API_VERSIONS = [ 'v19', 'v18', 'v17' ];
+    const API_VERSIONS = [ 'v22', 'v21', 'v20', 'v19', 'v18', 'v17' ];
 
     public static $last_error = null;
 
@@ -262,23 +262,23 @@ class RZPA_Google_Ads {
         $cid = self::customer_id( $opts );
         $url = self::api_base() . "/customers/{$cid}/googleAds:searchStream";
 
+        // Note: expanded_text_ad fields removed – deprecated/removed in Google Ads API v20+
         $query = "SELECT
             ad_group_ad.ad.id,
             ad_group_ad.ad.type,
-            ad_group_ad.ad.name,
             ad_group_ad.ad.responsive_search_ad.headlines,
             ad_group_ad.ad.responsive_search_ad.descriptions,
-            ad_group_ad.ad.expanded_text_ad.headline_part1,
-            ad_group_ad.ad.expanded_text_ad.headline_part2,
-            ad_group_ad.ad.expanded_text_ad.description,
             ad_group_ad.ad.final_urls,
             ad_group_ad.status,
+            campaign.id,
             campaign.name,
+            ad_group.id,
             ad_group.name,
             metrics.impressions,
             metrics.clicks,
             metrics.cost_micros,
-            metrics.ctr
+            metrics.ctr,
+            metrics.average_cpc
         FROM ad_group_ad
         WHERE ad_group_ad.status = 'ENABLED'
           AND campaign.status = 'ENABLED'
@@ -294,9 +294,16 @@ class RZPA_Google_Ads {
         ] );
 
         if ( is_wp_error( $res ) ) return [ 'error' => $res->get_error_message() ];
-        $http = wp_remote_retrieve_response_code( $res );
-        $body = json_decode( wp_remote_retrieve_body( $res ), true );
-        if ( $http !== 200 ) return [ 'error' => $body[0]['error']['message'] ?? 'HTTP ' . $http ];
+        $http     = wp_remote_retrieve_response_code( $res );
+        $raw_body = wp_remote_retrieve_body( $res );
+        $body     = json_decode( $raw_body, true );
+        if ( $http !== 200 ) {
+            $msg = $body[0]['error']['details'][0]['errors'][0]['message']
+                ?? $body[0]['error']['message']
+                ?? $body['error']['message']
+                ?? 'HTTP ' . $http;
+            return [ 'error' => $msg . ' [HTTP:' . $http . ' RAW:' . substr( $raw_body, 0, 300 ) . ']' ];
+        }
 
         $ads = [];
         foreach ( $body as $chunk ) {
@@ -322,11 +329,15 @@ class RZPA_Google_Ads {
                     $descriptions = [ $eta['description'] ];
                 }
 
+                $campaign_id = $result['campaign']['id'] ?? '';
+                $adgroup_id  = $result['adGroup']['id'] ?? '';
                 $ads[] = [
                     'ad_id'        => $ad['id'] ?? '',
                     'type'         => $ad['type'] ?? 'RESPONSIVE_SEARCH_AD',
                     'campaign'     => $result['campaign']['name'] ?? '',
+                    'campaign_id'  => $campaign_id,
                     'ad_group'     => $result['adGroup']['name'] ?? '',
+                    'ad_group_id'  => $adgroup_id,
                     'headlines'    => array_values( $headlines ),
                     'descriptions' => array_values( $descriptions ),
                     'final_url'    => $ad['finalUrls'][0] ?? '',
@@ -334,6 +345,10 @@ class RZPA_Google_Ads {
                     'clicks'       => (int) ( $metrics['clicks'] ?? 0 ),
                     'spend'        => round( (float) ( $metrics['costMicros'] ?? 0 ) / 1_000_000, 2 ),
                     'ctr'          => round( (float) ( $metrics['ctr'] ?? 0 ) * 100, 2 ),
+                    'cpc'          => round( (float) ( $metrics['averageCpc'] ?? 0 ) / 1_000_000, 2 ),
+                    'gads_url'     => $campaign_id && $adgroup_id
+                        ? "https://ads.google.com/aw/ads?campaignId={$campaign_id}&adGroupId={$adgroup_id}"
+                        : '',
                 ];
             }
         }
@@ -404,37 +419,113 @@ class RZPA_Google_Ads {
         if ( empty( $opts['google_ads_customer_id'] ) )       return [ 'step' => 'config', 'error' => 'Mangler Customer ID' ];
         if ( empty( $opts['google_ads_developer_token'] ) )   return [ 'step' => 'config', 'error' => 'Mangler Developer Token' ];
 
-        $token = self::get_access_token( $opts );
-        if ( ! $token ) return [ 'step' => 'token', 'error' => self::$last_error ];
+        // Ryd version-cache så vi altid tester frisk
+        delete_transient( 'rzpa_gads_api_version' );
+
+        // ── Trin 0: Test grundlæggende netværksforbindelse til Google ────────
+        // Test BOTH generic googleapis.com AND the specific googleads subdomain
+        $ping_res   = wp_remote_get( 'https://www.googleapis.com/', [ 'timeout' => 8 ] );
+        $ping_ok    = ! is_wp_error( $ping_res ) && wp_remote_retrieve_response_code( $ping_res ) > 0;
+        $ping_err   = is_wp_error( $ping_res ) ? $ping_res->get_error_message() : null;
+
+        // Specific test to googleads.googleapis.com (the actual API domain)
+        $ping2_res  = wp_remote_get( 'https://googleads.googleapis.com/', [ 'timeout' => 8 ] );
+        $ping2_http = is_wp_error( $ping2_res ) ? 0 : wp_remote_retrieve_response_code( $ping2_res );
+        $ping2_ok   = $ping2_http > 0; // any HTTP response = reachable
+        $ping2_err  = is_wp_error( $ping2_res ) ? $ping2_res->get_error_message() : null;
+
+        // ── Trin 1: Hent access token – log hele svar til debug ──────────────
+        $client_id = $opts['google_ads_client_id'] ?? $opts['google_client_id'] ?? '';
+        $token_res = wp_remote_post( 'https://oauth2.googleapis.com/token', [
+            'timeout' => 12,
+            'body'    => [
+                'client_id'     => $client_id,
+                'client_secret' => $opts['google_ads_client_secret'] ?? $opts['google_client_secret'] ?? '',
+                'refresh_token' => $opts['google_ads_refresh_token'],
+                'grant_type'    => 'refresh_token',
+            ],
+        ] );
+        $token_http = is_wp_error( $token_res ) ? 0 : wp_remote_retrieve_response_code( $token_res );
+        $token_body = is_wp_error( $token_res ) ? [] : json_decode( wp_remote_retrieve_body( $token_res ), true );
+        $token      = $token_body['access_token'] ?? '';
+        $token_err  = null;
+        if ( ! $token ) {
+            $token_err = $token_body['error_description'] ?? $token_body['error'] ?? ( is_wp_error( $token_res ) ? $token_res->get_error_message() : 'Ukendt fejl' );
+        }
+        $token_scope = $token_body['scope'] ?? null;
+
+        if ( ! $token ) {
+            return [
+                'step'          => 'token',
+                'error'         => $token_err,
+                'token_http'    => $token_http,
+                'token_scope'   => $token_scope,
+                'ping_ok'       => $ping_ok,
+                'ping_err'      => $ping_err,
+                'client_id_hint'=> $client_id ? ( substr( $client_id, 0, 15 ) . '…' ) : '(tom)',
+            ];
+        }
 
         $cid     = self::customer_id( $opts );
         $mcc     = preg_replace( '/[^0-9]/', '', $opts['google_ads_manager_id'] ?? '' );
-        $api_ver = get_transient( 'rzpa_gads_api_version' ) ?: self::API_VERSIONS[0];
+        $dev_tok = $opts['google_ads_developer_token'] ?? '';
 
-        // ── Trin 1: List accessible customers ───────────────────────────────
-        $accessible = [];
-        $list_url  = "https://googleads.googleapis.com/{$api_ver}/customers:listAccessibleCustomers";
-        $list_res  = wp_remote_get( $list_url, [
-            'timeout' => 10,
-            'headers' => [
-                'Authorization'   => 'Bearer ' . $token,
-                'developer-token' => $opts['google_ads_developer_token'] ?? '',
-            ],
-        ] );
-        if ( ! is_wp_error( $list_res ) ) {
-            $list_body = json_decode( wp_remote_retrieve_body( $list_res ), true );
-            foreach ( $list_body['resourceNames'] ?? [] as $rn ) {
-                // resourceName format: "customers/1234567890"
+        // ── Trin 2: Find aktiv API-version via listAccessibleCustomers ────────
+        $api_ver       = self::API_VERSIONS[0];
+        $list_raw      = '';
+        $list_http     = null;
+        $list_raw_mcc  = '';
+        $list_http_mcc = null;
+        $base_hdrs     = [ 'Authorization' => 'Bearer ' . $token, 'developer-token' => $dev_tok ];
+
+        foreach ( self::API_VERSIONS as $ver ) {
+            $probe_url  = "https://googleads.googleapis.com/{$ver}/customers:listAccessibleCustomers";
+            $probe_res  = wp_remote_get( $probe_url, [ 'timeout' => 10, 'headers' => $base_hdrs ] );
+            $probe_http = is_wp_error( $probe_res ) ? 0 : wp_remote_retrieve_response_code( $probe_res );
+            if ( $probe_http && $probe_http !== 404 ) {
+                $api_ver   = $ver;
+                $list_http = $probe_http;
+                $list_raw  = is_wp_error( $probe_res ) ? '' : wp_remote_retrieve_body( $probe_res );
+                set_transient( 'rzpa_gads_api_version', $ver, DAY_IN_SECONDS );
+                break;
+            }
+            // Keep the first attempt's raw so we can see any error message
+            if ( is_null( $list_http ) ) {
+                $list_http = $probe_http;
+                $list_raw  = is_wp_error( $probe_res ) ? '' : wp_remote_retrieve_body( $probe_res );
+            }
+        }
+
+        // ── Trin 3: List accessible customers (uden + med MCC) ───────────────
+        $accessible     = [];
+        $accessible_mcc = [];
+        $list_url       = "https://googleads.googleapis.com/{$api_ver}/customers:listAccessibleCustomers";
+
+        // Hent råt svar uden MCC (allerede gjort ovenfor i version-probe, genbruges)
+        if ( $list_raw ) {
+            $lb = json_decode( $list_raw, true );
+            foreach ( $lb['resourceNames'] ?? [] as $rn ) {
                 $accessible[] = preg_replace( '/^customers\//', '', $rn );
             }
         }
 
-        // ── Trin 2: Test med MCC ─────────────────────────────────────────────
-        $query = "SELECT campaign.id, campaign.name FROM campaign LIMIT 3";
-        $url   = "https://googleads.googleapis.com/{$api_ver}/customers/{$cid}/googleAds:searchStream";
+        // Med login-customer-id (MCC)
+        if ( $mcc ) {
+            $list_res2     = wp_remote_get( $list_url, [ 'timeout' => 10, 'headers' => array_merge( $base_hdrs, [ 'login-customer-id' => $mcc ] ) ] );
+            $list_http_mcc = is_wp_error( $list_res2 ) ? 0 : wp_remote_retrieve_response_code( $list_res2 );
+            $list_raw_mcc  = is_wp_error( $list_res2 ) ? '' : wp_remote_retrieve_body( $list_res2 );
+            $lb2           = json_decode( $list_raw_mcc, true );
+            foreach ( $lb2['resourceNames'] ?? [] as $rn ) {
+                $accessible_mcc[] = preg_replace( '/^customers\//', '', $rn );
+            }
+        }
 
+        // ── Trin 4: Test søgning med MCC ────────────────────────────────────
+        $query   = "SELECT campaign.id, campaign.name, campaign.status FROM campaign LIMIT 3";
+        $url     = "https://googleads.googleapis.com/{$api_ver}/customers/{$cid}/googleAds:search";
         $headers = self::headers( $token, $opts );
-        $res     = wp_remote_post( $url, [
+
+        $res  = wp_remote_post( $url, [
             'timeout' => 15,
             'headers' => $headers,
             'body'    => wp_json_encode( [ 'query' => $query ] ),
@@ -443,22 +534,34 @@ class RZPA_Google_Ads {
         $raw  = wp_remote_retrieve_body( $res );
         $body = json_decode( $raw, true );
 
-        // ── Trin 3: Fallback uden MCC ────────────────────────────────────────
-        $used_mcc     = true;
-        $http_no_mcc  = null;
+        // ── Trin 5: Fallback uden MCC ───────────────────────────────────────
+        $used_mcc    = true;
+        $http_no_mcc = null;
+        $raw_no_mcc  = '';
         if ( $http !== 200 && $mcc ) {
-            $hdrs_direct = $headers;
-            unset( $hdrs_direct['login-customer-id'] );
-            $res2  = wp_remote_post( $url, [
-                'timeout' => 15,
-                'headers' => $hdrs_direct,
-                'body'    => wp_json_encode( [ 'query' => $query ] ),
-            ] );
+            $hdrs2 = $headers;
+            unset( $hdrs2['login-customer-id'] );
+            $res2        = wp_remote_post( $url, [ 'timeout' => 15, 'headers' => $hdrs2, 'body' => wp_json_encode( [ 'query' => $query ] ) ] );
             $http_no_mcc = wp_remote_retrieve_response_code( $res2 );
+            $raw_no_mcc  = wp_remote_retrieve_body( $res2 );
             if ( $http_no_mcc === 200 ) {
-                $body     = json_decode( wp_remote_retrieve_body( $res2 ), true );
+                $body     = json_decode( $raw_no_mcc, true );
                 $http     = 200;
                 $used_mcc = false;
+            }
+        }
+
+        // ── Trin 6: Prøv searchStream som fallback ───────────────────────────
+        $http_stream = null;
+        $raw_stream  = '';
+        if ( $http !== 200 ) {
+            $url_stream  = str_replace( '/googleAds:search', '/googleAds:searchStream', $url );
+            $res_stream  = wp_remote_post( $url_stream, [ 'timeout' => 15, 'headers' => $headers, 'body' => wp_json_encode( [ 'query' => $query ] ) ] );
+            $http_stream = wp_remote_retrieve_response_code( $res_stream );
+            $raw_stream  = wp_remote_retrieve_body( $res_stream );
+            if ( $http_stream === 200 ) {
+                $body = json_decode( $raw_stream, true );
+                $http = 200;
             }
         }
 
@@ -472,19 +575,40 @@ class RZPA_Google_Ads {
         $rows = 0;
         foreach ( (array) $body as $chunk ) { $rows += count( $chunk['results'] ?? [] ); }
 
+        // Best raw snippet: prioritise one with actual content
+        $best_raw = '';
+        foreach ( [ $raw, $raw_no_mcc, $raw_stream, $list_raw, $list_raw_mcc ] as $candidate ) {
+            if ( strlen( $candidate ) > strlen( $best_raw ) ) { $best_raw = $candidate; }
+        }
+
         return [
-            'step'              => 'api',
-            'http_code'         => $http,
-            'http_no_mcc'       => $http_no_mcc,
-            'customer_id'       => $cid,
-            'manager_id'        => $mcc ?: null,
-            'used_mcc'          => $used_mcc,
-            'api_version'       => $api_ver,
-            'campaigns_found'   => $rows,
-            'error'             => $err,
-            'google_status'     => $google_status,
+            'step'                => 'api',
+            'http_code'           => $http,
+            'http_no_mcc'         => $http_no_mcc,
+            'http_stream'         => $http_stream,
+            'list_http'           => $list_http,
+            'list_http_mcc'       => $list_http_mcc,
+            'customer_id'         => $cid,
+            'manager_id'          => $mcc ?: null,
+            'used_mcc'            => $used_mcc,
+            'api_version'         => $api_ver,
+            'campaigns_found'     => $rows,
+            'error'               => $err,
+            'google_status'       => $google_status,
             'accessible_accounts' => $accessible,
-            'raw_snippet'       => substr( $raw, 0, 600 ),
+            'accessible_via_mcc'  => $accessible_mcc,
+            'cid_in_direct'       => in_array( $cid, $accessible ),
+            'cid_in_mcc'          => in_array( $cid, $accessible_mcc ),
+            'ping_ok'             => $ping_ok,
+            'ping_err'            => $ping_err,
+            'ping2_ok'            => $ping2_ok,
+            'ping2_http'          => $ping2_http,
+            'ping2_err'           => $ping2_err,
+            'token_http'          => $token_http,
+            'token_scope'         => $token_scope,
+            'client_id_hint'      => $client_id ? ( substr( $client_id, 0, 15 ) . '…' ) : '(tom)',
+            'raw_snippet'         => substr( $best_raw, 0, 1200 ),
+            'list_raw_snippet'    => substr( $list_raw, 0, 600 ),
         ];
     }
 

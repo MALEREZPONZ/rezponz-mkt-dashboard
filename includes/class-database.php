@@ -258,7 +258,7 @@ class RZPA_Database {
     public static function get_blog_insights( int $days = 30 ) : array {
         global $wpdb;
 
-        // Hent alle publicerede blogindlæg
+        // Hent kun blogindlæg (post_type = 'post')
         $posts = get_posts( [
             'post_type'      => 'post',
             'post_status'    => 'publish',

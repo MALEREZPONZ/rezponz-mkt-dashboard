@@ -7,7 +7,22 @@ class RZPA_Admin {
         add_action( 'admin_menu',            [ __CLASS__, 'add_menu' ] );
         add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue' ] );
         add_action( 'admin_post_rzpa_save_settings', [ __CLASS__, 'save_settings' ] );
+        add_action( 'admin_post_rzpa_pdf_download',  [ __CLASS__, 'handle_pdf_download' ] );
         add_action( 'admin_init',            [ __CLASS__, 'handle_google_oauth' ] );
+    }
+
+    /**
+     * Stream a PDF download directly to the browser.
+     * Hooked on admin_post_rzpa_pdf_download — no JSON wrapping.
+     */
+    public static function handle_pdf_download(): void {
+        check_admin_referer( 'rzpa_pdf_download' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( 'Ingen adgang', 403 );
+        }
+        $days  = (int) ( $_GET['days'] ?? 30 );
+        $title = sanitize_text_field( wp_unslash( $_GET['title'] ?? '' ) );
+        RZPA_PDF_Generator::download( $days, $title );
     }
 
     /**
@@ -121,6 +136,8 @@ class RZPA_Admin {
             'preload'         => self::get_page_preload( $hook ),
             'meta_account_id' => sanitize_text_field( get_option( 'rzpa_settings', [] )['meta_ad_account_id'] ?? '' ),
             'settingsUrl'     => admin_url( 'admin.php?page=rzpa-settings' ),
+            'adminPostUrl'    => admin_url( 'admin-post.php' ),
+            'pdfNonce'        => wp_create_nonce( 'rzpa_pdf_download' ),
         ] );
     }
 
@@ -216,6 +233,8 @@ class RZPA_Admin {
             'openai_api_key',
             'google_ads_developer_token', 'google_ads_customer_id', 'google_ads_manager_id',
             'google_ads_client_id', 'google_ads_client_secret',
+            // SMTP
+            'smtp_host', 'smtp_username', 'smtp_password', 'smtp_from_email', 'smtp_from_name',
         ];
 
         // Textarea-felter der kræver sanitize_textarea_field
@@ -229,6 +248,13 @@ class RZPA_Admin {
         foreach ( $textarea_fields as $f ) {
             $opts[ $f ] = sanitize_textarea_field( wp_unslash( $_POST[ $f ] ?? '' ) );
         }
+
+        // SMTP — særlige felter
+        $opts['smtp_enabled']    = isset( $_POST['smtp_enabled'] ) ? '1' : '';
+        $opts['smtp_port']       = absint( $_POST['smtp_port'] ?? 587 );
+        $opts['smtp_encryption'] = in_array( $_POST['smtp_encryption'] ?? 'tls', [ 'tls', 'ssl', 'none' ], true )
+                                    ? sanitize_text_field( $_POST['smtp_encryption'] ) : 'tls';
+
         update_option( 'rzpa_settings', $opts );
 
         // Gem + redirect til OAuth hvis brugeren klikkede på forbind-knappen
