@@ -128,6 +128,43 @@ class RZPA_REST_API {
             'permission_callback' => $cap,
         ] );
 
+        // ── SEO Engine ───────────────────────────────────────────────────────
+        register_rest_route( self::NS, '/seo-engine/datasets', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'seo_datasets' ],
+            'permission_callback' => $cap,
+        ] );
+        register_rest_route( self::NS, '/seo-engine/generate', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'seo_generate_page' ],
+            'permission_callback' => $cap,
+        ] );
+        register_rest_route( self::NS, '/seo-engine/bulk-generate', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'seo_bulk_generate' ],
+            'permission_callback' => $cap,
+        ] );
+        register_rest_route( self::NS, '/seo-engine/generate-blog', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'seo_generate_blog' ],
+            'permission_callback' => $cap,
+        ] );
+        register_rest_route( self::NS, '/seo-engine/link-suggestions', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'seo_link_suggestions' ],
+            'permission_callback' => $cap,
+        ] );
+        register_rest_route( self::NS, '/seo-engine/preview-template', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'seo_preview_template' ],
+            'permission_callback' => $cap,
+        ] );
+        register_rest_route( self::NS, '/seo-engine/stats', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'seo_engine_stats' ],
+            'permission_callback' => $cap,
+        ] );
+
         // ── Rekruttering ─────────────────────────────────────────────────────
         register_rest_route( self::NS, '/rekruttering/stats', [
             'methods'             => 'GET',
@@ -676,6 +713,80 @@ PROMPT;
         $data = RZPA_Meta_Ads::fetch_invoices( $since, $until );
         if ( ! isset( $data['error'] ) ) set_transient( $key, $data, 30 * MINUTE_IN_SECONDS );
         return self::ok( $data );
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // REKRUTTERING
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ════════════════════════════════════════════════════════════════════════
+    // SEO ENGINE REST ENDPOINTS
+    // ════════════════════════════════════════════════════════════════════════
+
+    public static function seo_engine_stats( WP_REST_Request $r ) {
+        $datasets  = RZPA_SEO_DB::count_by_status();
+        $briefs    = RZPA_SEO_DB::count_briefs_by_status();
+        $pseo_count= wp_count_posts( 'rzpa_pseo' );
+        return self::ok( [
+            'datasets'    => $datasets,
+            'briefs'      => $briefs,
+            'pseo_posts'  => [
+                'publish' => (int) ( $pseo_count->publish ?? 0 ),
+                'draft'   => (int) ( $pseo_count->draft   ?? 0 ),
+                'pending' => (int) ( $pseo_count->pending ?? 0 ),
+            ],
+        ] );
+    }
+
+    public static function seo_datasets( WP_REST_Request $r ) {
+        $total    = 0;
+        $per_page = min( (int) ( $r->get_param( 'per_page' ) ?? 50 ), 200 );
+        $offset   = (int) ( $r->get_param( 'offset' ) ?? 0 );
+        $status   = sanitize_text_field( $r->get_param( 'status' ) ?? '' );
+        $template = (int) ( $r->get_param( 'template_id' ) ?? 0 );
+        $group    = sanitize_text_field( $r->get_param( 'group' ) ?? '' );
+        $datasets = RZPA_SEO_DB::get_datasets( $template ?: null, $status ?: null, $group ?: null, $per_page, $offset, $total );
+        return self::ok( [ 'items' => $datasets, 'total' => $total ] );
+    }
+
+    public static function seo_generate_page( WP_REST_Request $r ) {
+        $dataset_id = (int) ( $r->get_param( 'dataset_id' ) ?? 0 );
+        $status     = sanitize_text_field( $r->get_param( 'publish_status' ) ?? 'draft' );
+        if ( ! $dataset_id ) return new WP_Error( 'missing_id', 'dataset_id required', [ 'status' => 400 ] );
+        $result = RZPA_SEO_Generator::generate_page( $dataset_id, $status );
+        return $result['success'] ? self::ok( $result ) : new WP_Error( 'generate_failed', implode( ', ', $result['errors'] ), [ 'status' => 422 ] );
+    }
+
+    public static function seo_bulk_generate( WP_REST_Request $r ) {
+        $ids    = array_map( 'absint', (array) ( $r->get_param( 'dataset_ids' ) ?? [] ) );
+        $status = sanitize_text_field( $r->get_param( 'publish_status' ) ?? 'draft' );
+        if ( empty( $ids ) ) return new WP_Error( 'missing_ids', 'dataset_ids required', [ 'status' => 400 ] );
+        $result = RZPA_SEO_Generator::bulk_generate( $ids, $status );
+        return self::ok( $result );
+    }
+
+    public static function seo_generate_blog( WP_REST_Request $r ) {
+        $brief_id = (int) ( $r->get_param( 'brief_id' ) ?? 0 );
+        $use_ai   = (bool) ( $r->get_param( 'use_ai' ) ?? false );
+        if ( ! $brief_id ) return new WP_Error( 'missing_id', 'brief_id required', [ 'status' => 400 ] );
+        $result = RZPA_SEO_Blog::generate_blog_post( $brief_id, $use_ai );
+        return $result['success'] ? self::ok( $result ) : new WP_Error( 'generate_failed', implode( ', ', $result['errors'] ), [ 'status' => 422 ] );
+    }
+
+    public static function seo_link_suggestions( WP_REST_Request $r ) {
+        $post_id = (int) ( $r->get_param( 'post_id' ) ?? 0 );
+        $limit   = (int) ( $r->get_param( 'limit' ) ?? 10 );
+        if ( ! $post_id ) return new WP_Error( 'missing_id', 'post_id required', [ 'status' => 400 ] );
+        $suggestions = RZPA_SEO_Linking::find_suggestions( $post_id, $limit );
+        return self::ok( $suggestions );
+    }
+
+    public static function seo_preview_template( WP_REST_Request $r ) {
+        $template_id  = (int) ( $r->get_param( 'template_id' ) ?? 0 );
+        $sample_data  = (array) ( $r->get_param( 'sample_data' ) ?? [] );
+        if ( ! $template_id ) return new WP_Error( 'missing_id', 'template_id required', [ 'status' => 400 ] );
+        $preview = RZPA_SEO_Template::preview( $template_id, $sample_data );
+        return self::ok( $preview );
     }
 
     // ════════════════════════════════════════════════════════════════════════
