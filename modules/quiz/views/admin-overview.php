@@ -3,19 +3,19 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 /** @var string $tab  set by RZPA_Quiz_Admin::page_main() */
 $tab = $tab ?? 'submissions';
 ?>
-<div class="wrap rzpa-quiz-wrap" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:1060px;padding-top:16px">
+<div class="wrap rzpa-quiz-wrap" style="font-family:-apple-system,'Inter','Segoe UI',sans-serif;max-width:1060px;padding-top:16px;background:#08080b;color:#f0f0f2">
 
   <!-- ── Page header ──────────────────────────────────────────────────────── -->
   <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px">
     <div style="background:linear-gradient(135deg,#e8590c,#d6336c);width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;box-shadow:0 4px 14px rgba(232,89,12,.35)">🎯</div>
     <div>
-      <h1 style="margin:0;font-size:22px;font-weight:800;color:#111827;line-height:1.2">Profil-Quiz</h1>
-      <div style="font-size:13px;color:#6b7280;margin-top:2px">Customer Success DNA · <code style="background:#f3f4f6;padding:2px 7px;border-radius:4px;font-size:12px">[rezponz_quiz]</code></div>
+      <h1 style="margin:0;font-size:22px;font-weight:800;color:#f0f0f2;line-height:1.2">Profil-Quiz</h1>
+      <div style="font-size:13px;color:#8888a0;margin-top:2px">Customer Success DNA · <code style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.07);padding:2px 7px;border-radius:6px;font-size:12px;color:#CCFF00">[rezponz_quiz]</code></div>
     </div>
   </div>
 
   <!-- ── Tab navigation ───────────────────────────────────────────────────── -->
-  <div style="display:flex;gap:2px;margin-bottom:28px;background:#f3f4f6;border-radius:10px;padding:4px;width:fit-content">
+  <div style="display:flex;gap:2px;margin-bottom:28px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:4px;width:fit-content;backdrop-filter:blur(10px)">
     <?php
     $tabs = [
         'submissions' => [ 'label' => '📋 Besvarelser',        'icon' => '📋' ],
@@ -27,7 +27,7 @@ $tab = $tab ?? 'submissions';
         $url    = admin_url( 'admin.php?page=rzpa-quiz-submissions&tab=' . $slug );
     ?>
     <a href="<?php echo esc_url( $url ); ?>"
-       style="padding:8px 18px;border-radius:7px;font-size:13px;font-weight:<?php echo $active ? '700' : '500'; ?>;text-decoration:none;transition:all .15s;<?php echo $active ? 'background:#fff;color:#111;box-shadow:0 1px 5px rgba(0,0,0,.1)' : 'color:#6b7280;background:transparent'; ?>">
+       style="padding:8px 18px;border-radius:8px;font-size:13px;font-weight:<?php echo $active ? '700' : '500'; ?>;text-decoration:none;transition:all .15s;<?php echo $active ? 'background:rgba(204,255,0,.12);color:#CCFF00;border:1px solid rgba(204,255,0,.25)' : 'color:#8888a0;background:transparent;border:1px solid transparent'; ?>">
       <?php echo $info['label']; ?>
     </a>
     <?php endforeach; ?>
@@ -42,7 +42,7 @@ $tab = $tab ?? 'submissions';
   if ( $pdf_err ) :
       delete_transient( 'rzpa_quiz_pdf_error' );
   ?>
-  <div style="background:#2d0a0a;color:#f87171;border:1px solid #f8717140;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-family:monospace">
+  <div style="background:rgba(255,85,85,.06);color:#f87171;border:1px solid rgba(255,85,85,.25);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-family:monospace">
     ⚠️ <strong>PDF-fejl (seneste besvarelse):</strong><br><br><?php echo esc_html( $pdf_err ); ?>
   </div>
   <?php endif; ?>
@@ -52,14 +52,14 @@ $tab = $tab ?? 'submissions';
   if ( $mail_err ) :
       delete_transient( 'rzpa_quiz_mail_error' );
   ?>
-  <div style="background:#1a1a2e;color:#93c5fd;border:1px solid #3b82f640;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-family:monospace">
+  <div style="background:rgba(59,130,246,.06);color:#93c5fd;border:1px solid rgba(59,130,246,.25);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-family:monospace">
     📧 <strong>Mail-fejl (seneste besvarelse):</strong><br><br><?php echo esc_html( $mail_err ); ?><br><br>
-    <span style="color:#6b7280">Konfigurér SMTP under <a href="<?php echo esc_url( admin_url( 'admin.php?page=rzpa-settings' ) ); ?>" style="color:#60a5fa">Indstillinger → SMTP</a> for pålidelig email-afsendelse.</span>
+    <span style="color:#8888a0">Konfigurér SMTP under <a href="<?php echo esc_url( admin_url( 'admin.php?page=rzpa-settings' ) ); ?>" style="color:#CCFF00">Indstillinger → SMTP</a> for pålidelig email-afsendelse.</span>
   </div>
   <?php endif; ?>
 
   <?php if ( ! empty( $_GET['sub_deleted'] ) ) : ?>
-  <div style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-weight:600">
+  <div style="background:rgba(204,255,0,.06);color:#CCFF00;border:1px solid rgba(204,255,0,.25);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-weight:600">
     ✅ Besvarelsen er slettet.
   </div>
   <?php endif; ?>
@@ -77,71 +77,71 @@ $tab = $tab ?? 'submissions';
 
   <!-- KPI row -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:28px">
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px 22px;box-shadow:0 1px 4px rgba(0,0,0,.04)">
-      <div style="font-size:30px;font-weight:900;color:#111827;letter-spacing:-1px"><?php echo number_format( $total ); ?></div>
-      <div style="font-size:12px;color:#6b7280;margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Besvarelser i alt</div>
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:20px 22px;backdrop-filter:blur(24px);transition:border-color .2s">
+      <div style="font-size:34px;font-weight:900;color:#CCFF00;letter-spacing:-1px"><?php echo number_format( $total ); ?></div>
+      <div style="font-size:12px;color:#8888a0;margin-top:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Besvarelser i alt</div>
     </div>
     <?php foreach ( $dist as $d ) : ?>
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px 22px;box-shadow:0 1px 4px rgba(0,0,0,.04);border-left:4px solid <?php echo esc_attr( $d['color'] ); ?>">
-      <div style="font-size:22px;font-weight:900;color:#111827"><?php echo esc_html( $d['icon_emoji'] ); ?> <?php echo (int) $d['total']; ?></div>
-      <div style="font-size:11px;color:#6b7280;margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:.4px"><?php echo esc_html( $d['title'] ); ?></div>
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:20px 22px;backdrop-filter:blur(24px);border-left:3px solid <?php echo esc_attr( $d['color'] ); ?>">
+      <div style="font-size:26px;font-weight:900;color:#f0f0f2"><?php echo esc_html( $d['icon_emoji'] ); ?> <?php echo (int) $d['total']; ?></div>
+      <div style="font-size:11px;color:#8888a0;margin-top:6px;font-weight:600;text-transform:uppercase;letter-spacing:.4px"><?php echo esc_html( $d['title'] ); ?></div>
     </div>
     <?php endforeach; ?>
   </div>
 
   <?php if ( empty( $submissions ) ) : ?>
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:60px;text-align:center;color:#9ca3af">
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:60px;text-align:center;color:#8888a0;backdrop-filter:blur(16px)">
       <div style="font-size:48px;margin-bottom:16px">📭</div>
-      <p style="font-size:16px;margin:0;font-weight:600">Ingen besvarelser endnu</p>
+      <p style="font-size:16px;margin:0;font-weight:600;color:#f0f0f2">Ingen besvarelser endnu</p>
       <p style="font-size:13px;margin:8px 0 0">Del quizzen og vent på de første svar!</p>
     </div>
   <?php else : ?>
 
   <!-- Submissions table -->
-  <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04)">
+  <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;overflow:hidden;backdrop-filter:blur(16px)">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>
-        <tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb">
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px">#</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Navn</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Telefon</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Email</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Profil</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px">GDPR</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Tidspunkt</th>
+        <tr style="background:#0d0d11;border-bottom:1px solid rgba(255,255,255,.07)">
+          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">#</th>
+          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">Navn</th>
+          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">Telefon</th>
+          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">Email</th>
+          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">Profil</th>
+          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">GDPR</th>
+          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">Tidspunkt</th>
           <th style="padding:12px 16px;"></th>
         </tr>
       </thead>
       <tbody>
         <?php foreach ( $submissions as $i => $s ) : ?>
-        <tr style="border-bottom:1px solid #f3f4f6;<?php echo $i % 2 !== 0 ? 'background:#fafafa' : ''; ?>">
-          <td style="padding:12px 16px;color:#9ca3af;font-size:11px;font-weight:600"><?php echo $offset + $i + 1; ?></td>
-          <td style="padding:12px 16px;font-weight:700;color:#111827"><?php echo esc_html( $s['name'] ); ?></td>
-          <td style="padding:12px 16px;color:#4b5563"><?php echo esc_html( $s['phone'] ); ?></td>
-          <td style="padding:12px 16px;color:#4b5563"><?php echo $s['email'] ? esc_html( $s['email'] ) : '<span style="color:#d1d5db">—</span>'; ?></td>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.04);<?php echo $i % 2 !== 0 ? 'background:rgba(255,255,255,.015)' : ''; ?>">
+          <td style="padding:12px 16px;color:#44445a;font-size:11px;font-weight:600"><?php echo $offset + $i + 1; ?></td>
+          <td style="padding:12px 16px;font-weight:700;color:#f0f0f2"><?php echo esc_html( $s['name'] ); ?></td>
+          <td style="padding:12px 16px;color:#8888a0"><?php echo esc_html( $s['phone'] ); ?></td>
+          <td style="padding:12px 16px;color:#8888a0"><?php echo $s['email'] ? esc_html( $s['email'] ) : '<span style="color:#44445a">—</span>'; ?></td>
           <td style="padding:12px 16px">
             <?php if ( $s['profile_title'] ) : ?>
-            <span style="display:inline-flex;align-items:center;gap:5px;background:<?php echo esc_attr( $s['profile_color'] ); ?>18;color:<?php echo esc_attr( $s['profile_color'] ); ?>;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid <?php echo esc_attr( $s['profile_color'] ); ?>30">
+            <span style="display:inline-flex;align-items:center;gap:5px;background:<?php echo esc_attr( $s['profile_color'] ); ?>18;color:<?php echo esc_attr( $s['profile_color'] ); ?>;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid <?php echo esc_attr( $s['profile_color'] ); ?>30">
               <?php echo esc_html( $s['icon_emoji'] . ' ' . $s['profile_title'] ); ?>
             </span>
             <?php else : ?>
-            <span style="color:#d1d5db">—</span>
+            <span style="color:#44445a">—</span>
             <?php endif; ?>
           </td>
           <td style="padding:12px 16px">
             <?php if ( $s['consent'] ) : ?>
-              <span style="background:#d1fae5;color:#065f46;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px">✓ Ja</span>
+              <span style="background:rgba(204,255,0,.1);color:#CCFF00;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid rgba(204,255,0,.22)">✓ Ja</span>
             <?php else : ?>
-              <span style="background:#fee2e2;color:#991b1b;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px">✗ Nej</span>
+              <span style="background:rgba(255,85,85,.1);color:#ff5555;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,85,85,.22)">✗ Nej</span>
             <?php endif; ?>
           </td>
-          <td style="padding:12px 16px;color:#9ca3af;font-size:12px">
+          <td style="padding:12px 16px;color:#44445a;font-size:12px">
             <?php echo esc_html( wp_date( 'd.m.Y H:i', strtotime( $s['created_at'] ) ) ); ?>
           </td>
           <td style="padding:10px 14px;white-space:nowrap">
             <button onclick="rzpaToggleDetail(<?php echo (int) $s['id']; ?>)"
                     id="rzpa-btn-<?php echo (int) $s['id']; ?>"
-                    style="background:#f3f4f6;border:1px solid #e5e7eb;cursor:pointer;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;color:#374151;white-space:nowrap;margin-right:6px">
+                    style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);cursor:pointer;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;color:#f0f0f2;white-space:nowrap;margin-right:6px;transition:all .2s;font-family:inherit">
               👁 Se svar
             </button>
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
@@ -152,16 +152,16 @@ $tab = $tab ?? 'submissions';
               <input type="hidden" name="submission_id" value="<?php echo (int) $s['id']; ?>">
               <input type="hidden" name="paged"         value="<?php echo (int) ( $_GET['paged'] ?? 1 ); ?>">
               <button type="submit"
-                      style="background:#fee2e2;border:1px solid #fecaca;cursor:pointer;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;color:#dc2626;white-space:nowrap">
+                      style="background:rgba(255,85,85,.08);border:1px solid rgba(255,85,85,.25);cursor:pointer;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;color:#f87171;white-space:nowrap;font-family:inherit;transition:all .2s">
                 🗑 Slet
               </button>
             </form>
           </td>
         </tr>
         <tr id="rzpa-detail-<?php echo (int) $s['id']; ?>" style="display:none">
-          <td colspan="8" style="padding:0;border-bottom:2px solid rgba(232,89,12,.15)">
-            <div id="rzpa-detail-body-<?php echo (int) $s['id']; ?>" style="padding:24px 28px;background:#fafbff">
-              <div style="color:#9ca3af;font-size:13px">Henter data…</div>
+          <td colspan="8" style="padding:0;border-bottom:2px solid rgba(204,255,0,.12)">
+            <div id="rzpa-detail-body-<?php echo (int) $s['id']; ?>" style="padding:24px 28px;background:#0d0d11">
+              <div style="color:#8888a0;font-size:13px">Henter data…</div>
             </div>
           </td>
         </tr>
@@ -194,7 +194,7 @@ $tab = $tab ?? 'submissions';
       })
       .then(function(r){ return r.json(); })
       .then(function(d){ body.innerHTML = rzpaBuildDetail(d); })
-      .catch(function(){ body.innerHTML = '<div style="color:#dc2626;font-size:13px">Fejl ved hentning af data.</div>'; });
+      .catch(function(){ body.innerHTML = '<div style="color:#f87171;font-size:13px">Fejl ved hentning af data.</div>'; });
     }
 
     function rzpaBuildDetail(d) {
@@ -206,12 +206,12 @@ $tab = $tab ?? 'submissions';
       if (d.qa && d.qa.length) {
         d.qa.forEach(function(q, i) {
           qaHtml += '<div style="margin-bottom:14px">'
-            + '<div style="font-size:12px;color:#6b7280;font-weight:600;margin-bottom:4px">' + (i+1) + '. ' + rzpaEsc(q.question_text) + '</div>'
-            + '<div style="font-size:13px;color:#111827;padding-left:12px;border-left:3px solid #e8590c;line-height:1.4">→ ' + rzpaEsc(q.answer_text) + '</div>'
+            + '<div style="font-size:12px;color:#8888a0;font-weight:600;margin-bottom:4px">' + (i+1) + '. ' + rzpaEsc(q.question_text) + '</div>'
+            + '<div style="font-size:13px;color:#f0f0f2;padding-left:12px;border-left:3px solid #CCFF00;line-height:1.4">→ ' + rzpaEsc(q.answer_text) + '</div>'
             + '</div>';
         });
       } else {
-        qaHtml = '<div style="color:#9ca3af;font-size:13px">Ingen svar gemt.</div>';
+        qaHtml = '<div style="color:#8888a0;font-size:13px">Ingen svar gemt.</div>';
       }
 
       var scoresHtml = '';
@@ -220,43 +220,43 @@ $tab = $tab ?? 'submissions';
         var pct = Math.round((v / maxScore) * 100);
         var lbl = profileNames[k] || k;
         scoresHtml += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
-          + '<div style="font-size:12px;color:#374151;width:140px;font-weight:600;flex-shrink:0">' + rzpaEsc(lbl) + '</div>'
-          + '<div style="flex:1;background:#e5e7eb;border-radius:99px;height:8px">'
-          +   '<div style="background:#e8590c;height:8px;border-radius:99px;width:' + pct + '%"></div>'
+          + '<div style="font-size:12px;color:#8888a0;width:140px;font-weight:600;flex-shrink:0">' + rzpaEsc(lbl) + '</div>'
+          + '<div style="flex:1;background:rgba(255,255,255,.06);border-radius:999px;height:6px">'
+          +   '<div style="background:#CCFF00;height:6px;border-radius:999px;width:' + pct + '%;box-shadow:0 0 8px rgba(204,255,0,.4)"></div>'
           + '</div>'
-          + '<div style="font-size:12px;color:#6b7280;width:28px;text-align:right">' + v + '</div>'
+          + '<div style="font-size:12px;color:#8888a0;width:28px;text-align:right">' + v + '</div>'
           + '</div>';
       });
 
       var pdfUrl = rzpaAdminPostUrl + '?action=rzpa_quiz_download_pdf&submission_id=' + d.id + '&_wpnonce=' + rzpaPdfNonce;
 
-      return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">'
+      return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;font-family:-apple-system,\'Inter\',\'Segoe UI\',sans-serif">'
 
         // ── Left: contact + Q&A ──
         + '<div>'
-        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#9ca3af;margin-bottom:10px">Kontaktoplysninger</div>'
-        + '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin-bottom:20px">'
-        +   '<div style="font-size:15px;font-weight:800;color:#111827;margin-bottom:4px">' + rzpaEsc(d.name) + '</div>'
-        +   '<div style="font-size:13px;color:#4b5563">' + rzpaEsc(d.phone || '—') + '</div>'
-        +   '<div style="font-size:13px;color:#4b5563">' + rzpaEsc(d.email || '—') + '</div>'
+        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#44445a;margin-bottom:10px">Kontaktoplysninger</div>'
+        + '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px 16px;margin-bottom:20px">'
+        +   '<div style="font-size:15px;font-weight:800;color:#f0f0f2;margin-bottom:4px">' + rzpaEsc(d.name) + '</div>'
+        +   '<div style="font-size:13px;color:#8888a0">' + rzpaEsc(d.phone || '—') + '</div>'
+        +   '<div style="font-size:13px;color:#8888a0">' + rzpaEsc(d.email || '—') + '</div>'
         + '</div>'
-        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#9ca3af;margin-bottom:10px">Svar</div>'
+        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#44445a;margin-bottom:10px">Svar</div>'
         + qaHtml
         + '</div>'
 
         // ── Right: profile + scores + PDF ──
         + '<div>'
-        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#9ca3af;margin-bottom:10px">Profil-resultat</div>'
-        + '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px;margin-bottom:20px">'
-        +   '<div style="font-size:20px;font-weight:900;color:#111827;margin-bottom:6px">' + rzpaEsc((d.profile_icon||'') + ' ' + (d.profile_title||'—')) + '</div>'
-        +   (d.secondary_title ? '<div style="font-size:12px;color:#6b7280">Sekundær: ' + rzpaEsc((d.secondary_icon||'') + ' ' + d.secondary_title) + '</div>' : '')
+        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#44445a;margin-bottom:10px">Profil-resultat</div>'
+        + '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:16px 18px;margin-bottom:20px">'
+        +   '<div style="font-size:20px;font-weight:900;color:#f0f0f2;margin-bottom:6px">' + rzpaEsc((d.profile_icon||'') + ' ' + (d.profile_title||'—')) + '</div>'
+        +   (d.secondary_title ? '<div style="font-size:12px;color:#8888a0">Sekundær: ' + rzpaEsc((d.secondary_icon||'') + ' ' + d.secondary_title) + '</div>' : '')
         + '</div>'
-        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#9ca3af;margin-bottom:10px">Score-fordeling</div>'
-        + '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px;margin-bottom:20px">'
+        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#44445a;margin-bottom:10px">Score-fordeling</div>'
+        + '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:16px 18px;margin-bottom:20px">'
         + scoresHtml
         + '</div>'
         + '<a href="' + pdfUrl + '" target="_blank"'
-        +  ' style="display:inline-flex;align-items:center;gap:8px;background:#111827;color:#fff;text-decoration:none;padding:11px 22px;border-radius:8px;font-size:13px;font-weight:700">'
+        +  ' style="display:inline-flex;align-items:center;gap:8px;background:#CCFF00;color:#000;text-decoration:none;padding:11px 22px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 0 20px rgba(204,255,0,.2)">'
         +  '📄 Download PDF</a>'
         + '</div>'
 
@@ -278,7 +278,7 @@ $tab = $tab ?? 'submissions';
         $purl      = add_query_arg( 'paged', $p );
     ?>
     <a href="<?php echo esc_url( $purl ); ?>"
-       style="display:inline-block;padding:7px 13px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;<?php echo $active_pg ? 'background:#111827;color:#fff' : 'background:#f3f4f6;color:#374151'; ?>">
+       style="display:inline-block;padding:7px 14px;border-radius:999px;font-size:13px;font-weight:700;text-decoration:none;transition:all .18s;<?php echo $active_pg ? 'background:#CCFF00;color:#000;box-shadow:0 0 16px rgba(204,255,0,.25)' : 'background:rgba(255,255,255,.05);color:#8888a0;border:1px solid rgba(255,255,255,.07)'; ?>">
       <?php echo $p; ?>
     </a>
     <?php endfor; ?>
@@ -297,17 +297,17 @@ $tab = $tab ?? 'submissions';
   ?>
 
   <?php if ( $saved ) : ?>
-  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 16px;margin-bottom:20px;color:#166534;font-size:13px;font-weight:600">✓ Spørgsmål gemt</div>
+  <div style="background:rgba(204,255,0,.06);border:1px solid rgba(204,255,0,.22);border-radius:10px;padding:12px 16px;margin-bottom:20px;color:#CCFF00;font-size:13px;font-weight:600">✓ Spørgsmål gemt</div>
   <?php endif; ?>
   <?php if ( $deleted ) : ?>
-  <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px 16px;margin-bottom:20px;color:#991b1b;font-size:13px;font-weight:600">🗑 Spørgsmål slettet</div>
+  <div style="background:rgba(255,85,85,.06);border:1px solid rgba(255,85,85,.22);border-radius:10px;padding:12px 16px;margin-bottom:20px;color:#f87171;font-size:13px;font-weight:600">🗑 Spørgsmål slettet</div>
   <?php endif; ?>
 
   <!-- Toolbar -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-    <div style="font-size:14px;color:#6b7280"><?php echo count( $questions ); ?> spørgsmål i alt</div>
+    <div style="font-size:14px;color:#8888a0"><?php echo count( $questions ); ?> spørgsmål i alt</div>
     <a href="<?php echo esc_url( admin_url( 'admin.php?page=rzpa-quiz-edit-question' ) ); ?>"
-       style="background:linear-gradient(135deg,#e8590c,#d6336c);color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px">
+       style="background:#CCFF00;color:#000;text-decoration:none;padding:10px 22px;border-radius:999px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;box-shadow:0 0 20px rgba(204,255,0,.2);transition:all .2s">
       + Nyt spørgsmål
     </a>
   </div>
@@ -319,29 +319,29 @@ $tab = $tab ?? 'submissions';
         $ans_count  = count( $q['answers'] );
         $edit_url   = admin_url( 'admin.php?page=rzpa-quiz-edit-question&qid=' . $q['id'] );
     ?>
-    <div style="background:#fff;border:1px solid <?php echo $is_active ? '#e5e7eb' : '#f3f4f6'; ?>;border-radius:12px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,.04);<?php echo $is_active ? '' : 'opacity:.65'; ?>">
+    <div style="background:rgba(255,255,255,.03);border:1px solid <?php echo $is_active ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.04)'; ?>;border-radius:14px;padding:18px 20px;backdrop-filter:blur(12px);<?php echo $is_active ? '' : 'opacity:.55'; ?>;transition:border-color .2s">
       <div style="display:flex;align-items:flex-start;gap:14px">
 
         <!-- Sort number -->
-        <div style="background:#f3f4f6;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#374151;flex-shrink:0">
+        <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.07);border-radius:10px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#f0f0f2;flex-shrink:0">
           <?php echo $idx + 1; ?>
         </div>
 
         <!-- Question body -->
         <div style="flex:1;min-width:0">
-          <div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:6px;line-height:1.4">
+          <div style="font-size:15px;font-weight:700;color:#f0f0f2;margin-bottom:6px;line-height:1.4">
             <?php echo esc_html( $q['question_text'] ); ?>
           </div>
           <?php if ( $q['helper_text'] ) : ?>
-          <div style="font-size:12px;color:#9ca3af;font-style:italic;margin-bottom:8px"><?php echo esc_html( $q['helper_text'] ); ?></div>
+          <div style="font-size:12px;color:#8888a0;font-style:italic;margin-bottom:8px"><?php echo esc_html( $q['helper_text'] ); ?></div>
           <?php endif; ?>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <?php
             $is_active
-              ? print '<span style="background:#d1fae5;color:#065f46;font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px">● Aktiv</span>'
-              : print '<span style="background:#f3f4f6;color:#9ca3af;font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px">● Inaktiv</span>';
+              ? print '<span style="background:rgba(204,255,0,.1);color:#CCFF00;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid rgba(204,255,0,.22)">● Aktiv</span>'
+              : print '<span style="background:rgba(255,255,255,.04);color:#8888a0;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.07)">● Inaktiv</span>';
             ?>
-            <span style="background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px"><?php echo $ans_count; ?> svar</span>
+            <span style="background:rgba(255,255,255,.04);color:#8888a0;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.07)"><?php echo $ans_count; ?> svar</span>
           </div>
         </div>
 
@@ -350,7 +350,7 @@ $tab = $tab ?? 'submissions';
 
           <!-- Edit -->
           <a href="<?php echo esc_url( $edit_url ); ?>"
-             style="background:#f3f4f6;color:#374151;text-decoration:none;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:5px">
+             style="background:rgba(255,255,255,.05);color:#f0f0f2;text-decoration:none;padding:7px 14px;border-radius:999px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(255,255,255,.12);transition:all .2s">
             ✏️ Rediger
           </a>
 
@@ -361,7 +361,7 @@ $tab = $tab ?? 'submissions';
             <input type="hidden" name="is_active"           value="<?php echo $is_active ? 0 : 1; ?>">
             <?php wp_nonce_field( 'rzpa_quiz_toggle_question', 'rzpa_q_toggle_nonce' ); ?>
             <button type="submit"
-                    style="background:<?php echo $is_active ? '#fef3c7' : '#d1fae5'; ?>;color:<?php echo $is_active ? '#92400e' : '#065f46'; ?>;border:none;cursor:pointer;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700">
+                    style="background:<?php echo $is_active ? 'rgba(255,170,51,.08)' : 'rgba(204,255,0,.08)'; ?>;color:<?php echo $is_active ? '#ffaa33' : '#CCFF00'; ?>;border:1px solid <?php echo $is_active ? 'rgba(255,170,51,.25)' : 'rgba(204,255,0,.25)'; ?>;cursor:pointer;padding:7px 14px;border-radius:999px;font-size:12px;font-weight:700;font-family:inherit;transition:all .2s">
               <?php echo $is_active ? 'Deaktivér' : 'Aktivér'; ?>
             </button>
           </form>
@@ -373,7 +373,7 @@ $tab = $tab ?? 'submissions';
             <input type="hidden" name="qid"              value="<?php echo $q['id']; ?>">
             <?php wp_nonce_field( 'rzpa_quiz_delete_question', 'rzpa_q_del_nonce' ); ?>
             <button type="submit"
-                    style="background:#fef2f2;color:#dc2626;border:none;cursor:pointer;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700">
+                    style="background:rgba(255,85,85,.08);color:#f87171;border:1px solid rgba(255,85,85,.22);cursor:pointer;padding:7px 12px;border-radius:999px;font-size:12px;font-weight:700;font-family:inherit;transition:all .2s">
               🗑
             </button>
           </form>
@@ -383,9 +383,9 @@ $tab = $tab ?? 'submissions';
     <?php endforeach; ?>
 
     <?php if ( empty( $questions ) ) : ?>
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:60px;text-align:center;color:#9ca3af">
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:60px;text-align:center;color:#8888a0;backdrop-filter:blur(16px)">
       <div style="font-size:48px;margin-bottom:16px">📝</div>
-      <p style="font-size:15px;margin:0;font-weight:600">Ingen spørgsmål endnu</p>
+      <p style="font-size:15px;margin:0;font-weight:600;color:#f0f0f2">Ingen spørgsmål endnu</p>
       <p style="font-size:13px;margin:10px 0 0">Klik "Nyt spørgsmål" for at komme i gang</p>
     </div>
     <?php endif; ?>
@@ -401,14 +401,14 @@ $tab = $tab ?? 'submissions';
   ?>
 
   <?php if ( $saved ) : ?>
-  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 16px;margin-bottom:20px;color:#166534;font-size:13px;font-weight:600">✓ E-mail indstillinger gemt</div>
+  <div style="background:rgba(204,255,0,.06);border:1px solid rgba(204,255,0,.22);border-radius:10px;padding:12px 16px;margin-bottom:20px;color:#CCFF00;font-size:13px;font-weight:600">✓ E-mail indstillinger gemt</div>
   <?php endif; ?>
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
 
     <!-- Settings form -->
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:28px;box-shadow:0 1px 4px rgba(0,0,0,.04)">
-      <h2 style="margin:0 0 20px;font-size:16px;font-weight:800;color:#111827">⚙️ Indstillinger</h2>
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:28px;backdrop-filter:blur(16px)">
+      <h2 style="margin:0 0 20px;font-size:16px;font-weight:800;color:#f0f0f2">⚙️ Indstillinger</h2>
 
       <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
         <input type="hidden" name="action" value="rzpa_quiz_save_email_cfg">
@@ -416,41 +416,41 @@ $tab = $tab ?? 'submissions';
 
         <!-- Admin email -->
         <div style="margin-bottom:18px">
-          <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b7280;margin-bottom:6px">Modtager (HR / Admin)</label>
+          <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#8888a0;margin-bottom:6px">Modtager (HR / Admin)</label>
           <input type="email" name="admin_email" value="<?php echo esc_attr( $cfg['admin_email'] ); ?>"
-                 style="width:100%;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px 12px;font-size:14px;color:#111;outline:none;font-family:inherit"
-                 onfocus="this.style.borderColor='#e8590c'" onblur="this.style.borderColor='#e5e7eb'">
-          <div style="font-size:11px;color:#9ca3af;margin-top:4px">Modtager admin-notifikation ved nye besvarelser</div>
+                 style="width:100%;background:#111116;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 14px;font-size:14px;color:#f0f0f2;outline:none;font-family:inherit;transition:border-color .18s"
+                 onfocus="this.style.borderColor='#CCFF00';this.style.boxShadow='0 0 0 2px rgba(204,255,0,.08)'" onblur="this.style.borderColor='rgba(255,255,255,.07)';this.style.boxShadow='none'">
+          <div style="font-size:11px;color:#8888a0;margin-top:4px">Modtager admin-notifikation ved nye besvarelser</div>
         </div>
 
         <!-- CTA URL -->
         <div style="margin-bottom:18px">
-          <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b7280;margin-bottom:6px">Knap URL (bruger-mail)</label>
+          <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#8888a0;margin-bottom:6px">Knap URL (bruger-mail)</label>
           <input type="text" name="cta_url" value="<?php echo esc_attr( $cfg['cta_url'] ); ?>"
-                 style="width:100%;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px 12px;font-size:14px;color:#111;outline:none;font-family:inherit"
-                 onfocus="this.style.borderColor='#e8590c'" onblur="this.style.borderColor='#e5e7eb'">
-          <div style="font-size:11px;color:#9ca3af;margin-top:4px">Fx <code>/book-en-samtale</code> eller fuld URL</div>
+                 style="width:100%;background:#111116;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 14px;font-size:14px;color:#f0f0f2;outline:none;font-family:inherit;transition:border-color .18s"
+                 onfocus="this.style.borderColor='#CCFF00';this.style.boxShadow='0 0 0 2px rgba(204,255,0,.08)'" onblur="this.style.borderColor='rgba(255,255,255,.07)';this.style.boxShadow='none'">
+          <div style="font-size:11px;color:#8888a0;margin-top:4px">Fx <code style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.07);padding:1px 6px;border-radius:5px;color:#CCFF00">/book-en-samtale</code> eller fuld URL</div>
         </div>
 
         <!-- CTA text -->
         <div style="margin-bottom:18px">
-          <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b7280;margin-bottom:6px">Knap tekst (bruger-mail)</label>
+          <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#8888a0;margin-bottom:6px">Knap tekst (bruger-mail)</label>
           <input type="text" name="cta_text" value="<?php echo esc_attr( $cfg['cta_text'] ); ?>"
-                 style="width:100%;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px 12px;font-size:14px;color:#111;outline:none;font-family:inherit"
-                 onfocus="this.style.borderColor='#e8590c'" onblur="this.style.borderColor='#e5e7eb'">
+                 style="width:100%;background:#111116;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 14px;font-size:14px;color:#f0f0f2;outline:none;font-family:inherit;transition:border-color .18s"
+                 onfocus="this.style.borderColor='#CCFF00';this.style.boxShadow='0 0 0 2px rgba(204,255,0,.08)'" onblur="this.style.borderColor='rgba(255,255,255,.07)';this.style.boxShadow='none'">
         </div>
 
         <!-- User subject override -->
         <div style="margin-bottom:24px">
-          <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b7280;margin-bottom:6px">Emne-override (bruger-mail) <span style="font-weight:400;text-transform:none">(valgfrit)</span></label>
+          <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#8888a0;margin-bottom:6px">Emne-override (bruger-mail) <span style="font-weight:400;text-transform:none;color:#44445a">(valgfrit)</span></label>
           <input type="text" name="user_subject" value="<?php echo esc_attr( $cfg['user_subject'] ); ?>"
                  placeholder="Lades blank for standard: Din Rezponz profil: [profil]"
-                 style="width:100%;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px 12px;font-size:14px;color:#111;outline:none;font-family:inherit"
-                 onfocus="this.style.borderColor='#e8590c'" onblur="this.style.borderColor='#e5e7eb'">
+                 style="width:100%;background:#111116;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 14px;font-size:14px;color:#f0f0f2;outline:none;font-family:inherit;transition:border-color .18s"
+                 onfocus="this.style.borderColor='#CCFF00';this.style.boxShadow='0 0 0 2px rgba(204,255,0,.08)'" onblur="this.style.borderColor='rgba(255,255,255,.07)';this.style.boxShadow='none'">
         </div>
 
         <button type="submit"
-                style="background:linear-gradient(135deg,#e8590c,#d6336c);color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:14px;font-weight:700;cursor:pointer;width:100%">
+                style="background:#CCFF00;color:#000;border:none;border-radius:999px;padding:12px 28px;font-size:14px;font-weight:700;cursor:pointer;width:100%;box-shadow:0 0 24px rgba(204,255,0,.2);transition:all .2s;font-family:inherit">
           💾 Gem indstillinger
         </button>
       </form>
@@ -460,27 +460,27 @@ $tab = $tab ?? 'submissions';
     <div style="display:flex;flex-direction:column;gap:16px">
 
       <!-- Bruger-mail preview -->
-      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.04)">
-        <h3 style="margin:0 0 16px;font-size:14px;font-weight:800;color:#111827">📧 Bruger-mail</h3>
-        <div style="font-size:13px;color:#4b5563;line-height:1.6">
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:24px;backdrop-filter:blur(16px)">
+        <h3 style="margin:0 0 16px;font-size:14px;font-weight:800;color:#f0f0f2">📧 Bruger-mail</h3>
+        <div style="font-size:13px;color:#8888a0;line-height:1.6">
           Sendes automatisk til kandidaten når de afslutter quizzen og opgiver en e-mailadresse.<br><br>
           Indeholder:
-          <ul style="margin:8px 0 0 18px;padding:0;line-height:1.8">
+          <ul style="margin:8px 0 0 18px;padding:0;line-height:1.8;color:#8888a0">
             <li>Profil-resultat + beskrivelse</li>
             <li>Styrker, trives-med og udviklingsområder</li>
             <li>Score-fordeling over de 4 profiler</li>
-            <li>CTA-knap → <strong><?php echo esc_html( $cfg['cta_url'] ); ?></strong></li>
+            <li>CTA-knap → <strong style="color:#f0f0f2"><?php echo esc_html( $cfg['cta_url'] ); ?></strong></li>
           </ul>
         </div>
       </div>
 
       <!-- Admin-mail preview -->
-      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.04)">
-        <h3 style="margin:0 0 16px;font-size:14px;font-weight:800;color:#111827">🔔 Admin-notifikation</h3>
-        <div style="font-size:13px;color:#4b5563;line-height:1.6">
-          Sendes til <strong><?php echo esc_html( $cfg['admin_email'] ); ?></strong> ved hver ny besvarelse.<br><br>
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:24px;backdrop-filter:blur(16px)">
+        <h3 style="margin:0 0 16px;font-size:14px;font-weight:800;color:#f0f0f2">🔔 Admin-notifikation</h3>
+        <div style="font-size:13px;color:#8888a0;line-height:1.6">
+          Sendes til <strong style="color:#f0f0f2"><?php echo esc_html( $cfg['admin_email'] ); ?></strong> ved hver ny besvarelse.<br><br>
           Indeholder:
-          <ul style="margin:8px 0 0 18px;padding:0;line-height:1.8">
+          <ul style="margin:8px 0 0 18px;padding:0;line-height:1.8;color:#8888a0">
             <li>Navn, telefon og e-mail</li>
             <li>Vinder-profil og score-fordeling</li>
             <li>Link til admin-oversigten</li>
