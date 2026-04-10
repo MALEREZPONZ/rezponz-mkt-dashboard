@@ -24,22 +24,21 @@ class RZPZ_Crew {
     // ── Admin Menu ───────────────────────────────────────────────────────────
 
     public static function register_menu() : void {
+        $cap = 'manage_options';
         $crew_pages = [
-            'rezponz-crew'        => [ __( 'Crew Oversigt',  'rezponz-analytics' ), [ __CLASS__, 'page_crew_list' ] ],
-            'rezponz-crew-bonus'  => [ __( 'Bonus',          'rezponz-analytics' ), [ __CLASS__, 'page_bonus' ] ],
-            'rezponz-crew-boost'  => [ __( 'Boost til Ads',  'rezponz-analytics' ), [ __CLASS__, 'page_boost' ] ],
-            'rezponz-crew-settings' => [ __( 'Crew Indstillinger', 'rezponz-analytics' ), [ __CLASS__, 'page_settings' ] ],
+            'rezponz-crew'          => __( 'Crew Oversigt',      'rezponz-analytics' ),
+            'rezponz-crew-bonus'    => __( 'Bonus',               'rezponz-analytics' ),
+            'rezponz-crew-boost'    => __( 'Boost til Ads',       'rezponz-analytics' ),
+            'rezponz-crew-settings' => __( 'Crew Indstillinger',  'rezponz-analytics' ),
         ];
-
-        foreach ( $crew_pages as $slug => [ $label, $cb ] ) {
-            add_submenu_page(
-                'rzpa-dashboard',
-                $label . ' – Rezponz Crew',
-                ( $slug === 'rezponz-crew' ? '👥 ' : '&nbsp;&nbsp;&nbsp;' ) . $label,
-                'manage_options',
-                $slug,
-                $cb
-            );
+        $callbacks = [
+            'rezponz-crew'          => [ __CLASS__, 'page_crew_list' ],
+            'rezponz-crew-bonus'    => [ __CLASS__, 'page_bonus' ],
+            'rezponz-crew-boost'    => [ __CLASS__, 'page_boost' ],
+            'rezponz-crew-settings' => [ __CLASS__, 'page_settings' ],
+        ];
+        foreach ( $crew_pages as $slug => $label ) {
+            add_submenu_page( 'rzpa-dashboard', $label . ' – Rezponz Crew', $label, $cap, $slug, $callbacks[ $slug ] );
         }
     }
 

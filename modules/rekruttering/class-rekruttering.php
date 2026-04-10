@@ -15,14 +15,9 @@ class RZPA_Rekruttering {
     }
 
     public static function add_menu() {
-        add_submenu_page(
-            'rzpa-dashboard',
-            'Rekruttering – Rezponz Marketing Platform',
-            '👥 Rekruttering',
-            'manage_options',
-            'rzpa-rekruttering',
-            [ __CLASS__, 'page_rekruttering' ]
-        );
+        $cap = 'manage_options';
+        add_submenu_page( 'rzpa-dashboard', '', '👥 HR & Crew', $cap, 'rzpa-section-crew', [ __CLASS__, 'page_rekruttering' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Rekruttering – Rezponz', 'Rekruttering', $cap, 'rzpa-rekruttering', [ __CLASS__, 'page_rekruttering' ] );
     }
 
     public static function page_rekruttering() {

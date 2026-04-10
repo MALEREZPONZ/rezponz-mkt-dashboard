@@ -6,6 +6,7 @@ class RZPA_Admin {
     public static function init() {
         add_action( 'admin_menu',            [ __CLASS__, 'add_menu' ] );
         add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue' ] );
+        add_action( 'admin_head',            [ __CLASS__, 'menu_styles' ] );
         add_action( 'admin_post_rzpa_save_settings', [ __CLASS__, 'save_settings' ] );
         add_action( 'admin_post_rzpa_pdf_download',  [ __CLASS__, 'handle_pdf_download' ] );
         add_action( 'admin_init',            [ __CLASS__, 'handle_google_oauth' ] );
@@ -100,21 +101,63 @@ class RZPA_Admin {
             3
         );
 
-        $pages = [
-            'rzpa-seo'       => [ 'SEO',              [ __CLASS__, 'page_seo' ] ],
-            'rzpa-ai'        => [ 'AI-synlighed',     [ __CLASS__, 'page_ai' ] ],
-            'rzpa-blog'      => [ 'Blog Indsigt',      [ __CLASS__, 'page_blog' ] ],
-            'rzpa-meta'      => [ 'Meta Ads',          [ __CLASS__, 'page_meta' ] ],
-            'rzpa-google-ads'=> [ 'Google Ads',        [ __CLASS__, 'page_google_ads' ] ],
-            'rzpa-snapchat'  => [ 'Snapchat Ads',      [ __CLASS__, 'page_snap' ] ],
-            'rzpa-tiktok'    => [ 'TikTok Ads',        [ __CLASS__, 'page_tiktok' ] ],
-            'rzpa-rapport'   => [ 'PDF Rapport',       [ __CLASS__, 'page_rapport' ] ],
-            'rzpa-settings'  => [ 'Indstillinger',     [ __CLASS__, 'page_settings' ] ],
-        ];
+        $cap = 'manage_options';
 
-        foreach ( $pages as $slug => [$label, $cb] ) {
-            add_submenu_page( 'rzpa-dashboard', $label . ' – Rezponz Marketing Platform', $label, 'manage_options', $slug, $cb );
+        // ── Sektion: Analyse & Ads ───────────────────────────────────────────
+        add_submenu_page( 'rzpa-dashboard', '', '📊 Analyse & Ads', $cap, 'rzpa-section-ads', [ __CLASS__, 'page_dashboard' ] );
+        add_submenu_page( 'rzpa-dashboard', 'SEO – Rezponz',              'SEO',              $cap, 'rzpa-seo',        [ __CLASS__, 'page_seo' ] );
+        add_submenu_page( 'rzpa-dashboard', 'AI-synlighed – Rezponz',     'AI-synlighed',     $cap, 'rzpa-ai',         [ __CLASS__, 'page_ai' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Blog Indsigt – Rezponz',     'Blog Indsigt',     $cap, 'rzpa-blog',       [ __CLASS__, 'page_blog' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Meta Ads – Rezponz',         'Meta Ads',         $cap, 'rzpa-meta',       [ __CLASS__, 'page_meta' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Google Ads – Rezponz',       'Google Ads',       $cap, 'rzpa-google-ads', [ __CLASS__, 'page_google_ads' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Snapchat Ads – Rezponz',     'Snapchat Ads',     $cap, 'rzpa-snapchat',   [ __CLASS__, 'page_snap' ] );
+        add_submenu_page( 'rzpa-dashboard', 'TikTok Ads – Rezponz',       'TikTok Ads',       $cap, 'rzpa-tiktok',     [ __CLASS__, 'page_tiktok' ] );
+        add_submenu_page( 'rzpa-dashboard', 'PDF Rapport – Rezponz',      'PDF Rapport',      $cap, 'rzpa-rapport',    [ __CLASS__, 'page_rapport' ] );
+
+        // ── Sektion: System ──────────────────────────────────────────────────
+        add_submenu_page( 'rzpa-dashboard', '', '⚙️ System', $cap, 'rzpa-section-system', [ __CLASS__, 'page_dashboard' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Indstillinger – Rezponz',    'Indstillinger',    $cap, 'rzpa-settings',   [ __CLASS__, 'page_settings' ] );
+    }
+
+    /**
+     * Inline CSS der styles WordPress-sidemenuen for Rezponz.
+     * Vises på alle admin-sider så sektions-headers altid er pæne.
+     */
+    public static function menu_styles() : void {
+        ?>
+        <style id="rzpa-menu-styles">
+        /* Sektions-headers i Rezponz-menuen */
+        #adminmenu a[href$="rzpa-section-ads"],
+        #adminmenu a[href$="rzpa-section-crew"],
+        #adminmenu a[href$="rzpa-section-refs"],
+        #adminmenu a[href$="rzpa-section-seo"],
+        #adminmenu a[href$="rzpa-section-system"] {
+            color: #CCFF00 !important;
+            font-size: 9px !important;
+            font-weight: 800 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1.2px !important;
+            pointer-events: none !important;
+            cursor: default !important;
+            padding-top: 14px !important;
+            padding-bottom: 2px !important;
+            opacity: 1 !important;
+            line-height: 1.2 !important;
         }
+        #adminmenu li:has(a[href$="rzpa-section-ads"]),
+        #adminmenu li:has(a[href$="rzpa-section-crew"]),
+        #adminmenu li:has(a[href$="rzpa-section-refs"]),
+        #adminmenu li:has(a[href$="rzpa-section-seo"]),
+        #adminmenu li:has(a[href$="rzpa-section-system"]) {
+            border-top: 1px solid rgba(204,255,0,.15) !important;
+            margin-top: 6px !important;
+        }
+        #adminmenu li:has(a[href$="rzpa-section-ads"]) {
+            border-top: none !important;
+            margin-top: 0 !important;
+        }
+        </style>
+        <?php
     }
 
     public static function enqueue( string $hook ) {

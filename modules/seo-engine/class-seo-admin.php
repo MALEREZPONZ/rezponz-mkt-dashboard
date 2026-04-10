@@ -57,10 +57,11 @@ class RZPA_SEO_Admin {
     public static function add_menu() : void {
         $cap = 'manage_options';
 
+        add_submenu_page( 'rzpa-dashboard', '', '🔍 SEO Engine', $cap, 'rzpa-section-seo', [ __CLASS__, 'page_dashboard' ] );
         add_submenu_page(
             'rzpa-dashboard',
             'SEO Engine',
-            '🔍 SEO Engine',
+            'SEO Engine',
             $cap,
             'rzpa-seo-engine',
             [ __CLASS__, 'page_dashboard' ]

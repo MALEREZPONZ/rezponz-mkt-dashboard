@@ -377,11 +377,13 @@ class RZPZ_Henvis {
     // ── Admin menu ──────────────────────────────────────────────────────────────
 
     public static function add_admin_menu() {
+        $cap = 'manage_options';
+        add_submenu_page( 'rzpa-dashboard', '', '🔗 Henvisninger', $cap, 'rzpa-section-refs', [ __CLASS__, 'render_admin' ] );
         add_submenu_page(
             'rzpa-dashboard',
             __( 'Henvisninger', 'rezponz-analytics' ),
             __( 'Henvisninger', 'rezponz-analytics' ),
-            'manage_options',
+            $cap,
             'rzpz-henvis',
             [ __CLASS__, 'render_admin' ]
         );
