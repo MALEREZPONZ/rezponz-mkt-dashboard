@@ -26,24 +26,24 @@ $base_url = admin_url( 'admin.php?page=rzpz-henvis-settings' );
 $pages = get_pages( [ 'post_status' => 'publish', 'number' => 50 ] );
 ?>
 <style>
-#wpbody-content, #wpcontent { background:#0d0d0d !important; }
-.rzpz-hs-page { padding:20px; background:#0d0d0d; min-height:100vh; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:#e0e0e0; }
+#wpbody-content, #wpcontent { background:#08080b !important; }
+.rzpz-hs-page { padding:20px; background:#08080b; min-height:100vh; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:#f0f0f2; }
 .rzpz-hs-header { display:flex; align-items:center; gap:12px; margin-bottom:8px; flex-wrap:wrap; }
-.rzpz-hs-title  { font-size:22px; font-weight:700; margin:0; color:#fff; }
+.rzpz-hs-title  { font-size:22px; font-weight:700; margin:0; color:#f0f0f2; }
 /* Tabs */
-.rzpz-tabs { display:flex; gap:0; margin-bottom:24px; border-bottom:2px solid #2a2a2a; }
-.rzpz-tabs a { padding:10px 20px; font-size:13px; font-weight:600; color:#666; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; transition:color .15s,border-color .15s; }
+.rzpz-tabs { display:flex; gap:0; margin-bottom:24px; border-bottom:2px solid rgba(255,255,255,.07); }
+.rzpz-tabs a { padding:10px 20px; font-size:13px; font-weight:600; color:#8888a0; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; transition:color .15s,border-color .15s; }
 .rzpz-tabs a.active { color:#CCFF00; border-bottom-color:#CCFF00; }
-.rzpz-tabs a:hover  { color:#e0e0e0; }
+.rzpz-tabs a:hover  { color:#f0f0f2; }
 /* Card */
-.rzpz-hs-card { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:12px; padding:24px; margin-bottom:20px; }
-.rzpz-hs-card h2 { font-size:15px; font-weight:700; color:#fff; margin:0 0 16px 0; }
-.rzpz-hs-card p  { color:#888; font-size:13px; margin:0 0 14px 0; line-height:1.6; }
+.rzpz-hs-card { background:rgba(255,255,255,.03); backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,.07); border-radius:18px; padding:24px; margin-bottom:20px; }
+.rzpz-hs-card h2 { font-size:15px; font-weight:700; color:#f0f0f2; margin:0 0 16px 0; }
+.rzpz-hs-card p  { color:#8888a0; font-size:13px; margin:0 0 14px 0; line-height:1.6; }
 /* Notices */
 .rzpz-notice { padding:10px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; }
 .rzpz-notice.success { background:#0a2e0a; color:#4ade80; border:1px solid #4ade8040; }
 .rzpz-notice.info    { background:#0a1a2e; color:#60a5fa; border:1px solid #60a5fa40; }
-.rzpz-notice.error   { background:#2d0a0a; color:#f87171; border:1px solid #f8717140; }
+.rzpz-notice.error   { background:#2d0a0a; color:#ff5555; border:1px solid #ff555540; }
 /* Form elements */
 .rzpz-field-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; align-items:flex-end; }
 .rzpz-field-row input[type=text],
@@ -55,49 +55,50 @@ $pages = get_pages( [ 'post_status' => 'publish', 'number' => 50 ] );
 .rzpz-field     input,
 .rzpz-field     select,
 .rzpz-field     textarea {
-    background:#111; border:1px solid #333; color:#e0e0e0; padding:8px 12px; border-radius:6px; font-size:13px; min-width:160px; box-sizing:border-box;
+    background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); color:#f0f0f2; padding:8px 12px; border-radius:6px; font-size:13px; min-width:160px; box-sizing:border-box;
 }
 .rzpz-field { display:flex; flex-direction:column; gap:5px; flex:1; min-width:160px; }
-.rzpz-field label { font-size:12px; color:#aaa; font-weight:600; }
+.rzpz-field label { font-size:12px; color:#8888a0; font-weight:600; }
 .rzpz-field input:focus, .rzpz-field select:focus, .rzpz-field textarea:focus,
 .rzpz-field-row input:focus, .rzpz-field-row select:focus { outline:none; border-color:#CCFF00; }
 .rzpz-field textarea { resize:vertical; min-height:80px; width:100%; }
 /* Buttons */
-.rzpz-btn-primary { background:#CCFF00; color:#0d0d0d; border:none; border-radius:6px; padding:8px 18px; font-weight:700; cursor:pointer; font-size:13px; white-space:nowrap; }
-.rzpz-btn-primary:hover { background:#bbee00; }
-.rzpz-btn-ghost  { background:transparent; color:#888; border:1px solid #333; border-radius:6px; padding:8px 18px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-block; white-space:nowrap; }
-.rzpz-btn-ghost:hover { color:#e0e0e0; border-color:#555; }
-.rzpz-btn-danger { background:#ef444420; color:#ef4444; border:1px solid #ef444440; border-radius:6px; padding:5px 12px; font-size:12px; cursor:pointer; font-weight:600; }
+.rzpz-btn-primary { background:rgba(255,255,255,.06); color:#CCFF00; border:1px solid rgba(255,255,255,.07); border-radius:999px; padding:8px 22px; font-weight:700; cursor:pointer; font-size:13px; white-space:nowrap; transition:background .15s,border-color .15s; }
+.rzpz-btn-primary:hover, .rzpz-btn-primary:active { background:#CCFF00; color:#0d0d0d; border-color:#CCFF00; }
+.rzpz-btn-ghost  { background:rgba(255,255,255,.03); color:#8888a0; border:1px solid rgba(255,255,255,.07); border-radius:999px; padding:8px 22px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-block; white-space:nowrap; transition:color .15s,border-color .15s,background .15s; }
+.rzpz-btn-ghost:hover { color:#f0f0f2; border-color:rgba(255,255,255,.2); background:rgba(255,255,255,.06); }
+.rzpz-btn-danger { background:#ff555520; color:#ff5555; border:1px solid #ff555540; border-radius:999px; padding:5px 14px; font-size:12px; cursor:pointer; font-weight:600; transition:background .15s; }
+.rzpz-btn-danger:hover { background:#ff555535; }
 /* Manager table */
 table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
-.rzpz-mgr-table th { background:#111; color:#aaa; font-size:11px; text-transform:uppercase; padding:8px 12px; text-align:left; border-bottom:1px solid #2a2a2a; letter-spacing:.5px; }
-.rzpz-mgr-table td { padding:10px 12px; border-bottom:1px solid #1f1f1f; font-size:13px; color:#e0e0e0; vertical-align:middle; }
+.rzpz-mgr-table th { background:rgba(255,255,255,.02); color:#8888a0; font-size:11px; text-transform:uppercase; padding:8px 12px; text-align:left; border-bottom:1px solid rgba(255,255,255,.07); letter-spacing:.5px; }
+.rzpz-mgr-table td { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.05); font-size:13px; color:#f0f0f2; vertical-align:middle; }
 .rzpz-mgr-table tr:last-child td { border-bottom:none; }
-.rzpz-mgr-table tr:hover td { background:#222; }
+.rzpz-mgr-table tr:hover td { background:rgba(255,255,255,.03); }
 /* Form config table */
 .rzpz-fc-table { width:100%; border-collapse:collapse; }
-.rzpz-fc-table th { background:#111; color:#aaa; font-size:11px; text-transform:uppercase; padding:8px 12px; text-align:left; border-bottom:1px solid #2a2a2a; letter-spacing:.5px; }
-.rzpz-fc-table td { padding:8px 12px; border-bottom:1px solid #1f1f1f; font-size:13px; vertical-align:middle; }
-.rzpz-fc-table input[type=text] { background:#111; border:1px solid #333; color:#e0e0e0; padding:5px 8px; border-radius:4px; font-size:12px; width:100%; box-sizing:border-box; }
+.rzpz-fc-table th { background:rgba(255,255,255,.02); color:#8888a0; font-size:11px; text-transform:uppercase; padding:8px 12px; text-align:left; border-bottom:1px solid rgba(255,255,255,.07); letter-spacing:.5px; }
+.rzpz-fc-table td { padding:8px 12px; border-bottom:1px solid rgba(255,255,255,.05); font-size:13px; vertical-align:middle; }
+.rzpz-fc-table input[type=text] { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); color:#f0f0f2; padding:5px 8px; border-radius:4px; font-size:12px; width:100%; box-sizing:border-box; }
 .rzpz-fc-table input[type=checkbox] { width:16px; height:16px; accent-color:#CCFF00; cursor:pointer; }
 .rzpz-fc-table .core-badge { background:#1a2a1a; color:#4ade80; font-size:10px; padding:2px 6px; border-radius:10px; }
 /* Shortcode box */
-.rzpz-shortcode-box { background:#111; border:2px dashed #CCFF0060; border-radius:10px; padding:20px; text-align:center; }
-.rzpz-shortcode-box code { background:#1e1e1e; color:#CCFF00; padding:10px 24px; border-radius:8px; font-size:18px; font-weight:700; border:1px solid #333; display:inline-block; margin:10px 0; cursor:pointer; letter-spacing:1px; }
+.rzpz-shortcode-box { background:rgba(255,255,255,.02); border:2px dashed #CCFF0060; border-radius:10px; padding:20px; text-align:center; }
+.rzpz-shortcode-box code { background:rgba(255,255,255,.05); color:#CCFF00; padding:10px 24px; border-radius:8px; font-size:18px; font-weight:700; border:1px solid rgba(255,255,255,.07); display:inline-block; margin:10px 0; cursor:pointer; letter-spacing:1px; }
 /* SMTP badge */
 .smtp-status-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
 .smtp-status-badge.active   { background:#0a2e0a; color:#4ade80; }
-.smtp-status-badge.inactive { background:#2a2a2a; color:#888; }
+.smtp-status-badge.inactive { background:rgba(255,255,255,.05); color:#8888a0; }
 /* QR output */
 #rzpz-qr-result { margin-top:20px; text-align:center; display:none; }
 #rzpz-qr-result img { border-radius:8px; border:4px solid #CCFF00; width:220px; height:220px; }
-.rzpz-section-header { font-size:11px; text-transform:uppercase; color:#555; letter-spacing:.8px; font-weight:700; margin:16px 0 8px 0; }
+.rzpz-section-header { font-size:11px; text-transform:uppercase; color:#8888a0; letter-spacing:.8px; font-weight:700; margin:16px 0 8px 0; }
 </style>
 
 <div class="rzpz-hs-page">
 
   <div class="rzpz-hs-header">
-    <a href="<?php echo esc_url( admin_url('admin.php?page=rzpz-henvis') ); ?>" style="color:#666;text-decoration:none;font-size:13px">← Tilbage til Henvisninger</a>
+    <a href="<?php echo esc_url( admin_url('admin.php?page=rzpz-henvis') ); ?>" style="color:#8888a0;text-decoration:none;font-size:13px">← Tilbage til Henvisninger</a>
     <h1 class="rzpz-hs-title" style="margin-left:4px">⚙️ Henvis Din Ven – Indstillinger</h1>
   </div>
 
@@ -122,9 +123,9 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
   <div class="rzpz-hs-card">
     <h2>📋 Shortcode til formularen</h2>
     <div class="rzpz-shortcode-box">
-      <div style="color:#888;font-size:13px;margin-bottom:6px">Indsæt på den side hvor formularen skal vises:</div>
+      <div style="color:#8888a0;font-size:13px;margin-bottom:6px">Indsæt på den side hvor formularen skal vises:</div>
       <code onclick="navigator.clipboard.writeText('[rezponz_henvis_ven]');this.textContent='✅ Kopieret!';setTimeout(()=>this.textContent='[rezponz_henvis_ven]',2000)">[rezponz_henvis_ven]</code>
-      <div style="color:#555;font-size:12px;margin-top:6px">Klik for at kopiere</div>
+      <div style="color:#8888a0;font-size:12px;margin-top:6px">Klik for at kopiere</div>
     </div>
   </div>
 
@@ -209,15 +210,15 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
       </span>
     </h2>
     <p>Konfigurer SMTP for pålidelig email-afsendelse. Uden SMTP bruger WordPress standard PHP mail(), som ofte blokeres af hosting-udbydere.</p>
-    <p style="color:#f59e0b">💡 <strong>SMTP er konfigureret og klar til brug.</strong> Brug "Send test-email" nedenfor for at bekræfte at det virker.</p>
+    <p style="color:#ffaa33">💡 <strong>SMTP er konfigureret og klar til brug.</strong> Brug "Send test-email" nedenfor for at bekræfte at det virker.</p>
 
     <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
       <input type="hidden" name="action" value="rzpz_henvis_save_smtp">
       <?php wp_nonce_field( 'rzpz_henvis_save_smtp' ); ?>
 
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;padding:12px 16px;background:#111;border-radius:8px;border:1px solid #2a2a2a">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;padding:12px 16px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.07)">
         <input type="checkbox" name="smtp_enabled" id="smtp_enabled" value="1" style="width:18px;height:18px;accent-color:#CCFF00;cursor:pointer" <?php checked( $smtp['enabled'] ); ?>>
-        <label for="smtp_enabled" style="font-size:14px;font-weight:700;color:#e0e0e0;cursor:pointer">Aktivér SMTP</label>
+        <label for="smtp_enabled" style="font-size:14px;font-weight:700;color:#f0f0f2;cursor:pointer">Aktivér SMTP</label>
       </div>
 
       <div class="rzpz-section-header">SMTP Server</div>
@@ -309,7 +310,7 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
     </form>
 
     <?php if ( empty($extra_recip) ) : ?>
-      <p style="color:#555;text-align:center;padding:20px 0">Ingen ekstra modtagere tilføjet endnu.</p>
+      <p style="color:#8888a0;text-align:center;padding:20px 0">Ingen ekstra modtagere tilføjet endnu.</p>
     <?php else : ?>
     <table class="rzpz-mgr-table">
       <thead><tr><th>Navn</th><th>Email</th><th>Modtager</th><th></th></tr></thead>
@@ -319,7 +320,7 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
           <td><?php echo esc_html( $r['name'] ); ?></td>
           <td><a href="mailto:<?php echo esc_attr($r['email']); ?>" style="color:#60a5fa;text-decoration:none"><?php echo esc_html( $r['email'] ); ?></a></td>
           <td>
-            <span style="font-size:12px;color:#888">CC på alle 3 mails</span>
+            <span style="font-size:12px;color:#8888a0">CC på alle 3 mails</span>
           </td>
           <td>
             <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" onsubmit="return confirm('Fjern denne modtager?')">
@@ -414,9 +415,9 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
     <div class="rzpz-hs-card">
       <h2>🛡️ CAPTCHA &amp; Felter</h2>
 
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;padding:12px 16px;background:#111;border-radius:8px;border:1px solid #2a2a2a">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;padding:12px 16px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.07)">
         <input type="checkbox" name="show_captcha" id="show_captcha" value="1" style="width:16px;height:16px;accent-color:#CCFF00" <?php checked( $fc['show_captcha'] ); ?>>
-        <label for="show_captcha" style="font-size:13px;color:#e0e0e0;cursor:pointer">Vis menneskeverifikation (matematik-CAPTCHA) inden formularen vises</label>
+        <label for="show_captcha" style="font-size:13px;color:#f0f0f2;cursor:pointer">Vis menneskeverifikation (matematik-CAPTCHA) inden formularen vises</label>
       </div>
 
       <table class="rzpz-fc-table">
@@ -521,14 +522,14 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
 
       <div id="cf-options-row" style="display:none;margin-top:12px">
         <div class="rzpz-field" style="max-width:400px">
-          <label>Dropdown valgmuligheder <span style="color:#555;font-weight:400">(én per linje)</span></label>
+          <label>Dropdown valgmuligheder <span style="color:#8888a0;font-weight:400">(én per linje)</span></label>
           <textarea name="cf_options" rows="4" placeholder="Fuldtid&#10;Deltid&#10;Freelance&#10;Praktikant"></textarea>
         </div>
       </div>
     </form>
 
     <?php if ( empty($custom_fields) ) : ?>
-      <p style="color:#555;text-align:center;padding:20px 0;margin-top:16px">Ingen ekstra felter endnu. Tilføj et ovenfor.</p>
+      <p style="color:#8888a0;text-align:center;padding:20px 0;margin-top:16px">Ingen ekstra felter endnu. Tilføj et ovenfor.</p>
     <?php else : ?>
     <table class="rzpz-mgr-table" style="margin-top:20px">
       <thead><tr><th>Label</th><th>Type</th><th>Sektion</th><th>Påkrævet</th><th>Placeholder</th><th></th></tr></thead>
@@ -541,12 +542,12 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
           <td><strong><?php echo esc_html( $cf['label'] ); ?></strong></td>
           <td><?php echo esc_html( $type_labels[ $cf['type'] ] ?? $cf['type'] ); ?>
             <?php if ( $cf['type'] === 'select' && ! empty( $cf['options'] ) ) : ?>
-              <br><span style="font-size:11px;color:#555"><?php echo esc_html( implode(', ', array_slice($cf['options'],0,3)) . (count($cf['options'])>3?' …':'') ); ?></span>
+              <br><span style="font-size:11px;color:#8888a0"><?php echo esc_html( implode(', ', array_slice($cf['options'],0,3)) . (count($cf['options'])>3?' …':'') ); ?></span>
             <?php endif; ?>
           </td>
           <td><?php echo esc_html( $section_labels[ $cf['section'] ] ?? $cf['section'] ); ?></td>
-          <td><?php echo ! empty($cf['required']) ? '<span style="color:#4ade80">✓ Ja</span>' : '<span style="color:#555">Nej</span>'; ?></td>
-          <td style="color:#666"><?php echo esc_html( $cf['placeholder'] ?? '' ); ?></td>
+          <td><?php echo ! empty($cf['required']) ? '<span style="color:#4ade80">✓ Ja</span>' : '<span style="color:#8888a0">Nej</span>'; ?></td>
+          <td style="color:#8888a0"><?php echo esc_html( $cf['placeholder'] ?? '' ); ?></td>
           <td>
             <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" onsubmit="return confirm('Slet dette felt?')">
               <input type="hidden" name="action" value="rzpz_henvis_delete_custom_field">
@@ -631,8 +632,8 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
   <style>
   .rzpz-tpl-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
   .rzpz-tpl-preview-wrap { display:flex; flex-direction:column; gap:5px; }
-  .rzpz-tpl-preview-label { font-size:12px; color:#aaa; font-weight:600; }
-  .rzpz-tpl-preview-frame { background:#fff; color:#333; padding:20px 24px; border-radius:8px; font-size:13px; line-height:1.7; min-height:220px; border:1px solid #2a2a2a; overflow:auto; }
+  .rzpz-tpl-preview-label { font-size:12px; color:#8888a0; font-weight:600; }
+  .rzpz-tpl-preview-frame { background:rgba(255,255,255,.03); backdrop-filter:blur(24px); color:#f0f0f2; padding:20px 24px; border-radius:8px; font-size:13px; line-height:1.7; min-height:220px; border:1px solid rgba(255,255,255,.07); overflow:auto; }
   .rzpz-tpl-preview-frame p  { margin:0 0 10px 0; }
   .rzpz-tpl-preview-frame ul { padding-left:20px; margin:6px 0 10px; }
   .rzpz-tpl-preview-frame li { margin-bottom:4px; }
@@ -648,13 +649,13 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
       <?php foreach ( $variables as $var => $desc ) : ?>
         <span onclick="navigator.clipboard.writeText('<?php echo esc_attr($var); ?>');this.style.borderColor='#CCFF00';setTimeout(()=>this.style.borderColor='',1500)"
               title="<?php echo esc_attr($desc); ?>"
-              style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:monospace;color:#CCFF00;transition:border-color .2s">
+              style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:monospace;color:#CCFF00;transition:border-color .2s">
           <?php echo esc_html($var); ?>
-          <span style="color:#555;font-family:sans-serif;font-size:10px;margin-left:4px"><?php echo esc_html($desc); ?></span>
+          <span style="color:#8888a0;font-family:sans-serif;font-size:10px;margin-left:4px"><?php echo esc_html($desc); ?></span>
         </span>
       <?php endforeach; ?>
     </div>
-    <p style="margin-top:10px;color:#555;font-size:12px">Klik på en variabel for at kopiere den til udklipsholderen.</p>
+    <p style="margin-top:10px;color:#8888a0;font-size:12px">Klik på en variabel for at kopiere den til udklipsholderen.</p>
   </div>
 
   <!-- Template forms -->
@@ -682,7 +683,7 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
 
       <div class="rzpz-tpl-grid">
         <div class="rzpz-field">
-          <label>HTML kode <span style="color:#555;font-weight:400;font-size:11px">(p, strong, ul, li, a)</span></label>
+          <label>HTML kode <span style="color:#8888a0;font-weight:400;font-size:11px">(p, strong, ul, li, a)</span></label>
           <textarea name="tpl_<?php echo esc_attr($key); ?>_body" rows="14"
                     oninput="rzpzUpdatePreview('<?php echo esc_js($key); ?>', this)"
                     style="width:100%;box-sizing:border-box;font-family:monospace;font-size:12px;line-height:1.6;resize:vertical"><?php echo esc_textarea( $body_val ); ?></textarea>
@@ -718,7 +719,7 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
     <div class="rzpz-field-row" style="align-items:flex-end;margin-bottom:16px">
       <div class="rzpz-field" style="flex:3">
         <label>URL til formularsiden</label>
-        <select id="rzpz-qr-page" style="background:#111;border:1px solid #333;color:#e0e0e0;padding:8px 12px;border-radius:6px;font-size:13px;width:100%">
+        <select id="rzpz-qr-page" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);color:#f0f0f2;padding:8px 12px;border-radius:6px;font-size:13px;width:100%">
           <option value="">– Vælg side –</option>
           <?php foreach ( $pages as $page ) : ?>
             <option value="<?php echo esc_attr( get_permalink( $page ) ); ?>"><?php echo esc_html( $page->post_title ); ?> — <?php echo esc_html( get_permalink( $page ) ); ?></option>
@@ -734,7 +735,7 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;align-items:center">
       <div class="rzpz-field" style="min-width:120px">
         <label>Størrelse</label>
-        <select id="rzpz-qr-size" style="background:#111;border:1px solid #333;color:#e0e0e0;padding:8px 12px;border-radius:6px;font-size:13px">
+        <select id="rzpz-qr-size" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);color:#f0f0f2;padding:8px 12px;border-radius:6px;font-size:13px">
           <option value="200">200×200 px (lille)</option>
           <option value="300" selected>300×300 px (standard)</option>
           <option value="500">500×500 px (stor)</option>
@@ -743,7 +744,7 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
       </div>
       <div class="rzpz-field" style="min-width:140px">
         <label>Baggrund</label>
-        <select id="rzpz-qr-bg" style="background:#111;border:1px solid #333;color:#e0e0e0;padding:8px 12px;border-radius:6px;font-size:13px">
+        <select id="rzpz-qr-bg" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);color:#f0f0f2;padding:8px 12px;border-radius:6px;font-size:13px">
           <option value="ffffff">Hvid</option>
           <option value="0d0d0d">Sort (mørk)</option>
           <option value="f0f0f0">Lysegrå</option>
@@ -751,7 +752,7 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
       </div>
       <div class="rzpz-field" style="min-width:140px">
         <label>QR farve</label>
-        <select id="rzpz-qr-color" style="background:#111;border:1px solid #333;color:#e0e0e0;padding:8px 12px;border-radius:6px;font-size:13px">
+        <select id="rzpz-qr-color" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);color:#f0f0f2;padding:8px 12px;border-radius:6px;font-size:13px">
           <option value="000000">Sort</option>
           <option value="CCFF00">Neon grøn (Rezponz)</option>
           <option value="1a1a1a">Mørk grå</option>
@@ -769,7 +770,7 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
         <button onclick="rzpzCopyQRUrl()" class="rzpz-btn-ghost">📋 Kopiér URL</button>
         <button onclick="rzpzPrintQR()" class="rzpz-btn-ghost">🖨 Print QR Kode</button>
       </div>
-      <div id="rzpz-qr-url-display" style="margin-top:12px;font-size:12px;color:#555;text-align:center"></div>
+      <div id="rzpz-qr-url-display" style="margin-top:12px;font-size:12px;color:#8888a0;text-align:center"></div>
     </div>
   </div>
 
@@ -826,7 +827,7 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
     w.document.write(`<html><body style="text-align:center;font-family:sans-serif;padding:40px">
       <h2 style="font-size:18px">Henvis Din Ven – Rezponz</h2>
       <img src="${img.src}" style="width:300px;height:300px;margin:20px 0;border:2px solid #eee"><br>
-      <p style="font-size:12px;color:#666;word-break:break-all">${url}</p>
+      <p style="font-size:12px;color:#8888a0;word-break:break-all">${url}</p>
       <script>window.print();window.close()<\/script></body></html>`);
   }
   // Auto-populate URL field when page is selected

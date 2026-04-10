@@ -58,76 +58,81 @@ $pending    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE status=
 $this_month = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE submitted_at >= DATE_FORMAT(NOW(),'%Y-%m-01')" );
 ?>
 <style>
-#wpbody-content { background:#0d0d0d !important; }
-#wpcontent { background:#0d0d0d !important; }
-.rzpz-henvis-page { padding:20px; background:#0d0d0d; min-height:100vh; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:#e0e0e0; }
+#wpbody-content { background:#08080b !important; }
+#wpcontent { background:#08080b !important; }
+.rzpz-henvis-page { padding:20px; background:#08080b; min-height:100vh; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:#f0f0f2; }
 .rzpz-ha-header { display:flex; align-items:center; gap:12px; margin-bottom:24px; flex-wrap:wrap; }
-.rzpz-ha-title  { font-size:22px; font-weight:700; margin:0; color:#fff; }
+.rzpz-ha-title  { font-size:22px; font-weight:700; margin:0; color:#f0f0f2; }
 .rzpz-ha-badge  { background:#CCFF00; color:#0d0d0d; border-radius:20px; padding:2px 12px; font-size:13px; font-weight:700; }
 .rzpz-ha-kpi-row { display:flex; gap:14px; margin-bottom:24px; flex-wrap:wrap; }
-.rzpz-ha-kpi { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:10px; padding:16px 22px; flex:1; min-width:140px; }
+.rzpz-ha-kpi { background:rgba(255,255,255,.03); backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,.07); border-radius:18px; padding:16px 22px; flex:1; min-width:140px; }
 .rzpz-ha-kpi .val { font-size:28px; font-weight:700; color:#CCFF00; }
-.rzpz-ha-kpi .lbl { font-size:12px; color:#888; margin-top:2px; }
-.rzpz-ha-shortcode-box { background:#111; border:1px solid #CCFF0040; border-radius:10px; padding:14px 20px; margin-bottom:24px; display:flex; align-items:center; gap:14px; }
-.rzpz-ha-shortcode-box code { background:#1e1e1e; color:#CCFF00; padding:6px 14px; border-radius:6px; font-size:15px; font-weight:700; letter-spacing:.5px; border:1px solid #333; }
-.rzpz-ha-shortcode-box .lbl { color:#888; font-size:13px; }
+.rzpz-ha-kpi .lbl { font-size:12px; color:#8888a0; margin-top:2px; }
+.rzpz-ha-shortcode-box { background:rgba(255,255,255,.03); backdrop-filter:blur(24px); border:1px solid rgba(204,255,0,.25); border-radius:18px; padding:14px 20px; margin-bottom:24px; display:flex; align-items:center; gap:14px; }
+.rzpz-ha-shortcode-box code { background:rgba(255,255,255,.05); color:#CCFF00; padding:6px 14px; border-radius:6px; font-size:15px; font-weight:700; letter-spacing:.5px; border:1px solid rgba(255,255,255,.07); }
+.rzpz-ha-shortcode-box .lbl { color:#8888a0; font-size:13px; }
 .rzpz-ha-filters { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; align-items:center; }
 .rzpz-ha-filters select, .rzpz-ha-filters input[type=search] {
-    background:#1e1e1e; border:1px solid #333; color:#e0e0e0; padding:6px 10px; border-radius:6px; font-size:13px;
+    background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); color:#f0f0f2; padding:6px 10px; border-radius:6px; font-size:13px;
 }
-.rzpz-ha-filters .rzpz-btn { background:#CCFF00; color:#0d0d0d; border:none; border-radius:6px; padding:6px 16px; font-weight:700; cursor:pointer; font-size:13px; text-decoration:none; display:inline-block; }
-.rzpz-ha-filters .rzpz-btn-ghost { background:transparent; color:#888; border:1px solid #333; border-radius:6px; padding:6px 16px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-block; }
-table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; border-radius:10px; overflow:hidden; }
-.rzpz-ha-table th { background:#111; color:#aaa; font-size:12px; text-transform:uppercase; padding:10px 14px; text-align:left; border-bottom:1px solid #2a2a2a; }
-.rzpz-ha-table td { padding:10px 14px; border-bottom:1px solid #1f1f1f; color:#e0e0e0; font-size:13px; vertical-align:middle; }
+.rzpz-ha-filters .rzpz-btn { background:rgba(255,255,255,.06); color:#CCFF00; border:1px solid rgba(255,255,255,.07); border-radius:999px; padding:6px 18px; font-weight:700; cursor:pointer; font-size:13px; text-decoration:none; display:inline-block; transition:background .15s,border-color .15s; }
+.rzpz-ha-filters .rzpz-btn:hover, .rzpz-ha-filters .rzpz-btn:active { background:#CCFF00; color:#0d0d0d; border-color:#CCFF00; }
+.rzpz-ha-filters .rzpz-btn-ghost { background:rgba(255,255,255,.03); color:#8888a0; border:1px solid rgba(255,255,255,.07); border-radius:999px; padding:6px 18px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-block; transition:color .15s,border-color .15s,background .15s; }
+.rzpz-ha-filters .rzpz-btn-ghost:hover { color:#f0f0f2; border-color:rgba(255,255,255,.2); background:rgba(255,255,255,.06); }
+table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,255,255,.03); backdrop-filter:blur(24px); border-radius:18px; overflow:hidden; border:1px solid rgba(255,255,255,.07); }
+.rzpz-ha-table th { background:rgba(255,255,255,.02); color:#8888a0; font-size:12px; text-transform:uppercase; padding:10px 14px; text-align:left; border-bottom:1px solid rgba(255,255,255,.07); }
+.rzpz-ha-table td { padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.05); color:#f0f0f2; font-size:13px; vertical-align:middle; }
 .rzpz-ha-table tr:last-child td { border-bottom:none; }
-.rzpz-ha-table tr.rzpz-data-row:hover td { background:#222; }
+.rzpz-ha-table tr.rzpz-data-row:hover td { background:rgba(255,255,255,.04); }
 .rzpz-status { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
-.rzpz-status.pending   { background:#2d2d00; color:#f59e0b; }
+.rzpz-status.pending   { background:#2d2d00; color:#ffaa33; }
 .rzpz-status.hired     { background:#0a2e0a; color:#4ade80; }
-.rzpz-status.rejected  { background:#2d0a0a; color:#f87171; }
+.rzpz-status.rejected  { background:#2d0a0a; color:#ff5555; }
 .rzpz-status.contacted { background:#0a1a2e; color:#60a5fa; }
-.rzpz-ha-form-inline select { background:#1e1e1e; border:1px solid #333; color:#e0e0e0; border-radius:4px; padding:3px 6px; font-size:12px; }
-.rzpz-ha-form-inline button { background:#CCFF00; color:#0d0d0d; border:none; border-radius:4px; padding:3px 8px; font-size:12px; cursor:pointer; font-weight:600; }
-.rzpz-ha-empty { text-align:center; padding:40px; color:#666; }
+.rzpz-ha-form-inline select { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); color:#f0f0f2; border-radius:4px; padding:3px 6px; font-size:12px; }
+.rzpz-ha-form-inline button { background:rgba(255,255,255,.06); color:#CCFF00; border:1px solid rgba(255,255,255,.07); border-radius:999px; padding:3px 10px; font-size:12px; cursor:pointer; font-weight:600; transition:background .15s; }
+.rzpz-ha-form-inline button:hover { background:#CCFF00; color:#0d0d0d; }
+.rzpz-ha-empty { text-align:center; padding:40px; color:#8888a0; }
 /* Action buttons per row */
 .rzpz-row-actions { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
-.rzpz-btn-xs { background:transparent; border:1px solid #333; color:#aaa; border-radius:4px; padding:3px 8px; font-size:11px; cursor:pointer; white-space:nowrap; }
-.rzpz-btn-xs:hover { border-color:#555; color:#e0e0e0; }
-.rzpz-btn-xs.active { border-color:#CCFF00; color:#CCFF00; }
+.rzpz-btn-xs { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); color:#8888a0; border-radius:999px; padding:3px 10px; font-size:11px; cursor:pointer; white-space:nowrap; transition:border-color .15s,color .15s,background .15s; }
+.rzpz-btn-xs:hover { border-color:rgba(255,255,255,.2); color:#f0f0f2; background:rgba(255,255,255,.06); }
+.rzpz-btn-xs.active { border-color:#CCFF00; color:#CCFF00; background:rgba(204,255,0,.07); }
 /* Email log accordion */
-.rzpz-email-log-row { display:none; background:#0d0d0d; }
+.rzpz-email-log-row { display:none; background:#08080b; }
 .rzpz-email-log-row.open { display:table-row; }
 .rzpz-email-log-row td { padding:0 !important; border-bottom:2px solid #CCFF0030 !important; }
 .rzpz-email-log-inner { padding:16px 20px; display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
-.rzpz-email-entry { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:8px; padding:12px 14px; font-size:12px; }
-.rzpz-email-entry .ee-label { font-size:10px; text-transform:uppercase; color:#555; letter-spacing:.5px; margin-bottom:4px; }
-.rzpz-email-entry .ee-to { color:#e0e0e0; font-weight:600; margin-bottom:3px; word-break:break-all; }
-.rzpz-email-entry .ee-time { color:#555; font-size:11px; }
+.rzpz-email-entry { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); border-radius:8px; padding:12px 14px; font-size:12px; }
+.rzpz-email-entry .ee-label { font-size:10px; text-transform:uppercase; color:#8888a0; letter-spacing:.5px; margin-bottom:4px; }
+.rzpz-email-entry .ee-to { color:#f0f0f2; font-weight:600; margin-bottom:3px; word-break:break-all; }
+.rzpz-email-entry .ee-time { color:#8888a0; font-size:11px; }
 .rzpz-email-entry .ee-status { display:inline-block; margin-top:4px; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
 .rzpz-email-entry .ee-status.ok  { background:#0a2e0a; color:#4ade80; }
-.rzpz-email-entry .ee-status.err { background:#2d0a0a; color:#f87171; }
+.rzpz-email-entry .ee-status.err { background:#2d0a0a; color:#ff5555; }
 .rzpz-email-entry .ee-status.cc  { background:#0a1a2e; color:#60a5fa; }
 /* Approve / Reject buttons */
-.rzpz-btn-approve { background:#0a2e0a; color:#4ade80; border:1px solid #4ade8040; border-radius:5px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.rzpz-btn-approve { background:#0a2e0a; color:#4ade80; border:1px solid #4ade8040; border-radius:999px; padding:5px 14px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; transition:background .15s,border-color .15s; }
 .rzpz-btn-approve:hover { background:#0f3d0f; border-color:#4ade8080; }
-.rzpz-btn-reject  { background:#2d0a0a; color:#f87171; border:1px solid #f8717140; border-radius:5px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
-.rzpz-btn-reject:hover  { background:#3d0f0f; border-color:#f8717180; }
-.rzpz-btn-bonus   { background:#2a1f00; color:#f59e0b; border:1px solid #f59e0b50; border-radius:5px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
-.rzpz-btn-bonus:hover   { background:#3a2a00; border-color:#f59e0b90; }
-.rzpz-bonus-sent  { display:inline-block; background:#0a1a2e; color:#60a5fa; border:1px solid #60a5fa30; border-radius:5px; padding:4px 10px; font-size:11px; white-space:nowrap; }
+.rzpz-btn-reject  { background:#2d0a0a; color:#ff5555; border:1px solid #ff555540; border-radius:999px; padding:5px 14px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; transition:background .15s,border-color .15s; }
+.rzpz-btn-reject:hover  { background:#3d0f0f; border-color:#ff555580; }
+.rzpz-btn-bonus   { background:#2a1f00; color:#ffaa33; border:1px solid #ffaa3350; border-radius:999px; padding:5px 14px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; transition:background .15s,border-color .15s; }
+.rzpz-btn-bonus:hover   { background:#3a2a00; border-color:#ffaa3390; }
+.rzpz-bonus-sent  { display:inline-block; background:#0a1a2e; color:#60a5fa; border:1px solid #60a5fa30; border-radius:999px; padding:4px 12px; font-size:11px; white-space:nowrap; }
 .rzpz-status.hired-bonus { background:#0a1a2e; color:#60a5fa; }
-.rzpz-section-sep td { background:#111 !important; padding:6px 14px !important; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#555; border-bottom:2px solid #222 !important; }
+.rzpz-section-sep td { background:rgba(255,255,255,.02) !important; padding:6px 14px !important; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#8888a0; border-bottom:2px solid rgba(255,255,255,.07) !important; }
 /* Note row */
-.rzpz-note-row { display:none; background:#0d0d0d; }
+.rzpz-note-row { display:none; background:#08080b; }
 .rzpz-note-row.open { display:table-row; }
 .rzpz-note-row td { padding:0 !important; border-bottom:2px solid #60a5fa30 !important; }
 .rzpz-note-inner { padding:14px 20px; }
-.rzpz-note-inner textarea { width:100%; background:#111; border:1px solid #333; color:#e0e0e0; border-radius:6px; padding:8px 12px; font-size:13px; resize:vertical; min-height:60px; box-sizing:border-box; font-family:inherit; }
+.rzpz-note-inner textarea { width:100%; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); color:#f0f0f2; border-radius:6px; padding:8px 12px; font-size:13px; resize:vertical; min-height:60px; box-sizing:border-box; font-family:inherit; }
 .rzpz-note-inner textarea:focus { outline:none; border-color:#60a5fa; }
 .rzpz-note-inner .note-actions { display:flex; gap:8px; margin-top:8px; align-items:center; }
-.rzpz-note-inner .note-save { background:#CCFF00; color:#0d0d0d; border:none; border-radius:4px; padding:5px 14px; font-size:12px; cursor:pointer; font-weight:700; }
-.rzpz-note-inner .note-cancel { background:transparent; border:1px solid #333; color:#888; border-radius:4px; padding:5px 12px; font-size:12px; cursor:pointer; }
+.rzpz-note-inner .note-save { background:rgba(255,255,255,.06); color:#CCFF00; border:1px solid rgba(255,255,255,.07); border-radius:999px; padding:5px 16px; font-size:12px; cursor:pointer; font-weight:700; transition:background .15s,border-color .15s; }
+.rzpz-note-inner .note-save:hover { background:#CCFF00; color:#0d0d0d; border-color:#CCFF00; }
+.rzpz-note-inner .note-cancel { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); color:#8888a0; border-radius:999px; padding:5px 14px; font-size:12px; cursor:pointer; transition:color .15s,border-color .15s; }
+.rzpz-note-inner .note-cancel:hover { color:#f0f0f2; border-color:rgba(255,255,255,.2); }
 .rzpz-note-preview { font-size:11px; color:#60a5fa; max-width:160px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 </style>
 
@@ -136,17 +141,17 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
   <?php if ( ! empty( $_GET['approved'] ) ) : ?>
     <div style="background:#0a2e0a;color:#4ade80;border:1px solid #4ade8040;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">✅ Henvisning godkendt og markeret som ansat. <strong>Husk:</strong> Klik "💰 Kandidat startet" den dag kandidaten møder ind — så udløses bonusmailen til medarbejder og løn.</div>
   <?php elseif ( ! empty( $_GET['rejected'] ) ) : ?>
-    <div style="background:#2d0a0a;color:#f87171;border:1px solid #f8717140;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">❌ Henvisning afvist – afvisningsmail sendt til medarbejder.</div>
+    <div style="background:#2d0a0a;color:#ff5555;border:1px solid #ff555540;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">❌ Henvisning afvist – afvisningsmail sendt til medarbejder.</div>
   <?php elseif ( ! empty( $_GET['bonus_sent'] ) ) : ?>
     <div style="background:#0a1a2e;color:#60a5fa;border:1px solid #60a5fa40;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">💰 Bonus udløst – email sendt til medarbejder og loen@rezponz.dk.</div>
   <?php elseif ( ! empty( $_GET['deleted'] ) ) : ?>
-    <div style="background:#1a1a1a;color:#888;border:1px solid #33333380;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">🗑️ Henvisning slettet.</div>
+    <div style="background:rgba(255,255,255,.03);color:#8888a0;border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">🗑️ Henvisning slettet.</div>
   <?php elseif ( isset( $_GET['error'] ) && $_GET['error'] === 'bonus_already_sent' ) : ?>
-    <div style="background:#2a1f00;color:#f59e0b;border:1px solid #f59e0b40;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">⚠️ Bonusmail er allerede sendt for denne henvisning.</div>
+    <div style="background:#2a1f00;color:#ffaa33;border:1px solid #ffaa3340;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">⚠️ Bonusmail er allerede sendt for denne henvisning.</div>
   <?php elseif ( ! empty( $_GET['batch_sent'] ) ) : ?>
     <div style="background:#052e16;color:#4ade80;border:1px solid #16653440;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">💰 Batch bonus sendt: <strong><?php echo (int) $_GET['batch_sent']; ?> medarbejder-email(s)</strong> + 1 samlet løn-mail til loen@rezponz.dk.</div>
   <?php elseif ( isset( $_GET['batch_error'] ) && $_GET['batch_error'] === 'empty' ) : ?>
-    <div style="background:#2a1f00;color:#f59e0b;border:1px solid #f59e0b40;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">⚠️ Ingen henvisninger valgt — sæt mindst ét kryds.</div>
+    <div style="background:#2a1f00;color:#ffaa33;border:1px solid #ffaa3340;border-radius:8px;padding:10px 18px;margin-bottom:16px;font-size:13px">⚠️ Ingen henvisninger valgt — sæt mindst ét kryds.</div>
   <?php endif; ?>
 
   <div class="rzpz-ha-header">
@@ -154,9 +159,9 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
     <span class="rzpz-ha-badge"><?php echo $total_all; ?> total</span>
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <a href="<?php echo esc_url( admin_url( 'admin-post.php?action=rzpz_henvis_export_csv&_wpnonce=' . wp_create_nonce('rzpz_henvis_export_csv') . ( $filter_mgr ? '&mgr=' . urlencode($filter_mgr) : '' ) . ( $filter_status ? '&status=' . urlencode($filter_status) : '' ) . ( $search ? '&s=' . urlencode($search) : '' ) ) ); ?>"
-         style="background:#1e1e1e;border:1px solid #333;color:#aaa;padding:6px 14px;border-radius:6px;font-size:12px;text-decoration:none;">⬇ Eksportér CSV</a>
+         style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);color:#8888a0;padding:6px 16px;border-radius:999px;font-size:12px;text-decoration:none;">⬇ Eksportér CSV</a>
       <a href="<?php echo esc_url( admin_url('admin.php?page=rzpz-henvis-settings') ); ?>"
-         style="background:#1e1e1e;border:1px solid #333;color:#aaa;padding:6px 14px;border-radius:6px;font-size:12px;text-decoration:none;">⚙️ Indstillinger</a>
+         style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);color:#8888a0;padding:6px 16px;border-radius:999px;font-size:12px;text-decoration:none;">⚙️ Indstillinger</a>
     </div>
   </div>
 
@@ -166,7 +171,7 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
       <div class="lbl" style="margin-bottom:6px;">📋 Indsæt formularen på en side med denne shortcode:</div>
       <code onclick="navigator.clipboard.writeText('[rezponz_henvis_ven]');this.textContent='✅ Kopieret!';setTimeout(()=>this.textContent='[rezponz_henvis_ven]',2000)" style="cursor:pointer">[rezponz_henvis_ven]</code>
     </div>
-    <div style="margin-left:auto;font-size:12px;color:#555;text-align:right;line-height:1.8">
+    <div style="margin-left:auto;font-size:12px;color:#8888a0;text-align:right;line-height:1.8">
       <a href="<?php echo esc_url( admin_url('admin.php?page=rzpz-henvis-settings&tab=form') ); ?>" style="color:#CCFF00;text-decoration:none;display:block">📝 Tilpas formular-felter</a>
       <a href="<?php echo esc_url( admin_url('admin.php?page=rzpz-henvis-settings&tab=emails') ); ?>" style="color:#CCFF00;text-decoration:none;display:block">📧 Email-modtagere</a>
       <a href="<?php echo esc_url( admin_url('admin.php?page=rzpz-henvis-settings&tab=qr') ); ?>" style="color:#CCFF00;text-decoration:none;display:block">📱 QR Kode</a>
@@ -210,10 +215,10 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
     <input type="hidden" id="rzpz-batch-ids" name="referral_ids" value="">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
       <button type="button" id="rzpz-batch-btn" disabled onclick="rzpzSubmitBatch()"
-              style="background:#f59e0b;color:#0d0d0d;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;opacity:.35;transition:opacity .15s">
+              style="background:rgba(255,170,51,.15);color:#ffaa33;border:1px solid #ffaa3350;border-radius:999px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;opacity:.35;transition:opacity .15s,background .15s">
         💰 Send batch bonus-mail til løn (<span id="rzpz-batch-count">0</span> valgte)
       </button>
-      <span style="font-size:12px;color:#555">Markér "Ansat – bonus afventer"-rækker og send individuelle medarbejder-mails + én samlet løn-mail</span>
+      <span style="font-size:12px;color:#8888a0">Markér "Ansat – bonus afventer"-rækker og send individuelle medarbejder-mails + én samlet løn-mail</span>
     </div>
   </form>
 
@@ -270,13 +275,13 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
         <td style="white-space:nowrap"><?php echo esc_html( wp_date( 'd/m/Y H:i', strtotime( $r->submitted_at ) ) ); ?></td>
         <td>
           <strong><?php echo esc_html( $r->referrer_name ); ?></strong><br>
-          <small style="color:#888"><?php echo esc_html( $r->referrer_email ); ?></small>
-          <?php if ( $r->referrer_phone ) : ?><br><small style="color:#666"><?php echo esc_html( $r->referrer_phone ); ?></small><?php endif; ?>
+          <small style="color:#8888a0"><?php echo esc_html( $r->referrer_email ); ?></small>
+          <?php if ( $r->referrer_phone ) : ?><br><small style="color:#8888a0"><?php echo esc_html( $r->referrer_phone ); ?></small><?php endif; ?>
         </td>
         <td>
           <strong><?php echo esc_html( $r->friend_name ); ?></strong>
-          <?php if ( $r->friend_email ) : ?><br><small style="color:#888"><?php echo esc_html( $r->friend_email ); ?></small><?php endif; ?>
-          <?php if ( $r->friend_phone ) : ?><br><small style="color:#666"><?php echo esc_html( $r->friend_phone ); ?></small><?php endif; ?>
+          <?php if ( $r->friend_email ) : ?><br><small style="color:#8888a0"><?php echo esc_html( $r->friend_email ); ?></small><?php endif; ?>
+          <?php if ( $r->friend_phone ) : ?><br><small style="color:#8888a0"><?php echo esc_html( $r->friend_phone ); ?></small><?php endif; ?>
         </td>
         <td><?php echo $mgr ? esc_html( $mgr['label'] ) : esc_html( $r->manager_key ); ?></td>
         <td>
@@ -323,7 +328,7 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
             <?php if ( $has_log ) : ?>
               <button class="rzpz-btn-xs" onclick="rzpzToggleRow('email-<?php echo $row_id; ?>', this)">📧 Emails</button>
             <?php else : ?>
-              <span style="font-size:11px;color:#444">📧 —</span>
+              <span style="font-size:11px;color:#8888a0">📧 —</span>
             <?php endif; ?>
             <button class="rzpz-btn-xs<?php echo $has_note ? ' active' : ''; ?>" onclick="rzpzToggleRow('note-<?php echo $row_id; ?>', this)">
               📝 <?php echo $has_note ? 'Note' : 'Tilføj note'; ?>
@@ -402,7 +407,7 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:#1a1a1a; 
               <?php foreach ( $cc_list as $cc ) : ?>
                 <div class="ee-to" style="margin-bottom:4px">
                   <?php echo esc_html( $cc['name'] ?? '' ); ?><br>
-                  <span style="font-weight:400;color:#888"><?php echo esc_html( $cc['email'] ?? '' ); ?></span>
+                  <span style="font-weight:400;color:#8888a0"><?php echo esc_html( $cc['email'] ?? '' ); ?></span>
                 </div>
               <?php endforeach; ?>
               <div class="ee-status cc">CC – alle mails</div>
