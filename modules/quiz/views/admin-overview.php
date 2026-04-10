@@ -77,15 +77,15 @@ $tab = $tab ?? 'submissions';
 
   <!-- KPI row -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:20px;margin-bottom:32px">
-    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:28px 32px;backdrop-filter:blur(24px);transition:border-color .2s">
-      <div style="font-size:52px;font-weight:900;color:#CCFF00;letter-spacing:-2px;line-height:1"><?php echo number_format( $total ); ?></div>
-      <div style="font-size:11px;color:#8888a0;margin-top:10px;font-weight:600;text-transform:uppercase;letter-spacing:.12em">Besvarelser i alt</div>
+    <div style="background:#161616;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:28px 32px;transition:border-color .2s">
+      <div style="font-size:52px;font-weight:800;color:#ffffff;letter-spacing:-2px;line-height:1"><?php echo number_format( $total ); ?></div>
+      <div style="font-size:13px;color:#888888;margin-top:10px;font-weight:500">Besvarelser i alt</div>
     </div>
     <?php foreach ( $dist as $d ) : ?>
-    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:28px 32px;backdrop-filter:blur(24px);border-left:3px solid <?php echo esc_attr( $d['color'] ); ?>">
-      <div style="font-size:52px;font-weight:900;color:#f0f0f2;line-height:1;letter-spacing:-2px"><?php echo (int) $d['total']; ?></div>
-      <div style="font-size:18px;margin-top:4px"><?php echo esc_html( $d['icon_emoji'] ); ?></div>
-      <div style="font-size:11px;color:#8888a0;margin-top:8px;font-weight:600;text-transform:uppercase;letter-spacing:.12em"><?php echo esc_html( $d['title'] ); ?></div>
+    <div style="background:#161616;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:28px 32px;border-left:3px solid <?php echo esc_attr( $d['color'] ); ?>">
+      <div style="font-size:52px;font-weight:800;color:#ffffff;line-height:1;letter-spacing:-2px"><?php echo (int) $d['total']; ?></div>
+      <div style="font-size:16px;margin-top:6px"><?php echo esc_html( $d['icon_emoji'] ); ?></div>
+      <div style="font-size:13px;color:#888888;margin-top:6px;font-weight:500"><?php echo esc_html( $d['title'] ); ?></div>
     </div>
     <?php endforeach; ?>
   </div>
@@ -99,18 +99,18 @@ $tab = $tab ?? 'submissions';
   <?php else : ?>
 
   <!-- Submissions table -->
-  <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;overflow:hidden;backdrop-filter:blur(16px)">
+  <div style="background:#161616;border:1px solid rgba(255,255,255,.08);border-radius:20px;overflow:hidden">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>
-        <tr style="background:#0d0d11;border-bottom:1px solid rgba(255,255,255,.07)">
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">#</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">Navn</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">Telefon</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">Email</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">Profil</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">GDPR</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#8888a0;font-size:10px;text-transform:uppercase;letter-spacing:.6px">Tidspunkt</th>
-          <th style="padding:12px 16px;"></th>
+        <tr style="background:#111111;border-bottom:1px solid rgba(255,255,255,.08)">
+          <th style="padding:14px 16px;text-align:left;font-weight:500;color:#555555;font-size:12px">#</th>
+          <th style="padding:14px 16px;text-align:left;font-weight:500;color:#555555;font-size:12px">Navn</th>
+          <th style="padding:14px 16px;text-align:left;font-weight:500;color:#555555;font-size:12px">Telefon</th>
+          <th style="padding:14px 16px;text-align:left;font-weight:500;color:#555555;font-size:12px">Email</th>
+          <th style="padding:14px 16px;text-align:left;font-weight:500;color:#555555;font-size:12px">Profil</th>
+          <th style="padding:14px 16px;text-align:left;font-weight:500;color:#555555;font-size:12px">GDPR</th>
+          <th style="padding:14px 16px;text-align:left;font-weight:500;color:#555555;font-size:12px">Tidspunkt</th>
+          <th style="padding:14px 16px;"></th>
         </tr>
       </thead>
       <tbody>
