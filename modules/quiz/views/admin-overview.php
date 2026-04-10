@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 /** @var string $tab  set by RZPA_Quiz_Admin::page_main() */
 $tab = $tab ?? 'submissions';
 ?>
-<div class="wrap rzpa-quiz-wrap" style="font-family:-apple-system,'Inter','Segoe UI',sans-serif;max-width:1060px;padding-top:16px;background:#08080b;color:#f0f0f2">
+<div class="wrap rzpa-quiz-wrap">
 
   <!-- ── Page header ──────────────────────────────────────────────────────── -->
   <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px">
@@ -42,7 +42,7 @@ $tab = $tab ?? 'submissions';
   if ( $pdf_err ) :
       delete_transient( 'rzpa_quiz_pdf_error' );
   ?>
-  <div style="background:rgba(255,85,85,.06);color:#f87171;border:1px solid rgba(255,85,85,.25);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-family:monospace">
+  <div style="background:rgba(255,85,85,.06);color:#f87171;border:1px solid rgba(255,85,85,.25);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px">
     ⚠️ <strong>PDF-fejl (seneste besvarelse):</strong><br><br><?php echo esc_html( $pdf_err ); ?>
   </div>
   <?php endif; ?>
@@ -52,7 +52,7 @@ $tab = $tab ?? 'submissions';
   if ( $mail_err ) :
       delete_transient( 'rzpa_quiz_mail_error' );
   ?>
-  <div style="background:rgba(59,130,246,.06);color:#93c5fd;border:1px solid rgba(59,130,246,.25);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-family:monospace">
+  <div style="background:rgba(59,130,246,.06);color:#93c5fd;border:1px solid rgba(59,130,246,.25);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px">
     📧 <strong>Mail-fejl (seneste besvarelse):</strong><br><br><?php echo esc_html( $mail_err ); ?><br><br>
     <span style="color:#8888a0">Konfigurér SMTP under <a href="<?php echo esc_url( admin_url( 'admin.php?page=rzpa-settings' ) ); ?>" style="color:#CCFF00">Indstillinger → SMTP</a> for pålidelig email-afsendelse.</span>
   </div>
@@ -76,15 +76,16 @@ $tab = $tab ?? 'submissions';
   ?>
 
   <!-- KPI row -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:28px">
-    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:20px 22px;backdrop-filter:blur(24px);transition:border-color .2s">
-      <div style="font-size:34px;font-weight:900;color:#CCFF00;letter-spacing:-1px"><?php echo number_format( $total ); ?></div>
-      <div style="font-size:12px;color:#8888a0;margin-top:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Besvarelser i alt</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:20px;margin-bottom:32px">
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:28px 32px;backdrop-filter:blur(24px);transition:border-color .2s">
+      <div style="font-size:52px;font-weight:900;color:#CCFF00;letter-spacing:-2px;line-height:1"><?php echo number_format( $total ); ?></div>
+      <div style="font-size:11px;color:#8888a0;margin-top:10px;font-weight:600;text-transform:uppercase;letter-spacing:.12em">Besvarelser i alt</div>
     </div>
     <?php foreach ( $dist as $d ) : ?>
-    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:20px 22px;backdrop-filter:blur(24px);border-left:3px solid <?php echo esc_attr( $d['color'] ); ?>">
-      <div style="font-size:26px;font-weight:900;color:#f0f0f2"><?php echo esc_html( $d['icon_emoji'] ); ?> <?php echo (int) $d['total']; ?></div>
-      <div style="font-size:11px;color:#8888a0;margin-top:6px;font-weight:600;text-transform:uppercase;letter-spacing:.4px"><?php echo esc_html( $d['title'] ); ?></div>
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:28px 32px;backdrop-filter:blur(24px);border-left:3px solid <?php echo esc_attr( $d['color'] ); ?>">
+      <div style="font-size:52px;font-weight:900;color:#f0f0f2;line-height:1;letter-spacing:-2px"><?php echo (int) $d['total']; ?></div>
+      <div style="font-size:18px;margin-top:4px"><?php echo esc_html( $d['icon_emoji'] ); ?></div>
+      <div style="font-size:11px;color:#8888a0;margin-top:8px;font-weight:600;text-transform:uppercase;letter-spacing:.12em"><?php echo esc_html( $d['title'] ); ?></div>
     </div>
     <?php endforeach; ?>
   </div>
@@ -230,7 +231,7 @@ $tab = $tab ?? 'submissions';
 
       var pdfUrl = rzpaAdminPostUrl + '?action=rzpa_quiz_download_pdf&submission_id=' + d.id + '&_wpnonce=' + rzpaPdfNonce;
 
-      return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;font-family:-apple-system,\'Inter\',\'Segoe UI\',sans-serif">'
+      return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;font-family:\'Inter\',-apple-system,\'Segoe UI\',sans-serif">'
 
         // ── Left: contact + Q&A ──
         + '<div>'
