@@ -133,30 +133,102 @@ class RZPA_Admin {
         #adminmenu a[href$="rzpa-section-seo"],
         #adminmenu a[href$="rzpa-section-system"] {
             color: #CCFF00 !important;
-            font-size: 9px !important;
-            font-weight: 800 !important;
+            font-size: 11px !important;
+            font-weight: 500 !important;
             text-transform: uppercase !important;
-            letter-spacing: 1.2px !important;
-            pointer-events: none !important;
-            cursor: default !important;
+            letter-spacing: 1px !important;
+            cursor: pointer !important;
             padding-top: 14px !important;
-            padding-bottom: 2px !important;
+            padding-bottom: 4px !important;
             opacity: 1 !important;
-            line-height: 1.2 !important;
+            line-height: 1.3 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+        }
+        #adminmenu a[href$="rzpa-section-ads"]::after,
+        #adminmenu a[href$="rzpa-section-crew"]::after,
+        #adminmenu a[href$="rzpa-section-refs"]::after,
+        #adminmenu a[href$="rzpa-section-seo"]::after,
+        #adminmenu a[href$="rzpa-section-system"]::after {
+            content: '▾';
+            font-size: 10px;
+            opacity: .7;
+            transition: transform .2s;
+            margin-right: 4px;
+        }
+        #adminmenu li.rzpa-collapsed a[href$="rzpa-section-ads"]::after,
+        #adminmenu li.rzpa-collapsed a[href$="rzpa-section-crew"]::after,
+        #adminmenu li.rzpa-collapsed a[href$="rzpa-section-refs"]::after,
+        #adminmenu li.rzpa-collapsed a[href$="rzpa-section-seo"]::after,
+        #adminmenu li.rzpa-collapsed a[href$="rzpa-section-system"]::after {
+            transform: rotate(-90deg);
         }
         #adminmenu li:has(a[href$="rzpa-section-ads"]),
         #adminmenu li:has(a[href$="rzpa-section-crew"]),
         #adminmenu li:has(a[href$="rzpa-section-refs"]),
         #adminmenu li:has(a[href$="rzpa-section-seo"]),
         #adminmenu li:has(a[href$="rzpa-section-system"]) {
-            border-top: 1px solid rgba(204,255,0,.15) !important;
-            margin-top: 6px !important;
+            border-top: 1px solid rgba(204,255,0,.12) !important;
+            margin-top: 4px !important;
         }
         #adminmenu li:has(a[href$="rzpa-section-ads"]) {
             border-top: none !important;
             margin-top: 0 !important;
         }
+        /* Skjulte items ved collapse */
+        #adminmenu li.rzpa-section-hidden {
+            display: none !important;
+        }
         </style>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var sections = ['rzpa-section-ads','rzpa-section-crew','rzpa-section-refs','rzpa-section-seo','rzpa-section-system'];
+            sections.forEach(function(sec) {
+                var link = document.querySelector('#adminmenu a[href$="' + sec + '"]');
+                if (!link) return;
+                var headerLi = link.parentElement;
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var collapsed = headerLi.classList.toggle('rzpa-collapsed');
+                    var el = headerLi.nextElementSibling;
+                    while (el) {
+                        var isNextHeader = el.querySelector('a[href*="rzpa-section-"]');
+                        if (isNextHeader) break;
+                        if (collapsed) {
+                            el.classList.add('rzpa-section-hidden');
+                        } else {
+                            el.classList.remove('rzpa-section-hidden');
+                        }
+                        el = el.nextElementSibling;
+                    }
+                    // Gem tilstand
+                    try {
+                        var state = JSON.parse(localStorage.getItem('rzpaMenuState') || '{}');
+                        state[sec] = collapsed;
+                        localStorage.setItem('rzpaMenuState', JSON.stringify(state));
+                    } catch(err) {}
+                });
+            });
+            // Gendan gemt tilstand
+            try {
+                var state = JSON.parse(localStorage.getItem('rzpaMenuState') || '{}');
+                Object.keys(state).forEach(function(sec) {
+                    if (!state[sec]) return;
+                    var link = document.querySelector('#adminmenu a[href$="' + sec + '"]');
+                    if (!link) return;
+                    var headerLi = link.parentElement;
+                    headerLi.classList.add('rzpa-collapsed');
+                    var el = headerLi.nextElementSibling;
+                    while (el) {
+                        if (el.querySelector('a[href*="rzpa-section-"]')) break;
+                        el.classList.add('rzpa-section-hidden');
+                        el = el.nextElementSibling;
+                    }
+                });
+            } catch(err) {}
+        });
+        </script>
         <?php
     }
 

@@ -109,7 +109,6 @@ $tab = $tab ?? 'submissions';
           <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Profil</th>
           <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px">GDPR</th>
           <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Tidspunkt</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px"></th>
           <th style="padding:12px 16px;"></th>
         </tr>
       </thead>
@@ -139,29 +138,28 @@ $tab = $tab ?? 'submissions';
           <td style="padding:12px 16px;color:#9ca3af;font-size:12px">
             <?php echo esc_html( wp_date( 'd.m.Y H:i', strtotime( $s['created_at'] ) ) ); ?>
           </td>
-          <td style="padding:10px 14px">
+          <td style="padding:10px 14px;white-space:nowrap">
             <button onclick="rzpaToggleDetail(<?php echo (int) $s['id']; ?>)"
                     id="rzpa-btn-<?php echo (int) $s['id']; ?>"
-                    style="background:#f3f4f6;border:none;cursor:pointer;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;color:#374151;white-space:nowrap">
+                    style="background:#f3f4f6;border:1px solid #e5e7eb;cursor:pointer;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;color:#374151;white-space:nowrap;margin-right:6px">
               👁 Se svar
             </button>
-          </td>
-          <td style="padding:10px 14px">
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
+                  style="display:inline"
                   onsubmit="return confirm('Slet denne besvarelse permanent?')">
               <?php wp_nonce_field( 'rzpa_quiz_delete_submission', 'rzpa_sub_del_nonce' ); ?>
               <input type="hidden" name="action"        value="rzpa_quiz_delete_submission">
               <input type="hidden" name="submission_id" value="<?php echo (int) $s['id']; ?>">
               <input type="hidden" name="paged"         value="<?php echo (int) ( $_GET['paged'] ?? 1 ); ?>">
               <button type="submit"
-                      style="background:#fee2e2;border:1px solid #fecaca;cursor:pointer;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;color:#dc2626;white-space:nowrap">
+                      style="background:#fee2e2;border:1px solid #fecaca;cursor:pointer;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;color:#dc2626;white-space:nowrap">
                 🗑 Slet
               </button>
             </form>
           </td>
         </tr>
         <tr id="rzpa-detail-<?php echo (int) $s['id']; ?>" style="display:none">
-          <td colspan="9" style="padding:0;border-bottom:2px solid rgba(232,89,12,.15)">
+          <td colspan="8" style="padding:0;border-bottom:2px solid rgba(232,89,12,.15)">
             <div id="rzpa-detail-body-<?php echo (int) $s['id']; ?>" style="padding:24px 28px;background:#fafbff">
               <div style="color:#9ca3af;font-size:13px">Henter data…</div>
             </div>
