@@ -1283,7 +1283,14 @@ const RZPA_App = (() => {
     const rekrutDaysSel = el('rekrut-days');
     const rekrutRefresh = el('rekrut-refresh');
     if (rekrutDaysSel) rekrutDaysSel.addEventListener('change', () => { rekrutDays = parseInt(rekrutDaysSel.value); loadRekruttering(rekrutDays, true); });
-    if (rekrutRefresh) rekrutRefresh.addEventListener('click', () => loadRekruttering(rekrutDays, true));
+    if (rekrutRefresh) rekrutRefresh.addEventListener('click', async () => {
+      const orig = rekrutRefresh.textContent;
+      rekrutRefresh.textContent = '⏳ Henter…';
+      rekrutRefresh.disabled = true;
+      await loadRekruttering(rekrutDays, true);
+      rekrutRefresh.textContent = '✓ Opdateret';
+      setTimeout(() => { rekrutRefresh.textContent = orig; rekrutRefresh.disabled = false; }, 2000);
+    });
 
     // Filter-knapper
     document.querySelectorAll('[data-rekrut-filter]').forEach(btn => {
