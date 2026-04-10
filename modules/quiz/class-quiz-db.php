@@ -509,6 +509,13 @@ class RZPA_Quiz_DB {
         return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}rzpa_quiz_submissions" );
     }
 
+    public static function delete_submission( int $id ): bool {
+        global $wpdb;
+        $wpdb->delete( $wpdb->prefix . 'rzpa_quiz_answers',     [ 'submission_id' => $id ], [ '%d' ] );
+        $rows = $wpdb->delete( $wpdb->prefix . 'rzpa_quiz_submissions', [ 'id' => $id ], [ '%d' ] );
+        return $rows !== false;
+    }
+
     // ── Refresh profile texts (called on DB version bump) ──────────────────────
 
     public static function refresh_profiles(): void {

@@ -58,6 +58,12 @@ $tab = $tab ?? 'submissions';
   </div>
   <?php endif; ?>
 
+  <?php if ( ! empty( $_GET['sub_deleted'] ) ) : ?>
+  <div style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-weight:600">
+    ✅ Besvarelsen er slettet.
+  </div>
+  <?php endif; ?>
+
   <?php if ( $tab === 'submissions' ) :
 
     $per_page    = 20;
@@ -104,6 +110,7 @@ $tab = $tab ?? 'submissions';
           <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px">GDPR</th>
           <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Tidspunkt</th>
           <th style="padding:12px 16px;text-align:left;font-weight:700;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.5px"></th>
+          <th style="padding:12px 16px;"></th>
         </tr>
       </thead>
       <tbody>
@@ -138,6 +145,19 @@ $tab = $tab ?? 'submissions';
                     style="background:#f3f4f6;border:none;cursor:pointer;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;color:#374151;white-space:nowrap">
               👁 Se svar
             </button>
+          </td>
+          <td style="padding:10px 14px">
+            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
+                  onsubmit="return confirm('Slet denne besvarelse permanent?')">
+              <?php wp_nonce_field( 'rzpa_quiz_delete_submission', 'rzpa_sub_del_nonce' ); ?>
+              <input type="hidden" name="action"        value="rzpa_quiz_delete_submission">
+              <input type="hidden" name="submission_id" value="<?php echo (int) $s['id']; ?>">
+              <input type="hidden" name="paged"         value="<?php echo (int) ( $_GET['paged'] ?? 1 ); ?>">
+              <button type="submit"
+                      style="background:#fee2e2;border:1px solid #fecaca;cursor:pointer;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;color:#dc2626;white-space:nowrap">
+                🗑 Slet
+              </button>
+            </form>
           </td>
         </tr>
         <tr id="rzpa-detail-<?php echo (int) $s['id']; ?>" style="display:none">

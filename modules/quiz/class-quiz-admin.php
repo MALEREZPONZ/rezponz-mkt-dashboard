@@ -7,6 +7,7 @@ class RZPA_Quiz_Admin {
         add_action( 'admin_menu',                             [ __CLASS__, 'add_menu' ] );
         add_action( 'admin_post_rzpa_quiz_save_question',     [ __CLASS__, 'handle_save_question' ] );
         add_action( 'admin_post_rzpa_quiz_delete_question',   [ __CLASS__, 'handle_delete_question' ] );
+        add_action( 'admin_post_rzpa_quiz_delete_submission', [ __CLASS__, 'handle_delete_submission' ] );
         add_action( 'admin_post_rzpa_quiz_toggle_question',   [ __CLASS__, 'handle_toggle_question' ] );
         add_action( 'admin_post_rzpa_quiz_save_email_cfg',    [ __CLASS__, 'handle_save_email_cfg' ] );
         add_action( 'admin_post_rzpa_quiz_download_pdf',      [ __CLASS__, 'handle_download_pdf' ] );
@@ -137,6 +138,22 @@ class RZPA_Quiz_Admin {
         }
 
         wp_redirect( admin_url( 'admin.php?page=rzpa-quiz-submissions&tab=questions&deleted=1' ) );
+        exit;
+    }
+
+    // ── Delete submission ─────────────────────────────────────────────────────
+
+    public static function handle_delete_submission(): void {
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Adgang nægtet' );
+        if ( ! wp_verify_nonce( $_POST['rzpa_sub_del_nonce'] ?? '', 'rzpa_quiz_delete_submission' ) ) wp_die( 'Ugyldig nonce' );
+
+        $id = absint( $_POST['submission_id'] ?? 0 );
+        if ( $id ) {
+            RZPA_Quiz_DB::delete_submission( $id );
+        }
+
+        $page = absint( $_POST['paged'] ?? 1 );
+        wp_redirect( admin_url( 'admin.php?page=rzpa-quiz-submissions&tab=submissions&paged=' . $page . '&sub_deleted=1' ) );
         exit;
     }
 
