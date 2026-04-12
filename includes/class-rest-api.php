@@ -498,6 +498,11 @@ PROMPT;
             return new WP_Error( 'missing_params', 'Mangler post_id eller fix_type.', [ 'status' => 400 ] );
         }
 
+        $allowed_fix_types = [ 'fix_ctr', 'fix_ai_vis', 'fix_snippet', 'fix_paa', 'fix_content', 'fix_rewrite' ];
+        if ( ! in_array( $fix_type, $allowed_fix_types, true ) ) {
+            return new WP_Error( 'invalid_fix_type', 'Ugyldig fix_type.', [ 'status' => 400 ] );
+        }
+
         return self::apply_ai_fix_to_post( $post_id, $fix_type, $keyword, $opts['openai_api_key'] );
     }
 
@@ -530,7 +535,7 @@ PROMPT;
 
         // ② Detect page builder (Elementor, WPBakery, Divi)
         $is_page_builder = get_post_meta( $post_id, '_elementor_edit_mode', true ) === 'builder'
-            || ! empty( get_post_meta( $post_id, '_wpb_vc_js_status', true ) )
+            || get_post_meta( $post_id, '_wpb_vc_js_status', true ) === 'true'
             || get_post_meta( $post_id, 'et_pb_use_builder', true ) === 'on';
 
         // ③ Page builder: kør kun titel + meta uanset fix_type (body-ændringer er usynlige)
@@ -692,7 +697,8 @@ PROMPT;
                 break;
 
             case 'fix_content':
-                // Udvid og forbedre eksisterende indhold
+                // Udvid og forbedre eksisterende indhold (brug op til 4000 tegn for fuld kontekst)
+                $excerpt = mb_substr( $content, 0, 4000 );
                 $prompt = <<<PROMPT
 Du er SEO-skribent for Rezponz – et dansk firma der tilbyder kundeservice outsourcing og rekruttering.
 
@@ -724,7 +730,8 @@ PROMPT;
                 break;
 
             case 'fix_rewrite':
-                // Komplet omskrivning
+                // Komplet omskrivning (brug op til 4000 tegn for fuld kontekst)
+                $excerpt = mb_substr( $content, 0, 4000 );
                 $prompt = <<<PROMPT
 Du er SEO-skribent for Rezponz – et dansk firma der tilbyder kundeservice outsourcing og rekruttering.
 
@@ -768,7 +775,7 @@ PROMPT;
     // ── Hjælpere ──────────────────────────────────────────────────────────────
 
     private static function openai_generate( string $prompt, string $api_key, int $max_tokens = 2000 ): string|\WP_Error {
-        @set_time_limit( 120 ); // Forhindrer PHP timeout ved lange AI-svar (Curanet shared hosting)
+        if ( function_exists( 'set_time_limit' ) ) set_time_limit( 120 ); // Forhindrer PHP timeout ved lange AI-svar
         $res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
             'headers' => [ 'Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json' ],
             'body'    => wp_json_encode( [ 'model' => 'gpt-4.1-mini', 'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ], 'max_tokens' => $max_tokens, 'temperature' => 0.5 ] ),
