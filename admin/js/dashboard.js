@@ -3739,6 +3739,7 @@ const RZPA_App = (() => {
           <div class="rzpa-kpi-value" style="color:#ef4444">${highPri}</div>
         </div>`;
       container.style.display = 'grid';
+      container.style.gridTemplateColumns = 'repeat(5, 1fr)';
     }
 
     function renderBlogTable(posts, container) {
