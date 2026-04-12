@@ -1167,21 +1167,26 @@ const RZPA_App = (() => {
     const planEl    = el('ai-action-plan');
     const planCount = el('ai-plan-count');
     if (planEl) {
-      const actions = generateActionPlan(keywords, logData, hasKey, tracked);
-      if (planCount) planCount.textContent = actions.length ? `${actions.length} handlinger` : '';
+      const fixableTypes   = ['faq_pages', 'featured_snippet', 'paa_sections'];
+      const getStored      = t => { try { return JSON.parse(localStorage.getItem(`rzpa_fiks_${t}`) || 'null'); } catch(e) { return null; } };
+      const allActions     = generateActionPlan(keywords, logData, hasKey, tracked);
+      // Fjern handlinger der allerede er udført (gemt i localStorage)
+      const actions        = allActions.filter(a => !fixableTypes.includes(a.type) || !getStored(a.type));
+      const doneCount      = allActions.length - actions.length;
+      if (planCount) planCount.textContent = actions.length ? `${actions.length} handlinger${doneCount ? ` · ${doneCount} afsluttet` : ''}` : '';
       if (!actions.length) {
-        planEl.innerHTML = '<div style="padding:16px 0;color:#4ade80;font-size:13px">✅ Ingen kritiske handlinger – din AI-synlighed ser stærk ud!</div>';
+        planEl.innerHTML = '<div style="padding:16px 0;color:#4ade80;font-size:13px">✅ Ingen aktive handlinger – godt arbejde! Din AI-synlighed forbedres løbende.</div>';
       } else {
         planEl.innerHTML = actions.map((a, i) => {
           const storeKey = a.type ? `rzpa_fiks_${a.type}` : null;
-          const stored   = storeKey ? (() => { try { return JSON.parse(localStorage.getItem(storeKey) || 'null'); } catch(e) { return null; } })() : null;
+          const stored   = storeKey ? getStored(a.type) : null;
           let fixBtn = '';
           if (a.type === 'settings_link') {
             fixBtn = `<a href="${RZPA?.settingsUrl||'#'}" class="rzpa-fiks-btn">${a.fixLabel}</a>`;
           } else if (a.type === 'sync_btn') {
             fixBtn = `<button class="rzpa-fiks-btn" onclick="document.getElementById('rzpa-ai-sync')?.click()">${a.fixLabel}</button>`;
           } else if (a.type === 'scroll_logs') {
-            fixBtn = `<button class="rzpa-fiks-btn rzpa-fiks-scroll" data-target="rzpa-manual-log-form">${a.fixLabel}</button>`;
+            fixBtn = `<button class="rzpa-fiks-btn rzpa-fiks-scroll" data-target="rzpa-log-form">${a.fixLabel}</button>`;
           } else if (a.type && stored) {
             if (stored.created) {
               fixBtn = `<span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
@@ -1211,11 +1216,14 @@ const RZPA_App = (() => {
           </div>`;
         }).join('');
 
-        // Scroll-knapper
+        // Scroll-knapper (åbn evt. skjult formular + scroll til den)
         planEl.querySelectorAll('.rzpa-fiks-scroll').forEach(btn => {
           btn.addEventListener('click', () => {
             const t = document.getElementById(btn.dataset.target);
-            if (t) t.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (!t) return;
+            // Vis formularen hvis den er skjult (toggle-baseret)
+            if (t.style.display === 'none' || t.style.display === '') t.style.display = 'block';
+            setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
           });
         });
 
