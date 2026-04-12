@@ -3990,11 +3990,7 @@ const RZPA_App = (() => {
           try {
             const res = await api('/ai/fix-post', { method: 'POST', body: JSON.stringify({ post_id: parseInt(postId), fix_type: fixType, keyword }) });
             if (res.ok) {
-              // Page builder posts: vis advarsel om at body-indhold ikke ændres visuelt
-              const color  = res.page_builder ? '#f59e0b' : '#4ade80';
-              const border = res.page_builder ? 'rgba(245,158,11,.3)' : 'rgba(74,222,128,.3)';
-              const suffix = res.page_builder ? ' (kun titel+meta) →' : ' →';
-              btn.outerHTML = `<a href="${res.edit_url}" target="_blank" class="rzpa-index-btn" style="text-decoration:none;color:${color};border-color:${border}">✓ ${res.label || 'Fikset'}${suffix}</a>`;
+              btn.outerHTML = `<a href="${res.edit_url}" target="_blank" class="rzpa-index-btn" style="text-decoration:none;color:#4ade80;border-color:rgba(74,222,128,.3)">✓ ${res.label || 'Fikset'} →</a>`;
             } else {
               const msg = res.message || res.error || '✗ Fejl';
               // Kun vis "Tilføj nøgle"-link når nøglen specifikt mangler

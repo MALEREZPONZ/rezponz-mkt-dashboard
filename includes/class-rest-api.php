@@ -533,45 +533,6 @@ PROMPT;
         // ① Gem revision FØR vi ændrer noget — giver undo-mulighed via WP Revisions
         wp_save_post_revision( $post_id );
 
-        // ② Detect page builder (Elementor, WPBakery, Divi)
-        $is_page_builder = get_post_meta( $post_id, '_elementor_edit_mode', true ) === 'builder'
-            || get_post_meta( $post_id, '_wpb_vc_js_status', true ) === 'true'
-            || get_post_meta( $post_id, 'et_pb_use_builder', true ) === 'on';
-
-        // ③ Page builder: kør kun titel + meta uanset fix_type (body-ændringer er usynlige)
-        if ( $is_page_builder && $fix_type !== 'fix_ctr' ) {
-            $pb_prompt = <<<PROMPT
-Du er SEO-specialist for Rezponz – et dansk kundeservice outsourcing firma.
-
-Indlæg: "{$title}"
-Primært søgeord: {$keyword}
-Nuværende indhold (uddrag): {$excerpt}
-
-Opgave: Skriv et optimeret SEO title tag og en meta description.
-Krav:
-- Title: max 60 tegn, søgeordet tidligt, brug tal eller power words
-- Meta: 140-155 tegn, klar CTA, søgeordet inkluderet
-- Svar i dette JSON-format (ingen anden tekst): {"title": "...", "meta": "..."}
-PROMPT;
-            $json = self::openai_generate( $pb_prompt, $api_key, 300 );
-            if ( is_wp_error( $json ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $json->get_error_message() ], 500 );
-            $data = json_decode( self::strip_md_fences( $json ), true );
-            if ( ! empty( $data['title'] ) ) {
-                wp_update_post( [ 'ID' => $post_id, 'post_title' => sanitize_text_field( $data['title'] ) ] );
-            }
-            if ( ! empty( $data['meta'] ) ) {
-                update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_text_field( $data['meta'] ) );
-                update_post_meta( $post_id, '_seopress_titles_desc', sanitize_text_field( $data['meta'] ) );
-            }
-            return new WP_REST_Response( [
-                'ok'           => true,
-                'post_id'      => $post_id,
-                'label'        => 'Titel og meta opdateret',
-                'page_builder' => true,
-                'edit_url'     => admin_url( "post.php?post={$post_id}&action=edit" ),
-            ], 200 );
-        }
-
         switch ( $fix_type ) {
             case 'fix_ctr':
                 // Generer bedre title + meta description
