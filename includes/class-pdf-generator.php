@@ -136,7 +136,7 @@ class RZPA_PDF_Generator {
                     . "\n\nFormatér som en nummereret liste. Vær specifik og datadrevet.";
             $res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
                 'headers' => [ 'Authorization' => 'Bearer ' . $opts['openai_api_key'], 'Content-Type' => 'application/json' ],
-                'body'    => wp_json_encode( [ 'model' => 'gpt-4o-mini', 'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ], 'max_tokens' => 600 ] ),
+                'body'    => wp_json_encode( [ 'model' => 'gpt-4.1-mini', 'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ], 'max_tokens' => 600 ] ),
                 'timeout' => 30,
             ] );
             if ( ! is_wp_error( $res ) ) {

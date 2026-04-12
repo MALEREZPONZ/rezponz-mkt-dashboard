@@ -352,7 +352,7 @@ class RZPA_REST_API {
 
     /**
      * AI Blog Strategi: Analysér hvilke blogindlæg Rezponz bør skrive for at
-     * ranke på jobrelevante søgeord. Bruger OpenAI gpt-4o-mini.
+     * ranke på jobrelevante søgeord. Bruger OpenAI gpt-4.1-mini.
      */
     public static function blog_request_indexing( WP_REST_Request $r ) {
         $opts = get_option( 'rzpa_settings', [] );
@@ -713,7 +713,7 @@ PROMPT;
     private static function openai_generate( string $prompt, string $api_key, int $max_tokens = 2000 ): string|\WP_Error {
         $res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
             'headers' => [ 'Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json' ],
-            'body'    => wp_json_encode( [ 'model' => 'gpt-4o-mini', 'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ], 'max_tokens' => $max_tokens, 'temperature' => 0.5 ] ),
+            'body'    => wp_json_encode( [ 'model' => 'gpt-4.1-mini', 'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ], 'max_tokens' => $max_tokens, 'temperature' => 0.5 ] ),
             'timeout' => 90,
         ] );
         if ( is_wp_error( $res ) ) return $res;
@@ -804,7 +804,7 @@ PROMPT;
                 'Content-Type'  => 'application/json',
             ],
             'body'    => wp_json_encode( [
-                'model'       => 'gpt-4o-mini',
+                'model'       => 'gpt-4.1-mini',
                 'messages'    => [ [ 'role' => 'user', 'content' => $prompt ] ],
                 'max_tokens'  => 2500,
                 'temperature' => 0.6,
@@ -884,7 +884,7 @@ PROMPT;
             'timeout' => 30,
             'headers' => [ 'Authorization' => 'Bearer ' . $key, 'Content-Type' => 'application/json' ],
             'body'    => wp_json_encode( [
-                'model'    => 'gpt-4o-mini',
+                'model'    => 'gpt-4.1-mini',
                 'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ],
                 'max_tokens' => 600,
             ] ),
@@ -1182,7 +1182,7 @@ PROMPT;
             'timeout' => 30,
             'headers' => [ 'Authorization' => 'Bearer ' . $key, 'Content-Type' => 'application/json' ],
             'body'    => wp_json_encode( [
-                'model'      => 'gpt-4o-mini',
+                'model'      => 'gpt-4.1-mini',
                 'messages'   => [ [ 'role' => 'user', 'content' => $prompt ] ],
                 'max_tokens' => 800,
             ] ),
@@ -1258,7 +1258,7 @@ PROMPT;
                 'Content-Type'  => 'application/json',
             ],
             'body' => wp_json_encode( [
-                'model'      => 'gpt-4o-mini',
+                'model'      => 'gpt-4.1-mini',
                 'messages'   => [ [ 'role' => 'user', 'content' => $prompt ] ],
                 'max_tokens' => 1200,
             ] ),
@@ -1369,7 +1369,7 @@ PROMPT;
         $ai_res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
             'timeout' => 45,
             'headers' => [ 'Authorization' => 'Bearer ' . $key, 'Content-Type' => 'application/json' ],
-            'body'    => wp_json_encode( [ 'model' => 'gpt-4o-mini', 'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ], 'max_tokens' => 1200 ] ),
+            'body'    => wp_json_encode( [ 'model' => 'gpt-4.1-mini', 'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ], 'max_tokens' => 1200 ] ),
         ] );
         if ( is_wp_error( $ai_res ) ) return self::ok( [ 'error' => $ai_res->get_error_message() ] );
         $ai_body = json_decode( wp_remote_retrieve_body( $ai_res ), true );
@@ -1646,7 +1646,7 @@ PROMPT;
                 'Content-Type'  => 'application/json',
             ],
             'body' => wp_json_encode( [
-                'model'      => 'gpt-4o-mini',
+                'model'      => 'gpt-4.1-mini',
                 'messages'   => [ [ 'role' => 'user', 'content' => $prompt ] ],
                 'max_tokens' => 1200,
             ] ),
@@ -1723,7 +1723,7 @@ PROMPT;
                 'Content-Type'  => 'application/json',
             ],
             'body' => wp_json_encode( [
-                'model'      => 'gpt-4o-mini',
+                'model'      => 'gpt-4.1-mini',
                 'messages'   => [ [ 'role' => 'user', 'content' => $prompt ] ],
                 'max_tokens' => 1200,
             ] ),
@@ -1930,7 +1930,7 @@ Svar KUN med et JSON-array — ingen tekst rundt om. Hvert element skal have pr�
             'timeout' => 45,
             'headers' => [ 'Authorization' => 'Bearer ' . $key, 'Content-Type' => 'application/json' ],
             'body'    => wp_json_encode( [
-                'model'       => 'gpt-4o-mini',
+                'model'       => 'gpt-4.1-mini',
                 'messages'    => [ [ 'role' => 'user', 'content' => $prompt ] ],
                 'max_tokens'  => 2500,
             ] ),
@@ -2031,7 +2031,7 @@ Svar KUN med et JSON-array — ingen tekst rundt om. Hvert element skal have pr�
             'timeout' => 30,
             'headers' => [ 'Authorization' => 'Bearer ' . $key, 'Content-Type' => 'application/json' ],
             'body'    => wp_json_encode( [
-                'model'      => 'gpt-4o-mini',
+                'model'      => 'gpt-4.1-mini',
                 'messages'   => [ [ 'role' => 'user', 'content' => $prompt ] ],
                 'max_tokens' => 600,
             ] ),
