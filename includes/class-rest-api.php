@@ -139,6 +139,16 @@ class RZPA_REST_API {
             'callback'            => [ __CLASS__, 'rekruttering_pipeline_save' ],
             'permission_callback' => $cap,
         ] );
+        register_rest_route( self::NS, '/rekruttering/generate-job-ad', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'rekruttering_generate_job_ad' ],
+            'permission_callback' => $cap,
+        ] );
+        register_rest_route( self::NS, '/rekruttering/ai-report', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'rekruttering_ai_report' ],
+            'permission_callback' => $cap,
+        ] );
 
         register_rest_route( self::NS, '/meta/ai-analysis', [
             'methods'             => 'POST',
@@ -1235,6 +1245,167 @@ PROMPT;
         if ( empty( $body ) ) return new WP_Error( 'bad_request', 'Ingen data', [ 'status' => 400 ] );
         $ok = RZPA_Rekruttering::save_pipeline( $body );
         return self::ok( [ 'saved' => $ok ] );
+    }
+
+    // ── POST /rekruttering/generate-job-ad ────────────────────────────────────
+    public static function rekruttering_generate_job_ad( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['openai_api_key'] ) ) {
+            return new WP_Error( 'no_openai', 'OpenAI API-nøgle mangler under Indstillinger.', [ 'status' => 400 ] );
+        }
+
+        $body      = $r->get_json_params();
+        $role      = sanitize_text_field( $body['role']      ?? '' );
+        $location  = sanitize_text_field( $body['location']  ?? 'Aalborg' );
+        $tone      = sanitize_text_field( $body['tone']      ?? 'professionel' );
+        $points    = array_map( 'sanitize_text_field', (array) ( $body['points'] ?? [] ) );
+        $points    = array_filter( $points );
+
+        if ( ! $role ) {
+            return new WP_Error( 'missing_role', 'Angiv en stillingsbetegnelse.', [ 'status' => 400 ] );
+        }
+
+        $points_str = ! empty( $points ) ? implode( "\n- ", $points ) : 'Fleksible arbejdstider, godt fællesskab, mulighed for karriereudvikling';
+
+        $prompt = <<<PROMPT
+Du er en erfaren rekrutteringsspecialist og copywriter for Rezponz – et dansk salgshus i Aalborg der rekrutterer kundeservicemedarbejdere til bl.a. Telenor, Norlys og CBB.
+
+Skriv to versioner af en jobopslag-annonce på dansk:
+
+Stilling: {$role}
+Lokation: {$location}
+Tone: {$tone}
+Fordele ved jobbet:
+- {$points_str}
+
+VERSION 1 – META ADS (Facebook/Instagram)
+- Maks 125 tegn til primær tekst (det folk ser uden at klikke "Se mere")
+- Én kort, fængende overskrift (maks 40 tegn)
+- En beskrivelse på 2-3 sætninger der fremhæver fordele og skaber lyst til at søge
+- Slut med en tydelig CTA
+
+VERSION 2 – GOOGLE SEARCH (RSA-format)
+- 3 overskrifter på maks 30 tegn hver (Headline 1, 2, 3)
+- 2 beskrivelseslinjer på maks 90 tegn hver
+
+Svar i dette JSON-format (ingen anden tekst):
+{
+  "meta": {
+    "primary_text": "...",
+    "headline": "...",
+    "description": "..."
+  },
+  "google": {
+    "headline1": "...",
+    "headline2": "...",
+    "headline3": "...",
+    "desc1": "...",
+    "desc2": "..."
+  },
+  "tips": ["...", "...", "..."]
+}
+
+"tips" skal indeholde 3 korte anbefalinger til targeting/opsætning baseret på stillingen og lokationen.
+PROMPT;
+
+        $json = self::openai_generate( $prompt, $opts['openai_api_key'], 800 );
+        if ( is_wp_error( $json ) ) {
+            return new WP_REST_Response( [ 'ok' => false, 'error' => $json->get_error_message() ], 500 );
+        }
+
+        $data = json_decode( self::strip_md_fences( $json ), true );
+        if ( ! $data ) {
+            return new WP_REST_Response( [ 'ok' => false, 'error' => 'AI returnerede ugyldigt format. Prøv igen.' ], 500 );
+        }
+
+        return self::ok( [ 'ad' => $data, 'role' => $role, 'location' => $location ] );
+    }
+
+    // ── GET /rekruttering/ai-report ───────────────────────────────────────────
+    public static function rekruttering_ai_report( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['openai_api_key'] ) ) {
+            return new WP_Error( 'no_openai', 'OpenAI API-nøgle mangler under Indstillinger.', [ 'status' => 400 ] );
+        }
+
+        $days  = (int) ( $r->get_param( 'days' ) ?? 30 );
+        $force = ! empty( $r->get_param( 'force' ) );
+
+        // 24-timers cache — AI-rapport behøver ikke regenereres ved hvert klik
+        $cache_key = 'rzpa_rekrut_ai_report_' . $days;
+        if ( ! $force ) {
+            $cached = get_transient( $cache_key );
+            if ( $cached !== false ) return self::ok( $cached );
+        }
+
+        $stats = RZPA_Rekruttering::get_stats( $days );
+        $t     = $stats['totals'] ?? [];
+        $all   = array_merge( $stats['meta_campaigns'] ?? [], $stats['google_campaigns'] ?? [] );
+        $pipe  = $stats['pipeline'] ?? [];
+
+        // Byg kompakt dataoversigt til AI
+        $camp_lines = '';
+        foreach ( $all as $c ) {
+            $cpl_str = $c['cpl'] > 0 ? number_format( $c['cpl'], 0, ',', '.' ) . ' kr.' : 'ingen data';
+            $camp_lines .= "- {$c['campaign_name']} ({$c['channel']}): {$c['leads']} ansøgninger, CPL {$cpl_str}, CTR {$c['ctr']}%, spend " . number_format( $c['spend'], 0, ',', '.' ) . " kr.\n";
+        }
+
+        $pipe_hired  = ( $pipe['ansat']['aalborg']   ?? 0 ) + ( $pipe['ansat']['remote']   ?? 0 ) + ( $pipe['ansat']['uopfordret'] ?? 0 );
+        $pipe_total  = ( $pipe['ansoegt']['aalborg'] ?? 0 ) + ( $pipe['ansoegt']['remote'] ?? 0 ) + ( $pipe['ansoegt']['uopfordret'] ?? 0 );
+        $conv_rate   = $pipe_total > 0 ? round( $pipe_hired / $pipe_total * 100 ) : 0;
+
+        $prompt = <<<PROMPT
+Du er en senior rekrutteringsrådgiver og performance marketing specialist med erfaring fra dansk arbejdsmarked.
+
+Analyser disse rekrutteringstal for Rezponz (seneste {$days} dage) og giv 4 konkrete anbefalinger:
+
+TOTALER:
+- Ansøgninger i alt: {$t['leads']}
+- Samlet CPL: {$t['cpl']} kr.
+- Samlet spend: {$t['spend']} kr.
+- Meta ansøgninger: {$t['meta_leads']} (spend: {$t['meta_spend']} kr.)
+- Google ansøgninger: {$t['google_leads']} (spend: {$t['google_spend']} kr.)
+
+KAMPAGNER:
+{$camp_lines}
+PIPELINE:
+- Ansøgt i alt: {$pipe_total}
+- Ansat: {$pipe_hired}
+- Konverteringsrate: {$conv_rate}%
+
+Svar i dette JSON-format (ingen anden tekst):
+{
+  "headline": "Kort overskrift på dansk (maks 60 tegn)",
+  "summary": "2-3 sætninger opsummering af rekrutteringssituationen",
+  "recommendations": [
+    {
+      "priority": "høj|middel|lav",
+      "icon": "emoji",
+      "title": "Kort titel (maks 50 tegn)",
+      "text": "Konkret anbefaling med tal hvor muligt (maks 120 tegn)",
+      "action": "Hvad skal gøres nu (maks 60 tegn)"
+    }
+  ]
+}
+
+Giv præcis 4 anbefalinger. Vær konkret med beløb og procenter. Fokus på hvad der øger antallet af ansøgninger.
+PROMPT;
+
+        $json = self::openai_generate( $prompt, $opts['openai_api_key'], 700 );
+        if ( is_wp_error( $json ) ) {
+            return new WP_REST_Response( [ 'ok' => false, 'error' => $json->get_error_message() ], 500 );
+        }
+
+        $report = json_decode( self::strip_md_fences( $json ), true );
+        if ( ! $report ) {
+            return new WP_REST_Response( [ 'ok' => false, 'error' => 'AI svar kunne ikke parses.' ], 500 );
+        }
+
+        $report['generated_at'] = current_time( 'mysql' );
+        $report['days']         = $days;
+        set_transient( $cache_key, $report, DAY_IN_SECONDS );
+
+        return self::ok( $report );
     }
 
     /**

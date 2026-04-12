@@ -1430,6 +1430,138 @@ const RZPA_App = (() => {
     });
 
     loadRekruttering(rekrutDays);
+
+    // ── AI Rekrutteringsrapport ────────────────────────────────────
+    const aiReportBtn = el('rekrut-ai-report-btn');
+    if (aiReportBtn) {
+      aiReportBtn.addEventListener('click', async () => {
+        const force = aiReportBtn.dataset.generated === '1';
+        aiReportBtn.textContent = '⏳ Analyserer…';
+        aiReportBtn.disabled = true;
+        const reportEl = el('rekrut-ai-report');
+        if (reportEl) reportEl.innerHTML = '<div style="color:#555;font-size:13px;padding:8px 0">🤖 GPT-4.1 mini analyserer dine rekrutteringstal…</div>';
+        try {
+          const params = new URLSearchParams({ days: rekrutDays });
+          if (force) params.set('force', '1');
+          const res = await api('/rekruttering/ai-report?' + params.toString());
+          const d = res.data || res;
+          if (d.ok === false) throw new Error(d.error || 'Fejl');
+          renderAIReport(d);
+          aiReportBtn.textContent = '🔄 Opdater rapport';
+          aiReportBtn.dataset.generated = '1';
+        } catch(err) {
+          if (reportEl) reportEl.innerHTML = `<div style="color:#ff5555;font-size:13px">⚠ ${err.message}</div>`;
+          aiReportBtn.textContent = '✨ Prøv igen';
+        }
+        aiReportBtn.disabled = false;
+      });
+    }
+
+    function renderAIReport(d) {
+      const reportEl = el('rekrut-ai-report');
+      if (!reportEl) return;
+      const recs = (d.recommendations || []).map(r => {
+        const borderClass = r.priority === 'høj' ? 'high' : r.priority === 'middel' ? 'middel' : 'lav';
+        return `<div class="ai-report-card ${borderClass}">
+          <div style="font-size:22px;flex-shrink:0">${r.icon || '💡'}</div>
+          <div>
+            <div style="font-weight:600;font-size:13px;color:#e5e5e5;margin-bottom:4px">${esc(r.title)}</div>
+            <div style="font-size:12px;color:#aaa;line-height:1.5;margin-bottom:6px">${esc(r.text)}</div>
+            <div style="font-size:11px;color:var(--neon);font-weight:600">→ ${esc(r.action)}</div>
+          </div>
+        </div>`;
+      }).join('');
+      const ts = d.generated_at ? `<div style="font-size:10px;color:#444;margin-top:14px;text-align:right">🤖 GPT-4.1 mini · ${d.generated_at}</div>` : '';
+      reportEl.innerHTML = `
+        <div style="margin-bottom:12px">
+          <div style="font-size:15px;font-weight:600;color:#e5e5e5;margin-bottom:6px">${esc(d.headline || '')}</div>
+          <div style="font-size:13px;color:#888;line-height:1.5">${esc(d.summary || '')}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">${recs}</div>
+        ${ts}`;
+    }
+
+    // ── Jobopslag Generator ────────────────────────────────────────
+    const jobadBtn = el('jobad-generate-btn');
+    if (jobadBtn) {
+      jobadBtn.addEventListener('click', async () => {
+        const role     = (el('jobad-role')?.value || '').trim();
+        const location = el('jobad-location')?.value || 'Aalborg';
+        const tone     = el('jobad-tone')?.value || 'professionel og imødekommende';
+        const points   = (el('jobad-points')?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+
+        if (!role) { el('jobad-role').focus(); return; }
+
+        jobadBtn.textContent = '⏳ Genererer…';
+        jobadBtn.disabled = true;
+        const resultEl = el('jobad-result');
+        if (resultEl) { resultEl.style.display = 'none'; resultEl.innerHTML = ''; }
+
+        try {
+          const res = await api('/rekruttering/generate-job-ad', {
+            method: 'POST',
+            body: JSON.stringify({ role, location, tone, points })
+          });
+          const d = res.data || res;
+          if (d.ok === false) throw new Error(d.error || 'Fejl');
+          renderJobAd(d.ad, role, location, resultEl);
+          jobadBtn.textContent = '✨ Generer igen';
+        } catch(err) {
+          if (resultEl) { resultEl.innerHTML = `<div style="color:#ff5555">⚠ ${esc(err.message)}</div>`; resultEl.style.display = ''; }
+          jobadBtn.textContent = '✨ Generer jobopslag';
+        }
+        jobadBtn.disabled = false;
+      });
+    }
+
+    function renderJobAd(ad, role, location, container) {
+      if (!ad || !container) return;
+      const m = ad.meta || {};
+      const g = ad.google || {};
+      const tips = (ad.tips || []).map(t => `<li style="font-size:12px;color:#aaa;padding:2px 0">💡 ${esc(t)}</li>`).join('');
+
+      const field = (label, value, charLimit) => {
+        const len = (value || '').length;
+        const over = charLimit && len > charLimit;
+        const counter = charLimit ? `<span style="color:${over ? '#ef4444' : '#555'}">${len}/${charLimit}</span>` : '';
+        return `<div class="jobad-field">
+          <div class="jobad-field-label">${label} ${counter} <button class="jobad-copy-btn" data-copy="${esc(value || '')}">Kopiér</button></div>
+          <div class="jobad-field-value">${esc(value || '')}</div>
+        </div>`;
+      };
+
+      container.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:#60a5fa;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">📘 Meta Ads</div>
+            ${field('Primær tekst (125 tegn)', m.primary_text, 125)}
+            ${field('Overskrift (40 tegn)', m.headline, 40)}
+            ${field('Beskrivelse', m.description)}
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:#34a853;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">🔍 Google Search (RSA)</div>
+            ${field('Headline 1 (30 tegn)', g.headline1, 30)}
+            ${field('Headline 2 (30 tegn)', g.headline2, 30)}
+            ${field('Headline 3 (30 tegn)', g.headline3, 30)}
+            ${field('Beskrivelse 1 (90 tegn)', g.desc1, 90)}
+            ${field('Beskrivelse 2 (90 tegn)', g.desc2, 90)}
+          </div>
+        </div>
+        ${tips ? `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)"><div style="font-size:11px;color:#555;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Targeting-tips</div><ul style="margin:0;padding:0 0 0 14px">${tips}</ul></div>` : ''}
+        <div style="margin-top:14px;font-size:10px;color:#444;text-align:right">🤖 GPT-4.1 mini · ${role} · ${location}</div>`;
+      container.style.display = '';
+
+      // Kopiér-knapper
+      container.querySelectorAll('.jobad-copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          navigator.clipboard?.writeText(btn.dataset.copy || '').then(() => {
+            const orig = btn.textContent;
+            btn.textContent = '✓ Kopieret';
+            setTimeout(() => btn.textContent = orig, 1500);
+          });
+        });
+      });
+    }
   }
 
   async function loadRekruttering(days, force = false) {
