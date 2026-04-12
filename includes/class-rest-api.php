@@ -525,16 +525,29 @@ PROMPT;
             return new WP_REST_Response( [ 'ok' => false, 'error' => 'Indlæg ikke fundet.' ], 404 );
         }
 
-        $title     = $post->post_title;
-        $content   = wp_strip_all_tags( $post->post_content );
-        $excerpt   = mb_substr( $content, 0, 1500 );
+        $title   = $post->post_title;
+        $content = wp_strip_all_tags( $post->post_content );
+        $excerpt = mb_substr( $content, 0, 1500 );
+
+        // Fix 7: Brug Yoast focus keyword hvis tilgængeligt – ellers post title
+        $focus_kw = sanitize_text_field( get_post_meta( $post_id, '_yoast_wpseo_focuskw', true ) );
+        if ( ! $keyword && $focus_kw ) {
+            $keyword = $focus_kw;
+        } elseif ( ! $keyword ) {
+            $keyword = $title;
+        }
+
         // Tracking – udfyldes i hvert case og sendes tilbage til JS
         $changes   = [];
         $new_title = '';
         $new_meta  = '';
 
-        // ① Gem revision FØR vi ændrer noget — giver undo-mulighed via WP Revisions
-        wp_save_post_revision( $post_id );
+        // ① Gem revision FØR vi ændrer noget — kun hvis revisioner er slået til
+        if ( wp_revisions_enabled( $post ) && current_user_can( 'edit_post', $post_id ) ) {
+            wp_save_post_revision( $post_id );
+        } elseif ( ! current_user_can( 'edit_post', $post_id ) ) {
+            return new WP_REST_Response( [ 'ok' => false, 'error' => 'Du har ikke rettigheder til at redigere dette indlæg.' ], 403 );
+        }
 
         switch ( $fix_type ) {
             case 'fix_ctr':
@@ -568,6 +581,10 @@ PROMPT;
                     update_post_meta( $post_id, '_yoast_wpseo_metadesc', $new_meta );
                     update_post_meta( $post_id, '_seopress_titles_desc', $new_meta );
                     $changes[] = 'Meta description opdateret (' . mb_strlen( $new_meta ) . ' tegn)';
+                }
+                // Fix 10: Returner fejl hvis AI ikke leverede noget brugbart
+                if ( empty( $changes ) ) {
+                    return new WP_REST_Response( [ 'ok' => false, 'error' => 'AI returnerede ingen gyldige felter. Prøv igen.' ], 500 );
                 }
                 $label = 'Titel og meta opdateret';
                 break;
@@ -630,8 +647,18 @@ PROMPT;
                 if ( is_wp_error( $snippet_html ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $snippet_html->get_error_message() ], 500 );
 
                 $snippet_html = wp_kses_post( self::strip_md_fences( $snippet_html ) );
-                $new_content  = $snippet_html . "\n\n" . $post->post_content;
-                $result       = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ], true );
+                // Fix 2: Guard mod tom AI-svar
+                if ( empty( trim( $snippet_html ) ) ) {
+                    return new WP_REST_Response( [ 'ok' => false, 'error' => 'AI returnerede intet indhold. Prøv igen.' ], 500 );
+                }
+                // Fix 3: Duplicate guard
+                if ( strpos( $post->post_content, '<!-- rzpa-snippet -->' ) !== false ) {
+                    $label   = 'Snippet allerede tilføjet';
+                    $changes = [ 'Snippet-intro er allerede i indlægget – ingen ændringer' ];
+                    break;
+                }
+                $new_content = "<!-- rzpa-snippet -->\n" . $snippet_html . "\n\n" . $post->post_content;
+                $result      = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
                 $changes = [
                     'Direkte svar-afsnit tilføjet øverst (45-55 ord)',
@@ -701,12 +728,18 @@ PROMPT;
                 if ( is_wp_error( $new_html ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $new_html->get_error_message() ], 500 );
 
                 $new_html = wp_kses_post( self::strip_md_fences( $new_html ) );
+                // Fix 2: Guard mod tom AI-svar
+                if ( empty( trim( $new_html ) ) ) {
+                    return new WP_REST_Response( [ 'ok' => false, 'error' => 'AI returnerede intet indhold. Prøv igen.' ], 500 );
+                }
                 if ( preg_match( '/<h1[^>]*>(.*?)<\/h1>/is', $new_html, $m ) ) {
                     $new_title = wp_strip_all_tags( $m[1] );
                     wp_update_post( [ 'ID' => $post_id, 'post_title' => $new_title ] );
                     $new_html = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $new_html, 1 );
                 }
-                $new_html  .= self::build_faq_schema( $new_html );
+                // Fix 4: Scop FAQPage schema kun til <!-- rzpa-faq --> blokken, ikke hele HTML
+                $new_html  = preg_replace( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>.*?<\/script>/is', '', $new_html );
+                $new_html .= "\n\n<!-- rzpa-faq -->\n" . self::build_faq_schema_from_section( $new_html );
                 $result     = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_html ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
                 $word_count = str_word_count( wp_strip_all_tags( $new_html ) );
@@ -722,31 +755,40 @@ PROMPT;
             case 'fix_rewrite':
                 // Komplet omskrivning (brug op til 4000 tegn for fuld kontekst)
                 $excerpt = mb_substr( $content, 0, 4000 );
+                // Fix 6: Send eksisterende indhold med som kontekst (tidligere manglede dette)
                 $prompt = <<<PROMPT
 Du er SEO-skribent for Rezponz – et dansk firma der tilbyder kundeservice outsourcing og rekruttering.
 
 Omskriv dette blogindlæg komplet til en stærk SEO-artikel på mindst 1.000 ord.
 Titel: "{$title}"
 Søgeord: {$keyword}
+Eksisterende indhold (bevar fakta og kernebudskab): {$excerpt}
 
 Krav:
 - <h1> med kraftfuld, søgeordsoptimeret titel
 - 5-7 <h2>-sektioner med substans
 - Fakta, fordele, og praktisk vejledning
-- FAQ-sektion (5 spørgsmål) og tydelig call-to-action til Rezponz
+- Afslut med en FAQ-sektion med præcis 5 spørgsmål markeret med kommentaren <!-- rzpa-faq-start --> OVER og <!-- rzpa-faq-end --> UNDER FAQ-afsnittet
+- Tydelig call-to-action til Rezponz til sidst
 - Skriv KUN HTML. Ingen markdown.
 PROMPT;
-                $rewrite = self::openai_generate( $prompt, $api_key, 2000 );
+                $rewrite = self::openai_generate( $prompt, $api_key, 2500 );
                 if ( is_wp_error( $rewrite ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $rewrite->get_error_message() ], 500 );
 
                 $rewrite = wp_kses_post( self::strip_md_fences( $rewrite ) );
+                // Fix 2: Guard mod tom AI-svar
+                if ( empty( trim( $rewrite ) ) ) {
+                    return new WP_REST_Response( [ 'ok' => false, 'error' => 'AI returnerede intet indhold. Prøv igen.' ], 500 );
+                }
                 if ( preg_match( '/<h1[^>]*>(.*?)<\/h1>/is', $rewrite, $m ) ) {
                     $new_title = wp_strip_all_tags( $m[1] );
                     wp_update_post( [ 'ID' => $post_id, 'post_title' => $new_title ] );
                     $rewrite = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $rewrite, 1 );
                 }
-                $rewrite   .= self::build_faq_schema( $rewrite );
-                $result     = wp_update_post( [ 'ID' => $post_id, 'post_content' => $rewrite ], true );
+                // Fix 4: Fjern evt. eksisterende schema, tilføj nyt scopet til FAQ-blokken
+                $rewrite = preg_replace( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>.*?<\/script>/is', '', $rewrite );
+                $rewrite .= "\n\n" . self::build_faq_schema_from_section( $rewrite );
+                $result   = wp_update_post( [ 'ID' => $post_id, 'post_content' => $rewrite ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
                 $word_count = str_word_count( wp_strip_all_tags( $rewrite ) );
                 $changes    = array_filter( [
@@ -805,6 +847,30 @@ PROMPT;
             $q = wp_strip_all_tags( $m[1] );
             $a = wp_strip_all_tags( $m[2] );
             if ( $q && $a ) {
+                $items[] = [ '@type' => 'Question', 'name' => $q, 'acceptedAnswer' => [ '@type' => 'Answer', 'text' => $a ] ];
+            }
+        }
+        if ( empty( $items ) ) return '';
+        $schema = wp_json_encode( [ '@context' => 'https://schema.org', '@type' => 'FAQPage', 'mainEntity' => $items ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
+        return "\n\n<script type=\"application/ld+json\">\n{$schema}\n</script>";
+    }
+
+    /**
+     * Fix 4: Scop FAQPage schema til kun spørgsmål markeret med rzpa-faq-start/end kommentarer.
+     * Falder tilbage til build_faq_schema() på hele HTML hvis markers ikke findes.
+     */
+    private static function build_faq_schema_from_section( string $html ): string {
+        if ( preg_match( '/<!--\s*rzpa-faq-start\s*-->(.*?)<!--\s*rzpa-faq-end\s*-->/is', $html, $m ) ) {
+            return self::build_faq_schema( $m[1] );
+        }
+        // Fallback: brug kun h2+p-par der ligner spørgsmål (indeholder "?" eller starter med "Hvad/Hvordan/Hvornår")
+        $items = [];
+        preg_match_all( '/<h2[^>]*>(.*?)<\/h2>\s*(?:<p[^>]*>(.*?)<\/p>)/is', $html, $matches, PREG_SET_ORDER );
+        foreach ( $matches as $m ) {
+            $q = wp_strip_all_tags( $m[1] );
+            $a = wp_strip_all_tags( $m[2] );
+            // Kun medtag hvis H2 ligner et spørgsmål
+            if ( $q && $a && ( str_contains( $q, '?' ) || preg_match( '/^(Hvad|Hvordan|Hvornår|Hvorfor|Kan|Er |Skal |Hvilke)/iu', $q ) ) ) {
                 $items[] = [ '@type' => 'Question', 'name' => $q, 'acceptedAnswer' => [ '@type' => 'Answer', 'text' => $a ] ];
             }
         }

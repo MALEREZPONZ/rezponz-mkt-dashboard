@@ -3947,6 +3947,9 @@ const RZPA_App = (() => {
       html += `</tbody></table></div>`;
       container.innerHTML = html;
 
+      // Fix 1: HTML-escape helper – forhindrer XSS når AI-strenge injiceres i innerHTML
+      const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
       // Indekser-knapper (ekskl. Fiks-knapper der deler rzpa-index-btn styling)
       container.querySelectorAll('.rzpa-index-btn:not(.rzpa-blog-fix-btn)').forEach(btn => {
         btn.addEventListener('click', async e => {
@@ -3962,21 +3965,23 @@ const RZPA_App = (() => {
               btn.style.borderColor = 'rgba(204,255,0,.3)';
               btn.title = 'Google anmodet om crawling – forventes inden for 24-48 timer';
             } else {
-              const errMsg = res.message || res.data?.message || 'Ukendt fejl';
-              // Scope-fejl: genopret forbindelsen
-              if (res.code === 'scope_missing' || (errMsg && errMsg.includes('scope'))) {
-                btn.textContent = '⚠ Mangler tilladelse';
-                btn.title = 'Genopret Google-forbindelsen under Indstillinger – Indexing API kræver opdateret scope';
-              } else if (res.code === 'no_gsc') {
-                btn.textContent = '⚠ Google ikke tilsluttet';
-                btn.title = 'Gå til Indstillinger og tilslut Google Search Console';
+              // Fix: tjek både res.code og res.data?.code (WP REST wrapper)
+              const errCode = res.code || res.data?.code || '';
+              const errMsg  = res.message || res.data?.message || 'Ukendt fejl';
+              const settingsUrl = (typeof RZPA !== 'undefined' && RZPA.adminUrl)
+                ? RZPA.adminUrl + 'admin.php?page=rzpa-settings'
+                : '#';
+              if (errCode === 'scope_missing' || errMsg.includes('scope')) {
+                btn.outerHTML = `<a href="${settingsUrl}" class="rzpa-index-btn" style="text-decoration:none;color:#f59e0b;border-color:rgba(245,158,11,.3);white-space:nowrap" title="Genopret Google-forbindelsen – Indexing API kræver ny tilladelse">⚠ Genopret Google →</a>`;
+              } else if (errCode === 'no_gsc') {
+                btn.outerHTML = `<a href="${settingsUrl}" class="rzpa-index-btn" style="text-decoration:none;color:#f59e0b;border-color:rgba(245,158,11,.3);white-space:nowrap">⚠ Tilslut Google →</a>`;
               } else {
-                btn.textContent = '✗ Fejl';
+                btn.textContent = '✗ ' + (errMsg.length > 35 ? errMsg.substring(0,35)+'…' : errMsg);
+                btn.style.color = '#ff5555';
+                btn.style.borderColor = 'rgba(255,85,85,.3)';
                 btn.title = errMsg;
+                btn.disabled = false;
               }
-              btn.style.color = '#f59e0b';
-              btn.style.borderColor = 'rgba(245,158,11,.3)';
-              btn.disabled = false;
             }
           } catch(err) {
             btn.textContent = '✗ Netværksfejl';
@@ -3994,29 +3999,43 @@ const RZPA_App = (() => {
           const postId   = btn.dataset.postId;
           const fixType  = btn.dataset.fixType;
           const keyword  = decodeURIComponent(btn.dataset.keyword || '');
-          // Bekræft før destruktiv handling på live indhold
+          // Fix 5: Inkluder Elementor-advarsel i confirm-dialog
           const shortKw = keyword.length > 50 ? keyword.substring(0, 50) + '…' : keyword;
-          if (!confirm(`AI vil forbedre "${shortKw || 'dette indlæg'}".\n\nÆndringerne publiceres direkte – du kan fortryde via Rediger → Revisioner.\n\nFortsæt?`)) return;
+          if (!confirm(`AI vil forbedre "${shortKw || 'dette indlæg'}".\n\nÆndringerne publiceres direkte – du kan fortryde via Rediger → Revisioner.\n\nNB: På Elementor-sider opdateres titel og meta med det samme, men brødtekst kræver manuel redigering i Elementor for at blive synlig på forsiden.\n\nFortsæt?`)) return;
+
+          if (!postId || isNaN(parseInt(postId))) return;
           btn.disabled = true;
-          btn.textContent = '⏳ Fikser…';
+
+          // Fix 8: Løbende progress-timer så brugeren kan se der sker noget
+          let elapsed = 0;
+          const msgs = ['Analyserer indhold…', 'Skriver med GPT-4.1 mini…', 'Optimerer til SEO…', 'Gemmer ændringer…'];
+          btn.textContent = '⏳ ' + msgs[0];
+          const timer = setInterval(() => {
+            elapsed++;
+            const msg = msgs[Math.min(Math.floor(elapsed / 8), msgs.length - 1)];
+            btn.textContent = `⏳ ${msg} (${elapsed}s)`;
+          }, 1000);
+
           try {
             const res = await api('/ai/fix-post', { method: 'POST', body: JSON.stringify({ post_id: parseInt(postId), fix_type: fixType, keyword }) });
+            clearInterval(timer);
             if (res.ok) {
-              // Erstat knap med grønt success-link
-              btn.outerHTML = `<a href="${res.edit_url}" target="_blank" class="rzpa-index-btn" style="text-decoration:none;color:#4ade80;border-color:rgba(74,222,128,.3)">✓ ${res.label || 'Fikset'} →</a>`;
+              // Erstat knap med grønt success-link (Fix 1: esc() på AI-strenge)
+              btn.outerHTML = `<a href="${res.edit_url}" target="_blank" class="rzpa-index-btn" style="text-decoration:none;color:#4ade80;border-color:rgba(74,222,128,.3)">✓ ${esc(res.label) || 'Fikset'} →</a>`;
 
               // Vis fix-summary i expand-rækken
               const expandRow = document.getElementById(`expand-${postId}`);
               if (expandRow) {
                 const ch = Array.isArray(res.changes) ? res.changes : [];
+                // Fix 1: esc() på alle AI-genererede strenge inden innerHTML
                 const changesHtml = ch.length
-                  ? `<ul style="margin:8px 0 0 0;padding:0;list-style:none">${ch.map(c => `<li style="font-size:12px;color:#aaa;padding:2px 0;display:flex;gap:6px"><span style="color:#4ade80;flex-shrink:0">✓</span>${c}</li>`).join('')}</ul>`
+                  ? `<ul style="margin:8px 0 0 0;padding:0;list-style:none">${ch.map(c => `<li style="font-size:12px;color:#aaa;padding:2px 0;display:flex;gap:6px"><span style="color:#4ade80;flex-shrink:0">✓</span>${esc(c)}</li>`).join('')}</ul>`
                   : '';
                 const titleHtml = res.new_title
-                  ? `<div style="margin-top:10px;font-size:12px;padding:8px 10px;background:rgba(74,222,128,.06);border-radius:6px;border-left:2px solid #4ade80"><span style="color:#888">Ny titel: </span><strong style="color:#e5e5e5">${res.new_title}</strong></div>`
+                  ? `<div style="margin-top:10px;font-size:12px;padding:8px 10px;background:rgba(74,222,128,.06);border-radius:6px;border-left:2px solid #4ade80"><span style="color:#888">Ny titel: </span><strong style="color:#e5e5e5">${esc(res.new_title)}</strong></div>`
                   : '';
                 const metaHtml = res.new_meta
-                  ? `<div style="margin-top:6px;font-size:12px;padding:8px 10px;background:rgba(96,165,250,.06);border-radius:6px;border-left:2px solid #60a5fa"><span style="color:#888">Meta: </span><em style="color:#ccc">${res.new_meta}</em></div>`
+                  ? `<div style="margin-top:6px;font-size:12px;padding:8px 10px;background:rgba(96,165,250,.06);border-radius:6px;border-left:2px solid #60a5fa"><span style="color:#888">Meta: </span><em style="color:#ccc">${esc(res.new_meta)}</em></div>`
                   : '';
                 const expandDiv = expandRow.querySelector('.rzpa-blog-expand');
                 if (expandDiv) {
@@ -4024,13 +4043,14 @@ const RZPA_App = (() => {
                     <div class="rzpa-blog-expand-icon">✅</div>
                     <div style="flex:1">
                       <div class="rzpa-blog-expand-title" style="color:#4ade80">AI Fix gennemført · GPT-4.1 mini</div>
-                      <div class="rzpa-blog-expand-text">${res.label || 'Indhold opdateret'}</div>
+                      <div class="rzpa-blog-expand-text">${esc(res.label) || 'Indhold opdateret'}</div>
                       ${changesHtml}${titleHtml}${metaHtml}
                     </div>`;
                 }
                 expandRow.style.display = '';
               }
             } else {
+              clearInterval(timer);
               const msg = res.message || res.error || '✗ Fejl';
               // Kun vis "Tilføj nøgle"-link når nøglen specifikt mangler
               if (res.code === 'no_openai') {
@@ -4049,8 +4069,9 @@ const RZPA_App = (() => {
               }
             }
           } catch(err) {
-            btn.textContent = '✗ Fejl';
-            btn.title = err.message || '';
+            clearInterval(timer);
+            btn.textContent = '✗ Netværksfejl';
+            btn.title = err.message || 'Tjek konsollen for detaljer';
             btn.style.color = '#ff5555';
             btn.disabled = false;
           }
