@@ -3989,14 +3989,23 @@ const RZPA_App = (() => {
             if (res.ok) {
               btn.outerHTML = `<a href="${res.edit_url}" target="_blank" class="rzpa-index-btn" style="text-decoration:none;color:#4ade80;border-color:rgba(74,222,128,.3)">✓ ${res.label || 'Fikset'} →</a>`;
             } else {
-              const msg = res.message || res.data?.message || '✗ Fejl';
-              btn.textContent = msg.length > 20 ? '✗ Fejl' : msg;
-              btn.title = msg;
-              btn.style.color = '#ff5555';
-              btn.disabled = false;
+              const msg = res.message || res.error || '✗ Fejl';
+              // OpenAI-nøgle mangler → vis link til indstillinger
+              if (res.code === 'no_openai' || (msg && msg.toLowerCase().includes('openai'))) {
+                const settingsUrl = (typeof RZPA !== 'undefined' && RZPA.adminUrl)
+                  ? RZPA.adminUrl + 'admin.php?page=rzpa-settings#openai'
+                  : '#';
+                btn.outerHTML = `<a href="${settingsUrl}" class="rzpa-index-btn" style="text-decoration:none;color:#f59e0b;border-color:rgba(245,158,11,.3);white-space:nowrap" title="${msg}">⚠ Tilføj OpenAI-nøgle →</a>`;
+              } else {
+                btn.textContent = '✗ ' + (msg.length > 25 ? msg.substring(0, 25) + '…' : msg);
+                btn.title = msg;
+                btn.style.color = '#ff5555';
+                btn.disabled = false;
+              }
             }
           } catch(err) {
             btn.textContent = '✗ Fejl';
+            btn.title = err.message || '';
             btn.style.color = '#ff5555';
             btn.disabled = false;
           }
