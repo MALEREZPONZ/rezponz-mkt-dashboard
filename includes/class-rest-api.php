@@ -282,6 +282,11 @@ class RZPA_REST_API {
             'callback'            => [ __CLASS__, 'blog_ai_suggestions' ],
             'permission_callback' => $cap,
         ] );
+        register_rest_route( self::NS, '/blog/request-indexing', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'blog_request_indexing' ],
+            'permission_callback' => $cap,
+        ] );
     }
 
     private static function days( WP_REST_Request $r ) : int {
@@ -339,6 +344,69 @@ class RZPA_REST_API {
      * AI Blog Strategi: Analysér hvilke blogindlæg Rezponz bør skrive for at
      * ranke på jobrelevante søgeord. Bruger OpenAI gpt-4o-mini.
      */
+    public static function blog_request_indexing( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['google_client_id'] ) || empty( $opts['google_refresh_token'] ) ) {
+            return new WP_Error( 'no_gsc', 'Google er ikke forbundet under Indstillinger.', [ 'status' => 400 ] );
+        }
+
+        $url = sanitize_url( $r->get_json_params()['url'] ?? '' );
+        if ( ! $url || ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
+            return new WP_Error( 'bad_url', 'Ugyldig URL.', [ 'status' => 400 ] );
+        }
+
+        // Hent frisk access token
+        $token_res = wp_remote_post( 'https://oauth2.googleapis.com/token', [
+            'body' => [
+                'client_id'     => $opts['google_client_id'],
+                'client_secret' => $opts['google_client_secret'] ?? '',
+                'refresh_token' => $opts['google_refresh_token'],
+                'grant_type'    => 'refresh_token',
+            ],
+            'timeout' => 15,
+        ] );
+        if ( is_wp_error( $token_res ) ) {
+            return new WP_Error( 'token_error', $token_res->get_error_message(), [ 'status' => 502 ] );
+        }
+        $token_body = json_decode( wp_remote_retrieve_body( $token_res ), true );
+        $access_token = $token_body['access_token'] ?? '';
+        if ( ! $access_token ) {
+            $err = $token_body['error_description'] ?? ( $token_body['error'] ?? 'Kunne ikke hente access token' );
+            // Hvis scope mangler, giv klar besked
+            if ( str_contains( $err, 'scope' ) || str_contains( $err, 'insufficient' ) ) {
+                return new WP_Error( 'scope_missing', 'Genopret Google-forbindelsen under Indstillinger (kræver opdateret tilladelse).', [ 'status' => 403 ] );
+            }
+            return new WP_Error( 'token_error', $err, [ 'status' => 502 ] );
+        }
+
+        // Kald Google Indexing API
+        $index_res = wp_remote_post( 'https://indexing.googleapis.com/v3/urlNotifications:publish', [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $access_token,
+                'Content-Type'  => 'application/json',
+            ],
+            'body'    => wp_json_encode( [ 'url' => $url, 'type' => 'URL_UPDATED' ] ),
+            'timeout' => 20,
+        ] );
+        if ( is_wp_error( $index_res ) ) {
+            return new WP_Error( 'indexing_error', $index_res->get_error_message(), [ 'status' => 502 ] );
+        }
+        $code = wp_remote_retrieve_response_code( $index_res );
+        $body = json_decode( wp_remote_retrieve_body( $index_res ), true );
+
+        if ( $code === 200 ) {
+            return self::ok( [ 'queued' => true, 'url' => $url ] );
+        }
+
+        // Scope-fejl fra Indexing API
+        if ( $code === 403 ) {
+            return new WP_Error( 'scope_missing', 'Genopret Google-forbindelsen under Indstillinger (kræver opdateret tilladelse til Indexing API).', [ 'status' => 403 ] );
+        }
+
+        $err_msg = $body['error']['message'] ?? ( 'API fejl ' . $code );
+        return new WP_Error( 'indexing_error', $err_msg, [ 'status' => $code ?: 502 ] );
+    }
+
     public static function blog_ai_suggestions( WP_REST_Request $r ) {
         $opts = get_option( 'rzpa_settings', [] );
         if ( empty( $opts['openai_api_key'] ) ) {

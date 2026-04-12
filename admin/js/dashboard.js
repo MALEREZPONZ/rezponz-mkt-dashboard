@@ -3813,6 +3813,7 @@ const RZPA_App = (() => {
                 <td class="rzpa-blog-rec-cell">
                   <span class="rzpa-blog-rec-dot">${priDot(post.priority)}</span>
                   <span class="rzpa-blog-rec-label">${post.rec_label}</span>
+                  ${!post.has_gsc ? `<button class="rzpa-index-btn" data-url="${post.url}" title="Bed Google om at indeksere denne side">↗ Indekser</button>` : ''}
                 </td>
               </tr>
               <tr class="rzpa-blog-expand-row" id="expand-${post.post_id}" style="display:none">
@@ -3831,6 +3832,34 @@ const RZPA_App = (() => {
 
       html += `</tbody></table></div>`;
       container.innerHTML = html;
+
+      // Indekser-knapper
+      container.querySelectorAll('.rzpa-index-btn').forEach(btn => {
+        btn.addEventListener('click', async e => {
+          e.stopPropagation();
+          const url = btn.dataset.url;
+          btn.textContent = '⏳';
+          btn.disabled = true;
+          try {
+            const res = await api('/blog/request-indexing', { method: 'POST', body: JSON.stringify({ url }) });
+            if (res.queued || res.data?.queued) {
+              btn.textContent = '✓ Sendt';
+              btn.style.color = 'var(--neon)';
+              btn.style.borderColor = 'rgba(204,255,0,.3)';
+            } else {
+              btn.textContent = '✗ Fejl';
+              btn.style.color = '#ff5555';
+              btn.title = res.message || 'Ukendt fejl';
+              btn.disabled = false;
+            }
+          } catch(err) {
+            btn.textContent = '✗ Fejl';
+            btn.style.color = '#ff5555';
+            btn.title = err.message || '';
+            btn.disabled = false;
+          }
+        });
+      });
 
       // Klik på række → toggle udvidet anbefaling
       container.querySelectorAll('.rzpa-blog-row').forEach(row => {

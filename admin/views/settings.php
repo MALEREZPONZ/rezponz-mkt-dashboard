@@ -164,7 +164,7 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
         'client_id'     => $g_id,
         'redirect_uri'  => $redirect_uri,
         'response_type' => 'code',
-        'scope'         => 'https://www.googleapis.com/auth/webmasters.readonly',
+        'scope'         => 'https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/indexing',
         'access_type'   => 'offline',
         'prompt'        => 'consent',
     ] );

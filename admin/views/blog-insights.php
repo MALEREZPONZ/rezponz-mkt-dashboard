@@ -263,6 +263,26 @@ $has_openai = ! empty( $opts['openai_api_key'] );
     align-items:center;
     gap:8px;
   }
+  .rzpa-index-btn {
+    display:inline-block;
+    margin-top:5px;
+    font-size:11px;
+    font-weight:600;
+    padding:3px 10px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.15);
+    background:rgba(255,255,255,.05);
+    color:#aaa;
+    cursor:pointer;
+    transition:all .15s;
+    font-family:inherit;
+  }
+  .rzpa-index-btn:hover:not(:disabled) {
+    border-color:rgba(204,255,0,.4);
+    color:var(--neon);
+    background:rgba(204,255,0,.06);
+  }
+  .rzpa-index-btn:disabled { cursor:default; opacity:.7; }
   </style>
 
 </div>
