@@ -466,32 +466,105 @@ class RZPA_REST_API {
         }
 
         // faq_pages (og fallback): opret ny FAQ-post med AI-skrevet indhold
+        // ── Saml interne sider + blogindlæg til linking-kontekst ──────────────
+        $site_pages = get_posts( [
+            'post_type'      => 'page',
+            'post_status'    => 'publish',
+            'posts_per_page' => 15,
+            'orderby'        => 'menu_order',
+            'order'          => 'ASC',
+        ] );
+        $site_posts = get_posts( [
+            'post_type'      => 'post',
+            'post_status'    => 'publish',
+            'posts_per_page' => 10,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+        ] );
+        $link_lines = array_map(
+            fn( $p ) => '  - ' . $p->post_title . ': ' . get_permalink( $p ),
+            array_merge( $site_pages, $site_posts )
+        );
+        $link_context = implode( "\n", $link_lines );
+
         $prompt = <<<PROMPT
-Du er SEO-skribent for Rezponz – et dansk firma der tilbyder kundeservice outsourcing, medarbejderrekruttering og vikarer til virksomheder.
+Du er en erfaren ekspert i kundeservice, rekruttering og HR for Rezponz – Danmarks specialister i kundeservice outsourcing og rekruttering af servicemedarbejdere.
 
-Skriv en komplet FAQ-artikel på dansk der svarer autoritativt på søgninger om: {$kw_list}
+Skriv en komplet, autoritativ FAQ-artikel på dansk om: {$kw_list}
 
-Regler:
-- Brug <h1> til den overordnede sidetitel
-- Brug <h2> til hvert spørgsmål (formulér som et konkret spørgsmål)
-- Skriv svar i <p>-tags: præcist, faktabaseret, 50-80 ord pr. svar – ingen indledning, gå direkte til sagen
-- Afslut med en kort <p> call-to-action der nævner Rezponz
-- Skriv KUN HTML (h1, h2, p). Ingen markdown, ingen forklaringer, ingen kommentarer.
+Artikelstruktur (følg præcis):
+1. Første linje: <!-- META: [meta description maks 155 tegn, inkl. søgeord, med klar CTA] -->
+2. <h1> med SEO-stærk titel (søgeord tidligt)
+3. <p> indledning på 60-80 ord der sætter kontekst og viser ekspertise
+4. 7-9 <h2> spørgsmål med <p> svar (60-90 ord pr. svar) – faktabaseret, konkret, ingen indledninger
+5. <p class="rzpa-expert-note"> med et kort ekspert-citat eller indsigt fra Rezponz' praktiske erfaring
+6. <p> afsluttende CTA med link til kontaktsiden
+
+Regler for interne links:
+- Inkluder 3-5 naturlige <a href="URL">ankertekst</a> links til relevante sider fra denne liste:
+{$link_context}
+- Placer links organisk i teksten – ikke som en liste til sidst
+- Link til kontaktsiden i CTA-afsnittet
+
+Ekspert-tone: Skriv som om du har 10+ års erfaring med kundeservice i Danmark. Brug konkrete tal, best practices og praktiske eksempler der viser autoritet.
+
+Skriv KUN HTML (h1, h2, p, a, ul, li). Ingen markdown, ingen forklaringer, ingen kommentarer undtagen META-linjen.
 PROMPT;
 
-        $html = self::openai_generate( $prompt, $opts['openai_api_key'], 3000 );
+        $html = self::openai_generate( $prompt, $opts['openai_api_key'], 5000 );
         if ( is_wp_error( $html ) ) return $html;
 
-        $html  = self::strip_md_fences( $html );
+        $html = self::strip_md_fences( $html );
+
+        // Udtræk META-linje (første linje)
+        $meta_desc = '';
+        if ( preg_match( '/<!--\s*META:\s*(.+?)\s*-->/i', $html, $meta_m ) ) {
+            $meta_desc = sanitize_text_field( $meta_m[1] );
+            $html      = str_replace( $meta_m[0], '', $html );
+        }
+
+        // Udtræk H1-titel
         $title = 'FAQ: ' . implode( ' – ', array_slice( $top, 0, 3 ) );
         if ( preg_match( '/<h1[^>]*>(.*?)<\/h1>/is', $html, $m ) ) {
             $title = wp_strip_all_tags( $m[1] );
             $html  = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $html, 1 );
         }
+
+        // Tilføj FAQPage schema
         $html .= self::build_faq_schema( $html );
 
-        $pid = wp_insert_post( [ 'post_title' => $title, 'post_content' => $html, 'post_status' => 'draft', 'post_type' => 'post' ] );
+        // Opret som kladde
+        $pid = wp_insert_post( [
+            'post_title'   => $title,
+            'post_content' => wp_kses_post( $html ),
+            'post_status'  => 'draft',
+            'post_type'    => 'post',
+        ] );
         if ( is_wp_error( $pid ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $pid->get_error_message() ], 500 );
+
+        // ── Yoast / SEOPress meta ──────────────────────────────────────────────
+        if ( $meta_desc ) {
+            update_post_meta( $pid, '_yoast_wpseo_metadesc',  $meta_desc );
+            update_post_meta( $pid, '_seopress_titles_desc',  $meta_desc );
+        }
+        if ( ! empty( $top[0] ) ) {
+            update_post_meta( $pid, '_yoast_wpseo_focuskw',   $top[0] );
+            update_post_meta( $pid, '_seopress_analysis_target_kw', $top[0] );
+        }
+
+        // ── Featured image: brug seneste relevante medie fra biblioteket ───────
+        $media_items = get_posts( [
+            'post_type'      => 'attachment',
+            'post_mime_type' => 'image/jpeg,image/png,image/webp',
+            'post_status'    => 'inherit',
+            'posts_per_page' => 1,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+        ] );
+        if ( ! empty( $media_items ) ) {
+            set_post_thumbnail( $pid, $media_items[0]->ID );
+        }
+
         self::clear_post_caches( $pid );
 
         return new WP_REST_Response( [
@@ -738,38 +811,44 @@ PROMPT;
                 break;
 
             case 'fix_content':
-                // Udvid og forbedre eksisterende indhold (brug op til 4000 tegn for fuld kontekst)
-                $excerpt = mb_substr( $content, 0, 4000 );
+                // Udvid og forbedre eksisterende indhold
+                $excerpt      = mb_substr( $content, 0, 4000 );
+                $link_context = self::get_internal_links_context( $post_id );
                 $prompt = <<<PROMPT
-Du er SEO-skribent for Rezponz – et dansk firma der tilbyder kundeservice outsourcing og rekruttering.
+Du er ekspert i kundeservice og rekruttering for Rezponz – Danmarks specialister i kundeservice outsourcing.
 
 Eksisterende blogindlæg: "{$title}"
 Søgeord: {$keyword}
 Nuværende indhold: {$excerpt}
 
-Opgave: Genskriv og udvid dette indlæg til mindst 800 ord. Bevar tonen og emnet.
+Opgave: Genskriv og udvid dette indlæg til mindst 900 ord med ekspert-tone og interne links.
 
-Krav:
-- <h1> med optimeret titel (søgeord tidligt)
-- Inddel med logiske <h2>-sektioner
-- Mindst 800 ord med værdifuldt, faktabaseret indhold
-- Afslut med en FAQ-sektion (3 spørgsmål) og call-to-action om Rezponz
-- Skriv KUN HTML. Ingen markdown.
+Struktur:
+1. Første linje: <!-- META: [meta description maks 155 tegn med søgeord og CTA] -->
+2. <h1> med optimeret titel (søgeord tidligt)
+3. <p> intro på 60-80 ord der etablerer ekspertise
+4. 5-7 <h2>-sektioner med faktabaseret, konkret indhold
+5. FAQ-sektion (3 spørgsmål) markeret med <!-- rzpa-faq-start --> og <!-- rzpa-faq-end -->
+6. <p> CTA med link til kontaktsiden
+
+Interne links (inkluder 3-4 naturlige links i teksten):
+{$link_context}
+
+Skriv KUN HTML. Ingen markdown.
 PROMPT;
                 $new_html = self::openai_generate( $prompt, $api_key, 5000 );
                 if ( is_wp_error( $new_html ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $new_html->get_error_message() ], 500 );
 
                 $new_html = wp_kses_post( self::strip_md_fences( $new_html ) );
-                // Fix 2: Guard mod tom AI-svar
                 if ( empty( trim( $new_html ) ) ) {
                     return new WP_REST_Response( [ 'ok' => false, 'error' => 'AI returnerede intet indhold. Prøv igen.' ], 500 );
                 }
+                $meta_set = self::apply_meta_from_html( $post_id, $new_html, $keyword );
                 if ( preg_match( '/<h1[^>]*>(.*?)<\/h1>/is', $new_html, $m ) ) {
                     $new_title = wp_strip_all_tags( $m[1] );
                     wp_update_post( [ 'ID' => $post_id, 'post_title' => $new_title ] );
                     $new_html = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $new_html, 1 );
                 }
-                // Fix 4: Scop FAQPage schema kun til <!-- rzpa-faq --> blokken, ikke hele HTML
                 $new_html  = preg_replace( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>.*?<\/script>/is', '', $new_html );
                 $new_html .= "\n\n<!-- rzpa-faq -->\n" . self::build_faq_schema_from_section( $new_html );
                 $result     = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_html ], true );
@@ -781,45 +860,51 @@ PROMPT;
                     "Indhold udvidet til ~{$word_count} ord med H2-sektioner",
                     'FAQ-sektion (3 spørgsmål) og CTA tilføjet',
                     'FAQ Schema markup (JSON-LD) tilføjet',
+                    $meta_set ? 'Yoast meta description + fokus-søgeord opdateret' : '',
                     $el_updated ? 'Elementor tekst-widget opdateret (synlig på forsiden)' : '',
                 ] );
                 $label = 'Indhold forbedret og udvidet';
                 break;
 
             case 'fix_rewrite':
-                // Komplet omskrivning (brug op til 4000 tegn for fuld kontekst)
-                $excerpt = mb_substr( $content, 0, 4000 );
-                // Fix 6: Send eksisterende indhold med som kontekst (tidligere manglede dette)
+                // Komplet omskrivning
+                $excerpt      = mb_substr( $content, 0, 4000 );
+                $link_context = self::get_internal_links_context( $post_id );
                 $prompt = <<<PROMPT
-Du er SEO-skribent for Rezponz – et dansk firma der tilbyder kundeservice outsourcing og rekruttering.
+Du er en ekspert inden for kundeservice og rekruttering for Rezponz – Danmarks specialister i kundeservice outsourcing.
 
-Omskriv dette blogindlæg komplet til en stærk SEO-artikel på mindst 1.000 ord.
+Omskriv dette blogindlæg komplet til en autoritativ SEO-artikel på mindst 1.100 ord.
 Titel: "{$title}"
 Søgeord: {$keyword}
 Eksisterende indhold (bevar fakta og kernebudskab): {$excerpt}
 
-Krav:
-- <h1> med kraftfuld, søgeordsoptimeret titel
-- 5-7 <h2>-sektioner med substans
-- Fakta, fordele, og praktisk vejledning
-- Afslut med en FAQ-sektion med præcis 5 spørgsmål markeret med kommentaren <!-- rzpa-faq-start --> OVER og <!-- rzpa-faq-end --> UNDER FAQ-afsnittet
-- Tydelig call-to-action til Rezponz til sidst
-- Skriv KUN HTML. Ingen markdown.
+Struktur:
+1. Første linje: <!-- META: [meta description maks 155 tegn med søgeord og CTA] -->
+2. <h1> med kraftfuld, søgeordsoptimeret titel
+3. <p> intro der etablerer Rezponz som ekspert
+4. 6-8 <h2>-sektioner med fakta, fordele og praktisk vejledning
+5. <p class="rzpa-expert-note"> med konkret indsigt fra Rezponz' erfaring
+6. FAQ-sektion (5 spørgsmål) markeret <!-- rzpa-faq-start --> og <!-- rzpa-faq-end -->
+7. <p> CTA med link til kontaktsiden
+
+Interne links (inkluder 4-5 naturlige links til relevante sider):
+{$link_context}
+
+Skriv KUN HTML. Ingen markdown.
 PROMPT;
                 $rewrite = self::openai_generate( $prompt, $api_key, 7000 );
                 if ( is_wp_error( $rewrite ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $rewrite->get_error_message() ], 500 );
 
                 $rewrite = wp_kses_post( self::strip_md_fences( $rewrite ) );
-                // Fix 2: Guard mod tom AI-svar
                 if ( empty( trim( $rewrite ) ) ) {
                     return new WP_REST_Response( [ 'ok' => false, 'error' => 'AI returnerede intet indhold. Prøv igen.' ], 500 );
                 }
+                $meta_set = self::apply_meta_from_html( $post_id, $rewrite, $keyword );
                 if ( preg_match( '/<h1[^>]*>(.*?)<\/h1>/is', $rewrite, $m ) ) {
                     $new_title = wp_strip_all_tags( $m[1] );
                     wp_update_post( [ 'ID' => $post_id, 'post_title' => $new_title ] );
                     $rewrite = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $rewrite, 1 );
                 }
-                // Fix 4: Fjern evt. eksisterende schema, tilføj nyt scopet til FAQ-blokken
                 $rewrite = preg_replace( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>.*?<\/script>/is', '', $rewrite );
                 $rewrite .= "\n\n" . self::build_faq_schema_from_section( $rewrite );
                 $result   = wp_update_post( [ 'ID' => $post_id, 'post_content' => $rewrite ], true );
@@ -829,9 +914,10 @@ PROMPT;
                 $changes    = array_filter( [
                     $new_title ? "Ny titel: \"{$new_title}\"" : '',
                     "Indlæg komplet omskrevet (~{$word_count} ord)",
-                    '5-7 H2-sektioner med fakta og praktisk vejledning',
+                    '6-8 H2-sektioner med fakta, ekspert-note og interne links',
                     'FAQ-sektion (5 spørgsmål) og CTA til Rezponz',
                     'FAQ Schema markup (JSON-LD) tilføjet',
+                    $meta_set ? 'Yoast meta description + fokus-søgeord opdateret' : '',
                     $el_updated ? 'Elementor tekst-widget opdateret (synlig på forsiden)' : '',
                 ] );
                 $label = 'Indlæg omskrevet';
@@ -870,6 +956,49 @@ PROMPT;
     }
 
     // ── Hjælpere ──────────────────────────────────────────────────────────────
+
+    /**
+     * Returner liste af sider + nyeste blogindlæg som linking-kontekst til AI-prompter.
+     */
+    private static function get_internal_links_context( int $exclude_id = 0 ): string {
+        $pages = get_posts( [
+            'post_type'      => 'page',
+            'post_status'    => 'publish',
+            'posts_per_page' => 12,
+            'orderby'        => 'menu_order',
+            'order'          => 'ASC',
+            'exclude'        => $exclude_id ? [ $exclude_id ] : [],
+        ] );
+        $posts = get_posts( [
+            'post_type'      => 'post',
+            'post_status'    => 'publish',
+            'posts_per_page' => 8,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+            'exclude'        => $exclude_id ? [ $exclude_id ] : [],
+        ] );
+        $lines = array_map(
+            fn( $p ) => '  - ' . $p->post_title . ': ' . get_permalink( $p ),
+            array_merge( $pages, $posts )
+        );
+        return implode( "\n", $lines );
+    }
+
+    /**
+     * Udtræk <!-- META: ... --> fra HTML, sæt Yoast/SEOPress meta + focuskw, fjern kommentaren fra HTML.
+     */
+    private static function apply_meta_from_html( int $post_id, string &$html, string $focus_kw ): bool {
+        if ( ! preg_match( '/<!--\s*META:\s*(.+?)\s*-->/i', $html, $m ) ) return false;
+        $meta_desc = sanitize_text_field( $m[1] );
+        $html      = str_replace( $m[0], '', $html );
+        update_post_meta( $post_id, '_yoast_wpseo_metadesc',  $meta_desc );
+        update_post_meta( $post_id, '_seopress_titles_desc',  $meta_desc );
+        if ( $focus_kw ) {
+            update_post_meta( $post_id, '_yoast_wpseo_focuskw',         $focus_kw );
+            update_post_meta( $post_id, '_seopress_analysis_target_kw', $focus_kw );
+        }
+        return true;
+    }
 
     /**
      * Ryd alle relevante caches for et post så nye ændringer vises til besøgende og Google-crawleren.
