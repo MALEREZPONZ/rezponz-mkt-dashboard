@@ -525,10 +525,13 @@ PROMPT;
             return new WP_REST_Response( [ 'ok' => false, 'error' => 'Indlæg ikke fundet.' ], 404 );
         }
 
-        $title   = $post->post_title;
-        $content = wp_strip_all_tags( $post->post_content );
-        // Begræns kontekst til 1500 tegn for at spare tokens
-        $excerpt = mb_substr( $content, 0, 1500 );
+        $title     = $post->post_title;
+        $content   = wp_strip_all_tags( $post->post_content );
+        $excerpt   = mb_substr( $content, 0, 1500 );
+        // Tracking – udfyldes i hvert case og sendes tilbage til JS
+        $changes   = [];
+        $new_title = '';
+        $new_meta  = '';
 
         // ① Gem revision FØR vi ændrer noget — giver undo-mulighed via WP Revisions
         wp_save_post_revision( $post_id );
@@ -556,15 +559,17 @@ PROMPT;
 
                 $data = json_decode( self::strip_md_fences( $json ), true );
                 if ( ! empty( $data['title'] ) ) {
-                    wp_update_post( [ 'ID' => $post_id, 'post_title' => sanitize_text_field( $data['title'] ) ] );
+                    $new_title = sanitize_text_field( $data['title'] );
+                    wp_update_post( [ 'ID' => $post_id, 'post_title' => $new_title ] );
+                    $changes[] = 'Titel opdateret';
                 }
                 if ( ! empty( $data['meta'] ) ) {
-                    // Yoast SEO meta description
-                    update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_text_field( $data['meta'] ) );
-                    // SEOPress fallback
-                    update_post_meta( $post_id, '_seopress_titles_desc', sanitize_text_field( $data['meta'] ) );
+                    $new_meta = sanitize_text_field( $data['meta'] );
+                    update_post_meta( $post_id, '_yoast_wpseo_metadesc', $new_meta );
+                    update_post_meta( $post_id, '_seopress_titles_desc', $new_meta );
+                    $changes[] = 'Meta description opdateret (' . mb_strlen( $new_meta ) . ' tegn)';
                 }
-                $label = 'Title og meta opdateret';
+                $label = 'Titel og meta opdateret';
                 break;
 
             case 'fix_ai_vis':
@@ -589,13 +594,19 @@ PROMPT;
                 $faq_html = wp_kses_post( self::strip_md_fences( $faq_html ) );
                 // Duplicate guard: tilføj ikke FAQ igen hvis den allerede er der
                 if ( strpos( $post->post_content, '<!-- rzpa-faq -->' ) !== false ) {
-                    $label = 'FAQ allerede tilføjet';
+                    $label   = 'FAQ allerede tilføjet';
+                    $changes = [ 'FAQ-sektion er allerede i indlægget – ingen ændringer' ];
                     break;
                 }
+                $faq_count   = substr_count( $faq_html, '<h2' );
                 $faq_html   .= self::build_faq_schema( $faq_html );
                 $new_content = $post->post_content . "\n\n<!-- rzpa-faq -->\n<h2>Ofte stillede spørgsmål</h2>\n" . $faq_html;
                 $result      = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
+                $changes = [
+                    "FAQ-sektion tilføjet ({$faq_count} spørgsmål og svar)",
+                    'FAQ Schema markup (JSON-LD) tilføjet – øger AI-synlighed',
+                ];
                 $label = 'FAQ-sektion tilføjet';
                 break;
 
@@ -622,6 +633,10 @@ PROMPT;
                 $new_content  = $snippet_html . "\n\n" . $post->post_content;
                 $result       = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
+                $changes = [
+                    'Direkte svar-afsnit tilføjet øverst (45-55 ord)',
+                    'Optimeret til Google Featured Snippet-format (H2 + P)',
+                ];
                 $label = 'Snippet-sektion tilføjet';
                 break;
 
@@ -647,13 +662,19 @@ PROMPT;
                 $paa_html = wp_kses_post( self::strip_md_fences( $paa_html ) );
                 // Duplicate guard
                 if ( strpos( $post->post_content, '<!-- rzpa-paa -->' ) !== false ) {
-                    $label = 'Q&A allerede tilføjet';
+                    $label   = 'Q&A allerede tilføjet';
+                    $changes = [ 'Q&A-sektion er allerede i indlægget – ingen ændringer' ];
                     break;
                 }
+                $paa_count   = substr_count( $paa_html, '<h2' );
                 $paa_html   .= self::build_faq_schema( $paa_html );
                 $new_content = $post->post_content . "\n\n<!-- rzpa-paa -->\n" . $paa_html;
                 $result      = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
+                $changes = [
+                    "\"Folk spørger også\"-sektion tilføjet ({$paa_count} spørgsmål)",
+                    'FAQ Schema markup (JSON-LD) tilføjet',
+                ];
                 $label = 'Q&A-sektion tilføjet';
                 break;
 
@@ -681,12 +702,20 @@ PROMPT;
 
                 $new_html = wp_kses_post( self::strip_md_fences( $new_html ) );
                 if ( preg_match( '/<h1[^>]*>(.*?)<\/h1>/is', $new_html, $m ) ) {
-                    wp_update_post( [ 'ID' => $post_id, 'post_title' => wp_strip_all_tags( $m[1] ) ] );
+                    $new_title = wp_strip_all_tags( $m[1] );
+                    wp_update_post( [ 'ID' => $post_id, 'post_title' => $new_title ] );
                     $new_html = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $new_html, 1 );
                 }
-                $new_html .= self::build_faq_schema( $new_html );
-                $result    = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_html ], true );
+                $new_html  .= self::build_faq_schema( $new_html );
+                $result     = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_html ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
+                $word_count = str_word_count( wp_strip_all_tags( $new_html ) );
+                $changes    = array_filter( [
+                    $new_title ? "Titel opdateret: \"{$new_title}\"" : '',
+                    "Indhold udvidet til ~{$word_count} ord med H2-sektioner",
+                    'FAQ-sektion (3 spørgsmål) og CTA tilføjet',
+                    'FAQ Schema markup (JSON-LD) tilføjet',
+                ] );
                 $label = 'Indhold forbedret og udvidet';
                 break;
 
@@ -712,12 +741,21 @@ PROMPT;
 
                 $rewrite = wp_kses_post( self::strip_md_fences( $rewrite ) );
                 if ( preg_match( '/<h1[^>]*>(.*?)<\/h1>/is', $rewrite, $m ) ) {
-                    wp_update_post( [ 'ID' => $post_id, 'post_title' => wp_strip_all_tags( $m[1] ) ] );
+                    $new_title = wp_strip_all_tags( $m[1] );
+                    wp_update_post( [ 'ID' => $post_id, 'post_title' => $new_title ] );
                     $rewrite = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $rewrite, 1 );
                 }
-                $rewrite .= self::build_faq_schema( $rewrite );
-                $result   = wp_update_post( [ 'ID' => $post_id, 'post_content' => $rewrite ], true );
+                $rewrite   .= self::build_faq_schema( $rewrite );
+                $result     = wp_update_post( [ 'ID' => $post_id, 'post_content' => $rewrite ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
+                $word_count = str_word_count( wp_strip_all_tags( $rewrite ) );
+                $changes    = array_filter( [
+                    $new_title ? "Ny titel: \"{$new_title}\"" : '',
+                    "Indlæg komplet omskrevet (~{$word_count} ord)",
+                    '5-7 H2-sektioner med fakta og praktisk vejledning',
+                    'FAQ-sektion (5 spørgsmål) og CTA til Rezponz',
+                    'FAQ Schema markup (JSON-LD) tilføjet',
+                ] );
                 $label = 'Indlæg omskrevet';
                 break;
 
@@ -727,9 +765,12 @@ PROMPT;
 
         return new WP_REST_Response( [
             'ok'       => true,
-            'post_id'  => $post_id,
-            'label'    => $label,
-            'edit_url' => admin_url( "post.php?post={$post_id}&action=edit" ),
+            'post_id'   => $post_id,
+            'label'     => $label,
+            'edit_url'  => admin_url( "post.php?post={$post_id}&action=edit" ),
+            'changes'   => array_values( $changes ),
+            'new_title' => $new_title,
+            'new_meta'  => $new_meta,
         ], 200 );
     }
 

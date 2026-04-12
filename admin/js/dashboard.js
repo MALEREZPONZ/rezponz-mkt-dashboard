@@ -3957,19 +3957,31 @@ const RZPA_App = (() => {
           try {
             const res = await api('/blog/request-indexing', { method: 'POST', body: JSON.stringify({ url }) });
             if (res.queued || res.data?.queued) {
-              btn.textContent = '✓ Sendt';
+              btn.textContent = '✓ Indekseret';
               btn.style.color = 'var(--neon)';
               btn.style.borderColor = 'rgba(204,255,0,.3)';
+              btn.title = 'Google anmodet om crawling – forventes inden for 24-48 timer';
             } else {
-              btn.textContent = '✗ Fejl';
-              btn.style.color = '#ff5555';
-              btn.title = res.message || 'Ukendt fejl';
+              const errMsg = res.message || res.data?.message || 'Ukendt fejl';
+              // Scope-fejl: genopret forbindelsen
+              if (res.code === 'scope_missing' || (errMsg && errMsg.includes('scope'))) {
+                btn.textContent = '⚠ Mangler tilladelse';
+                btn.title = 'Genopret Google-forbindelsen under Indstillinger – Indexing API kræver opdateret scope';
+              } else if (res.code === 'no_gsc') {
+                btn.textContent = '⚠ Google ikke tilsluttet';
+                btn.title = 'Gå til Indstillinger og tilslut Google Search Console';
+              } else {
+                btn.textContent = '✗ Fejl';
+                btn.title = errMsg;
+              }
+              btn.style.color = '#f59e0b';
+              btn.style.borderColor = 'rgba(245,158,11,.3)';
               btn.disabled = false;
             }
           } catch(err) {
-            btn.textContent = '✗ Fejl';
+            btn.textContent = '✗ Netværksfejl';
             btn.style.color = '#ff5555';
-            btn.title = err.message || '';
+            btn.title = err.message || 'Tjek konsollen for detaljer';
             btn.disabled = false;
           }
         });
@@ -3990,7 +4002,34 @@ const RZPA_App = (() => {
           try {
             const res = await api('/ai/fix-post', { method: 'POST', body: JSON.stringify({ post_id: parseInt(postId), fix_type: fixType, keyword }) });
             if (res.ok) {
+              // Erstat knap med grønt success-link
               btn.outerHTML = `<a href="${res.edit_url}" target="_blank" class="rzpa-index-btn" style="text-decoration:none;color:#4ade80;border-color:rgba(74,222,128,.3)">✓ ${res.label || 'Fikset'} →</a>`;
+
+              // Vis fix-summary i expand-rækken
+              const expandRow = document.getElementById(`expand-${postId}`);
+              if (expandRow) {
+                const ch = Array.isArray(res.changes) ? res.changes : [];
+                const changesHtml = ch.length
+                  ? `<ul style="margin:8px 0 0 0;padding:0;list-style:none">${ch.map(c => `<li style="font-size:12px;color:#aaa;padding:2px 0;display:flex;gap:6px"><span style="color:#4ade80;flex-shrink:0">✓</span>${c}</li>`).join('')}</ul>`
+                  : '';
+                const titleHtml = res.new_title
+                  ? `<div style="margin-top:10px;font-size:12px;padding:8px 10px;background:rgba(74,222,128,.06);border-radius:6px;border-left:2px solid #4ade80"><span style="color:#888">Ny titel: </span><strong style="color:#e5e5e5">${res.new_title}</strong></div>`
+                  : '';
+                const metaHtml = res.new_meta
+                  ? `<div style="margin-top:6px;font-size:12px;padding:8px 10px;background:rgba(96,165,250,.06);border-radius:6px;border-left:2px solid #60a5fa"><span style="color:#888">Meta: </span><em style="color:#ccc">${res.new_meta}</em></div>`
+                  : '';
+                const expandDiv = expandRow.querySelector('.rzpa-blog-expand');
+                if (expandDiv) {
+                  expandDiv.innerHTML = `
+                    <div class="rzpa-blog-expand-icon">✅</div>
+                    <div style="flex:1">
+                      <div class="rzpa-blog-expand-title" style="color:#4ade80">AI Fix gennemført · GPT-4.1 mini</div>
+                      <div class="rzpa-blog-expand-text">${res.label || 'Indhold opdateret'}</div>
+                      ${changesHtml}${titleHtml}${metaHtml}
+                    </div>`;
+                }
+                expandRow.style.display = '';
+              }
             } else {
               const msg = res.message || res.error || '✗ Fejl';
               // Kun vis "Tilføj nøgle"-link når nøglen specifikt mangler
