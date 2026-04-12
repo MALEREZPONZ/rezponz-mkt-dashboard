@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      2.9.8
+ * Version:      2.9.9
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '2.9.8' );
+define( 'RZPA_VERSION',     '2.9.9' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -99,6 +99,15 @@ register_activation_hook( __FILE__, function () {
     RZPA_SEO_DB::install();
 } );
 register_deactivation_hook( __FILE__, [ 'RZPA_Scheduler', 'clear_crons' ] );
+
+// ── FAQ Schema markup output i <head> for posts med _rzpa_faq_schema ────────────
+add_action( 'wp_head', function () {
+    if ( ! is_singular() ) return;
+    $schema = get_post_meta( get_the_ID(), '_rzpa_faq_schema', true );
+    if ( $schema ) {
+        echo "\n" . $schema . "\n";
+    }
+} );
 
 // Forhindre caching af sider med Profil-Quiz shortcode
 add_action( 'template_redirect', function () {

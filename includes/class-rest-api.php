@@ -530,8 +530,8 @@ PROMPT;
             $html  = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $html, 1 );
         }
 
-        // Tilføj FAQPage schema
-        $html .= self::build_faq_schema( $html );
+        // Byg FAQPage schema – gemmes som post meta (ikke i post_content, da wp_kses_post fjerner script-tags)
+        $faq_schema = self::build_faq_schema( $html );
 
         // Opret som kladde
         $pid = wp_insert_post( [
@@ -541,6 +541,11 @@ PROMPT;
             'post_type'    => 'post',
         ] );
         if ( is_wp_error( $pid ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $pid->get_error_message() ], 500 );
+
+        // Gem FAQ schema som post meta – outputtes i <head> via wp_head hook
+        if ( $faq_schema ) {
+            update_post_meta( $pid, '_rzpa_faq_schema', $faq_schema );
+        }
 
         // ── Yoast / SEOPress meta ──────────────────────────────────────────────
         if ( $meta_desc ) {
@@ -712,10 +717,13 @@ PROMPT;
                     break;
                 }
                 $faq_count   = substr_count( $faq_html, '<h2' );
-                $faq_html   .= self::build_faq_schema( $faq_html );
+                $faq_schema  = self::build_faq_schema( $faq_html ); // Gemmes som meta – ikke i post_content
                 $faq_append  = "\n\n<!-- rzpa-faq -->\n<h2>Ofte stillede spørgsmål</h2>\n" . $faq_html;
                 $new_content = $post->post_content . $faq_append;
                 $result      = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ], true );
+                if ( $faq_schema && ! is_wp_error( $result ) ) {
+                    update_post_meta( $post_id, '_rzpa_faq_schema', $faq_schema );
+                }
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
                 $el_updated = self::maybe_update_elementor( $post_id, $faq_append, 'append' );
                 $changes = array_filter( [
@@ -796,10 +804,13 @@ PROMPT;
                     break;
                 }
                 $paa_count   = substr_count( $paa_html, '<h2' );
-                $paa_html   .= self::build_faq_schema( $paa_html );
+                $paa_schema  = self::build_faq_schema( $paa_html ); // Gemmes som meta – ikke i post_content
                 $paa_append  = "\n\n<!-- rzpa-paa -->\n" . $paa_html;
                 $new_content = $post->post_content . $paa_append;
                 $result      = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ], true );
+                if ( $paa_schema && ! is_wp_error( $result ) ) {
+                    update_post_meta( $post_id, '_rzpa_faq_schema', $paa_schema );
+                }
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
                 $el_updated = self::maybe_update_elementor( $post_id, $paa_append, 'append' );
                 $changes = array_filter( [
@@ -849,10 +860,11 @@ PROMPT;
                     wp_update_post( [ 'ID' => $post_id, 'post_title' => $new_title ] );
                     $new_html = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $new_html, 1 );
                 }
-                $new_html  = preg_replace( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>.*?<\/script>/is', '', $new_html );
-                $new_html .= "\n\n<!-- rzpa-faq -->\n" . self::build_faq_schema_from_section( $new_html );
-                $result     = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_html ], true );
+                $new_html    = preg_replace( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>.*?<\/script>/is', '', $new_html );
+                $cnt_schema  = self::build_faq_schema_from_section( $new_html ); // Gemmes som meta
+                $result      = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_html ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
+                if ( $cnt_schema ) update_post_meta( $post_id, '_rzpa_faq_schema', $cnt_schema );
                 $el_updated = self::maybe_update_elementor( $post_id, $new_html, 'replace' );
                 $word_count = str_word_count( wp_strip_all_tags( $new_html ) );
                 $changes    = array_filter( [
@@ -905,10 +917,11 @@ PROMPT;
                     wp_update_post( [ 'ID' => $post_id, 'post_title' => $new_title ] );
                     $rewrite = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $rewrite, 1 );
                 }
-                $rewrite = preg_replace( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>.*?<\/script>/is', '', $rewrite );
-                $rewrite .= "\n\n" . self::build_faq_schema_from_section( $rewrite );
-                $result   = wp_update_post( [ 'ID' => $post_id, 'post_content' => $rewrite ], true );
+                $rewrite     = preg_replace( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>.*?<\/script>/is', '', $rewrite );
+                $rw_schema   = self::build_faq_schema_from_section( $rewrite ); // Gemmes som meta
+                $result      = wp_update_post( [ 'ID' => $post_id, 'post_content' => $rewrite ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
+                if ( $rw_schema ) update_post_meta( $post_id, '_rzpa_faq_schema', $rw_schema );
                 $el_updated = self::maybe_update_elementor( $post_id, $rewrite, 'replace' );
                 $word_count = str_word_count( wp_strip_all_tags( $rewrite ) );
                 $changes    = array_filter( [
