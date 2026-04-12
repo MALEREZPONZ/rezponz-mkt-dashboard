@@ -568,8 +568,9 @@ $tab = $tab ?? 'submissions';
             <div style="padding-top:14px;display:flex;align-items:center;gap:10px">
               <img src="<?php echo esc_url( RZPA_URL . 'assets/Rezponz-logo.png' ); ?>" alt="Rezponz" style="height:22px">
               <div style="font-size:12px;color:#555;line-height:1.5">
-                <strong style="color:#111">Lie Svenningsen</strong><br>
-                Rezponz · <a href="mailto:lie@rezponz.dk" style="color:#5d8089">lie@rezponz.dk</a>
+                <strong style="color:#111">Line Elsberg</strong><br>
+                HR &amp; Recruitment Assistant · Rezponz<br>
+                <a href="mailto:lie@rezponz.dk" style="color:#5d8089">lie@rezponz.dk</a>
               </div>
             </div>
           </div>

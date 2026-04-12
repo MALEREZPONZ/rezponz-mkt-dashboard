@@ -180,8 +180,8 @@ class RZPA_Quiz_API {
               <tr>
                 <td style="vertical-align:middle">
                   <img src="{$logo_url}" alt="Rezponz" style="height:28px;display:block;margin-bottom:8px">
-                  <span style="font-size:14px;font-weight:700;color:#111">Lie Svenningsen</span><br>
-                  <span style="font-size:13px;color:#666">Rezponz</span><br>
+                  <span style="font-size:14px;font-weight:700;color:#111">Line Elsberg</span><br>
+                  <span style="font-size:13px;color:#666">HR &amp; Recruitment Assistant · Rezponz</span><br>
                   <a href="mailto:lie@rezponz.dk" style="font-size:13px;color:#5d8089;text-decoration:none">lie@rezponz.dk</a>
                 </td>
               </tr>
