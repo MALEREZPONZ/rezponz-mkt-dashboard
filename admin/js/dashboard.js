@@ -1174,7 +1174,7 @@ const RZPA_App = (() => {
       } else {
         planEl.innerHTML = actions.map((a, i) => {
           const storeKey = a.type ? `rzpa_fiks_${a.type}` : null;
-          const stored   = storeKey ? (() => { try { return localStorage.getItem(storeKey); } catch(e) { return null; } })() : null;
+          const stored   = storeKey ? (() => { try { return JSON.parse(localStorage.getItem(storeKey) || 'null'); } catch(e) { return null; } })() : null;
           let fixBtn = '';
           if (a.type === 'settings_link') {
             fixBtn = `<a href="${RZPA?.settingsUrl||'#'}" class="rzpa-fiks-btn">${a.fixLabel}</a>`;
@@ -1183,10 +1183,17 @@ const RZPA_App = (() => {
           } else if (a.type === 'scroll_logs') {
             fixBtn = `<button class="rzpa-fiks-btn rzpa-fiks-scroll" data-target="rzpa-manual-log-form">${a.fixLabel}</button>`;
           } else if (a.type && stored) {
-            try {
-              const d = JSON.parse(stored);
-              fixBtn = `<a href="${d.url}" target="_blank" class="rzpa-fiks-btn rzpa-fiks-done">✓ Udkast oprettet →</a>`;
-            } catch(e) {}
+            if (stored.created) {
+              fixBtn = `<span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+                <a href="${stored.editUrl}" target="_blank" class="rzpa-fiks-btn rzpa-fiks-done" style="background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3);color:#f59e0b">📝 Publicer kladde →</a>
+                <span style="font-size:10px;color:#555">"${(stored.title||'').substring(0,35)}${(stored.title||'').length>35?'…':''}"</span>
+              </span>`;
+            } else {
+              fixBtn = `<span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+                <a href="${stored.viewUrl}" target="_blank" class="rzpa-fiks-btn rzpa-fiks-done">✅ Live – se side →</a>
+                <a href="${stored.editUrl}" target="_blank" style="font-size:10px;color:#555;text-decoration:none">Rediger i WordPress →</a>
+              </span>`;
+            }
           } else if (a.type) {
             fixBtn = `<button class="rzpa-fiks-btn" data-fix-type="${a.type}" data-fix-kw="${encodeURIComponent(JSON.stringify(a.fixKw||[]))}">${a.fixLabel}</button>`;
           }
@@ -1222,8 +1229,23 @@ const RZPA_App = (() => {
             try {
               const res = await api('/ai/fix-action', { method: 'POST', body: JSON.stringify({ type, keywords }) });
               if (res.ok && res.edit_url) {
-                try { localStorage.setItem(`rzpa_fiks_${type}`, JSON.stringify({ url: res.edit_url, title: res.title })); } catch(e) {}
-                btn.outerHTML = `<a href="${res.edit_url}" target="_blank" class="rzpa-fiks-btn rzpa-fiks-done">✓ Fikset – se udkast →</a>`;
+                try {
+                  localStorage.setItem(`rzpa_fiks_${type}`, JSON.stringify({
+                    editUrl: res.edit_url, viewUrl: res.view_url || '',
+                    title: res.title || res.label || '', created: !!res.created,
+                  }));
+                } catch(e) {}
+                if (res.created) {
+                  btn.outerHTML = `<span style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+                    <a href="${res.edit_url}" target="_blank" class="rzpa-fiks-btn rzpa-fiks-done" style="background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3);color:#f59e0b">📝 Kladde klar – publicer nu →</a>
+                    <span style="font-size:10px;color:#666">"${(res.title||'').substring(0,40)}${(res.title||'').length>40?'…':''}"</span>
+                  </span>`;
+                } else {
+                  btn.outerHTML = `<span style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+                    <a href="${res.view_url||res.edit_url}" target="_blank" class="rzpa-fiks-btn rzpa-fiks-done">✅ Opdateret – se live →</a>
+                    <a href="${res.edit_url}" target="_blank" style="font-size:10px;color:#555;text-decoration:none">Rediger i WordPress →</a>
+                  </span>`;
+                }
               } else {
                 const msg = res.message || res.data?.message || '✗ Fejl';
                 btn.textContent = msg.length > 30 ? '✗ Fejl' : msg;

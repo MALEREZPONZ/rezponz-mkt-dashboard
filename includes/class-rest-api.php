@@ -492,8 +492,16 @@ PROMPT;
 
         $pid = wp_insert_post( [ 'post_title' => $title, 'post_content' => $html, 'post_status' => 'draft', 'post_type' => 'post' ] );
         if ( is_wp_error( $pid ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $pid->get_error_message() ], 500 );
+        self::clear_post_caches( $pid );
 
-        return new WP_REST_Response( [ 'ok' => true, 'post_id' => $pid, 'title' => $title, 'edit_url' => admin_url( "post.php?post={$pid}&action=edit" ), 'created' => true ], 200 );
+        return new WP_REST_Response( [
+            'ok'       => true,
+            'post_id'  => $pid,
+            'title'    => $title,
+            'edit_url' => admin_url( "post.php?post={$pid}&action=edit" ),
+            'view_url' => get_permalink( $pid ) ?: '',
+            'created'  => true,
+        ], 200 );
     }
 
     // ── POST /ai/fix-post ─────────────────────────────────────────────────────
@@ -850,12 +858,14 @@ PROMPT;
             'post_id'     => $post_id,
             'label'       => $label,
             'edit_url'    => admin_url( "post.php?post={$post_id}&action=edit" ),
+            'view_url'    => get_permalink( $post_id ) ?: '',
             'changes'     => array_values( $changes ),
             'new_title'   => $new_title,
             'new_meta'    => $new_meta,
             'fixed_at'    => $fixed_at,
             'fix_type'    => $fix_type,
             'fixed_types' => array_keys( $fixed_data ),
+            'created'     => false,
         ], 200 );
     }
 
