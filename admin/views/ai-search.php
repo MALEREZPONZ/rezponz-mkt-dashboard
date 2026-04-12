@@ -141,7 +141,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div>
         <h2 style="margin:0;font-size:14px;font-weight:700">🤖 Manuel AI-svar log</h2>
-        <div class="rzpa-card-sub">Test selv: spørg ChatGPT/Perplexity om kundeservice outsourcing og log om Rezponz nævnes</div>
+        <div class="rzpa-card-sub">Test selv: spørg ChatGPT/Perplexity hvem der tilbyder jobs i kundeservice og log om Rezponz nævnes</div>
       </div>
       <button id="rzpa-log-toggle" class="btn-primary">+ Tilføj log</button>
     </div>
@@ -156,7 +156,14 @@
         </div>
         <div class="rzpa-field">
           <label>Søgeforespørgsel *</label>
-          <input type="text" id="log_query" placeholder="fx: hvem tilbyder kundeservice outsourcing i Danmark?" />
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">
+            <button type="button" class="rzpa-log-suggest">Deltidsjob kundeservice Danmark</button>
+            <button type="button" class="rzpa-log-suggest">Kundeservice job hjemmefra</button>
+            <button type="button" class="rzpa-log-suggest">Studiejob kundeservice København</button>
+            <button type="button" class="rzpa-log-suggest">Hvem tilbyder jobs i kundeservice?</button>
+            <button type="button" class="rzpa-log-suggest">Kundeservice outsourcing leverandører Danmark</button>
+          </div>
+          <input type="text" id="log_query" placeholder="fx: deltidsjob kundeservice hjemmefra Danmark" />
         </div>
       </div>
       <div class="rzpa-field" style="margin-bottom:12px">
@@ -191,6 +198,8 @@
 <style>
 .ai-filter-btn.active { background:#1877F2 !important; border-color:#1877F2 !important; color:#fff !important; }
 .ai-kw-row[data-hidden="1"] { display:none; }
+.rzpa-log-suggest { font-size:10px; padding:2px 9px; border-radius:20px; border:1px solid rgba(204,255,0,.2); background:rgba(204,255,0,.05); color:#888; cursor:pointer; white-space:nowrap; transition:.15s; }
+.rzpa-log-suggest:hover { border-color:rgba(204,255,0,.5); color:#CCFF00; }
 </style>
 <script>
 function rzpaAIFilter(type, btn) {

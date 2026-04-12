@@ -939,6 +939,14 @@ const RZPA_App = (() => {
       if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
     });
 
+    // Forslag-knapper: udfyld søgeforespørgsels-felt med ét klik
+    document.querySelectorAll('.rzpa-log-suggest').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const q = document.getElementById('log_query');
+        if (q) { q.value = btn.textContent.trim(); q.focus(); }
+      });
+    });
+
     el('rzpa-log-submit')?.addEventListener('click', async () => {
       const data = {
         platform:          el('log_platform')?.value,
