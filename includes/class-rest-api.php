@@ -833,6 +833,9 @@ PROMPT;
                 return new WP_REST_Response( [ 'ok' => false, 'error' => 'Ukendt fix_type: ' . $fix_type ], 400 );
         }
 
+        // Ryd page-caches så ændringerne er synlige for besøgende OG Google
+        self::clear_post_caches( $post_id );
+
         // Gem fix_type + tidsstempel — JSON keyed by fix_type (merge, aldrig overskriv andre fix-typer)
         $fixed_at   = current_time( 'mysql' );
         $fixed_raw  = get_post_meta( $post_id, '_rzpa_ai_fixed', true );
@@ -857,6 +860,39 @@ PROMPT;
     }
 
     // ── Hjælpere ──────────────────────────────────────────────────────────────
+
+    /**
+     * Ryd alle relevante caches for et post så nye ændringer vises til besøgende og Google-crawleren.
+     * Dækker: WP core, WP Fastest Cache, WP Rocket, Elementor CSS + filer.
+     */
+    private static function clear_post_caches( int $post_id ): void {
+        // WP core objekt-cache
+        clean_post_cache( $post_id );
+
+        // WP Fastest Cache — ryd URL-specifik cache (undgår global flush)
+        if ( function_exists( 'wpfc_delete_cache_by_url' ) ) {
+            wpfc_delete_cache_by_url( get_permalink( $post_id ) );
+        } elseif ( function_exists( 'wpfc_clear_all_cache' ) ) {
+            wpfc_clear_all_cache();
+        }
+
+        // WP Rocket
+        if ( function_exists( 'rocket_clean_post' ) ) {
+            rocket_clean_post( $post_id );
+        }
+
+        // LiteSpeed Cache
+        do_action( 'litespeed_purge_post', $post_id );
+
+        // Elementor CSS-meta + transient
+        delete_post_meta( $post_id, '_elementor_css' );
+        delete_transient( 'elementor_css_post_' . $post_id );
+
+        // Elementor global fil-cache
+        if ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->files_manager ) ) {
+            \Elementor\Plugin::$instance->files_manager->clear_cache();
+        }
+    }
 
     private static function openai_generate( string $prompt, string $api_key, int $max_tokens = 2000 ): string|\WP_Error {
         if ( function_exists( 'set_time_limit' ) ) set_time_limit( 120 ); // Forhindrer PHP timeout ved lange AI-svar
@@ -909,12 +945,7 @@ PROMPT;
         $updated = self::set_elementor_widget_by_id( $data, $found[0]['id'], $new_html, $mode );
         if ( $updated ) {
             update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $data ) ) );
-            // Ryd Elementors CSS-cache for dette indlæg
-            delete_post_meta( $post_id, '_elementor_css' );
-            // Ryd global Elementor-filcache hvis tilgængelig
-            if ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->files_manager ) ) {
-                \Elementor\Plugin::$instance->files_manager->clear_cache();
-            }
+            // Cache ryddes af clear_post_caches() i apply_ai_fix_to_post()
         }
         return $updated;
     }
