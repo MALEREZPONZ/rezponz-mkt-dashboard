@@ -4008,7 +4008,13 @@ const RZPA_App = (() => {
         if (p <= 20) return '#f59e0b18';
         return '#ef444418';
       };
-      const priDot = pri => pri === 'high' ? '🔴' : pri === 'medium' ? '🟡' : '🟢';
+      const priDot = pri => {
+        if (pri === 'resolved') return '✅';
+        if (pri === 'pending')  return '⏳';
+        if (pri === 'high')     return '🔴';
+        if (pri === 'medium')   return '🟡';
+        return '🟢';
+      };
 
       let html = `
         <div class="rzpa-blog-table-wrap">
@@ -4059,9 +4065,13 @@ const RZPA_App = (() => {
                 <td class="rzpa-blog-rec-cell">
                   <span class="rzpa-blog-rec-dot">${priDot(post.priority)}</span>
                   <span class="rzpa-blog-rec-label">${post.rec_label}</span>
-                  ${!post.has_gsc ? `<button class="rzpa-index-btn" data-url="${post.url}" title="Bed Google om at indeksere denne side">↗ Indekser</button>` : ''}
+                  ${post.has_gsc
+                    ? ''
+                    : post.indexing_requested
+                      ? `<span class="rzpa-index-btn" style="cursor:default;opacity:.7;color:var(--neon);border-color:rgba(204,255,0,.2)" title="Indekseringsanmodning sendt ${new Date(post.indexing_requested).toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'})} – afventer Google">⏳ Afventer Google</span>`
+                      : `<button class="rzpa-index-btn" data-url="${post.url}" title="Bed Google om at indeksere denne side">↗ Indekser</button>`}
                   ${post.fixed_at ? (() => { const d = new Date(post.fixed_at); const lbl = d.toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'}); return `<span class="rzpa-fixed-badge" title="AI fikset ${post.fixed_at}">✓ ${lbl}</span>`; })() : ''}
-                  ${BLOG_FIX_MAP[post.rec_label] && post.post_id ? `<button class="rzpa-blog-fix-btn rzpa-index-btn" data-post-id="${post.post_id}" data-fix-type="${BLOG_FIX_MAP[post.rec_label]}" data-keyword="${encodeURIComponent(post.title)}" style="${post.fixed_at ? 'border-color:rgba(74,222,128,.25);color:#4ade80;opacity:.75' : 'border-color:rgba(204,255,0,.3);color:var(--neon)'}">${post.fixed_at ? '🔄 Fiks igen' : '⚡ Fiks'}</button>` : ''}
+                  ${BLOG_FIX_MAP[post.rec_label] && post.post_id && post.priority !== 'resolved' && post.priority !== 'pending' ? `<button class="rzpa-blog-fix-btn rzpa-index-btn" data-post-id="${post.post_id}" data-fix-type="${BLOG_FIX_MAP[post.rec_label]}" data-keyword="${encodeURIComponent(post.title)}" style="${post.fixed_at ? 'border-color:rgba(74,222,128,.25);color:#4ade80;opacity:.75' : 'border-color:rgba(204,255,0,.3);color:var(--neon)'}">${post.fixed_at ? '🔄 Fiks igen' : '⚡ Fiks'}</button>` : ''}
                 </td>
               </tr>
               <tr class="rzpa-blog-expand-row" id="expand-${post.post_id}" style="display:none">
@@ -4094,10 +4104,18 @@ const RZPA_App = (() => {
           try {
             const res = await api('/blog/request-indexing', { method: 'POST', body: JSON.stringify({ url }) });
             if (res.queued || res.data?.queued) {
-              btn.textContent = '✓ Indekseret';
-              btn.style.color = 'var(--neon)';
-              btn.style.borderColor = 'rgba(204,255,0,.3)';
-              btn.title = 'Google anmodet om crawling – forventes inden for 24-48 timer';
+              // Erstat knap med "⏳ Afventer Google" span
+              const now = new Date().toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'});
+              btn.outerHTML = `<span class="rzpa-index-btn" style="cursor:default;opacity:.7;color:var(--neon);border-color:rgba(204,255,0,.2)" title="Indekseringsanmodning sendt – afventer Google crawling (24-48 timer)">⏳ Afventer Google</span>`;
+              // Opdater rec_label i samme række til "⏳ Indeksering afventer"
+              const recCell = btn.closest?.('td') || document.querySelector(`[data-url="${url}"]`)?.closest('tr')?.querySelector('.rzpa-blog-rec-cell');
+              const labelEl = btn.closest('tr')?.querySelector('.rzpa-blog-rec-label');
+              const dotEl   = btn.closest('tr')?.querySelector('.rzpa-blog-rec-dot');
+              if (labelEl) labelEl.textContent = '⏳ Indeksering afventer';
+              if (dotEl)   dotEl.textContent = '⏳';
+              // Gem i allPosts så filter/re-render bevarer tilstand
+              const entry = allPosts?.find(p => p.url === url);
+              if (entry) { entry.indexing_requested = new Date().toISOString(); entry.rec_label = '⏳ Indeksering afventer'; entry.priority = 'pending'; }
             } else {
               // Fix: tjek både res.code og res.data?.code (WP REST wrapper)
               const errCode = res.code || res.data?.code || '';
@@ -4154,10 +4172,20 @@ const RZPA_App = (() => {
             const res = await api('/ai/fix-post', { method: 'POST', body: JSON.stringify({ post_id: parseInt(postId), fix_type: fixType, keyword }) });
             clearInterval(timer);
             if (res.ok) {
+              // Opdater rec_label + dot til "✅ Fikset" i samme række
+              const row     = btn.closest('tr');
+              const labelEl = row?.querySelector('.rzpa-blog-rec-label');
+              const dotEl   = row?.querySelector('.rzpa-blog-rec-dot');
+              if (labelEl) { labelEl.textContent = '✅ Fikset'; labelEl.style.color = '#4ade80'; }
+              if (dotEl)   dotEl.textContent = '✅';
+              // Opdater allPosts in-memory
+              const postId = parseInt(btn.dataset.postId);
+              const entry  = allPosts?.find(p => p.post_id === postId);
+              if (entry) { entry.priority = 'resolved'; entry.rec_label = '✅ Fikset'; entry.fixed_at = res.fixed_at; if (res.fixed_types) entry.fixed_types = res.fixed_types; }
+
               // Erstat knap med grønt success-link + opdater fixed-badge
-              const today = new Date().toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'});
+              const today   = new Date().toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'});
               const recCell = btn.closest('td');
-              // Fjern eksisterende badge og opdater/indsæt nyt
               recCell?.querySelectorAll('.rzpa-fixed-badge').forEach(b => b.remove());
               const badge = document.createElement('span');
               badge.className = 'rzpa-fixed-badge';

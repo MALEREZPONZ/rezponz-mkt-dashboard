@@ -329,26 +329,43 @@ class RZPA_Database {
                 }
             }
 
-            [ $rec_label, $rec_detail, $priority ] = self::blog_recommendation( $position, $clicks, $impressions, $ctr, $ai_visible );
+            // Decode AI-fix historik (JSON keyed by fix_type → timestamp)
+            $fixed_raw  = get_post_meta( $post->ID, '_rzpa_ai_fixed', true );
+            $fixed_data = ( $fixed_raw && str_starts_with( trim( $fixed_raw ), '{' ) )
+                ? ( json_decode( $fixed_raw, true ) ?: [] )
+                : [];   // backward compat
+
+            [ $rec_label, $rec_detail, $priority ] = self::blog_recommendation(
+                $position, $clicks, $impressions, $ctr, $ai_visible, $fixed_data
+            );
+
+            // Indekserings-state: afventer (meta sat) → grøn (GSC bekræftet via $gsc !== null)
+            $indexing_requested = get_post_meta( $post->ID, '_rzpa_indexing_requested', true ) ?: null;
+            if ( $rec_label === 'Ikke i GSC' && $indexing_requested ) {
+                $rec_label = '⏳ Indeksering afventer';
+                $priority  = 'pending';
+            }
 
             $result[] = [
-                'post_id'     => $post->ID,
-                'title'       => $post->post_title,
-                'url'         => $url,
-                'slug'        => $slug,
-                'date'        => $post->post_date,
-                'thumbnail'   => get_the_post_thumbnail_url( $post, 'thumbnail' ) ?: '',
-                'position'    => $position,
-                'clicks'      => $clicks,
-                'impressions' => $impressions,
-                'ctr'         => $ctr,
-                'has_gsc'     => $gsc !== null,
-                'ai_visible'  => $ai_visible,
-                'ai_keyword'  => $ai_keyword,
-                'rec_label'   => $rec_label,
-                'rec_detail'  => $rec_detail,
-                'priority'    => $priority,
-                'fixed_at'    => get_post_meta( $post->ID, '_rzpa_ai_fixed', true ) ?: null,
+                'post_id'             => $post->ID,
+                'title'               => $post->post_title,
+                'url'                 => $url,
+                'slug'                => $slug,
+                'date'                => $post->post_date,
+                'thumbnail'           => get_the_post_thumbnail_url( $post, 'thumbnail' ) ?: '',
+                'position'            => $position,
+                'clicks'              => $clicks,
+                'impressions'         => $impressions,
+                'ctr'                 => $ctr,
+                'has_gsc'             => $gsc !== null,
+                'ai_visible'          => $ai_visible,
+                'ai_keyword'          => $ai_keyword,
+                'rec_label'           => $rec_label,
+                'rec_detail'          => $rec_detail,
+                'priority'            => $priority,
+                'fixed_at'            => ! empty( $fixed_data ) ? max( $fixed_data ) : null,
+                'fixed_types'         => array_keys( $fixed_data ),
+                'indexing_requested'  => $indexing_requested,
             ];
         }
 
@@ -361,7 +378,32 @@ class RZPA_Database {
         return rtrim( $url, '/' );
     }
 
-    private static function blog_recommendation( ?float $pos, int $clicks, int $impressions, float $ctr, bool $ai ) : array {
+    /**
+     * Beregn anbefaling for et blogindlæg.
+     * $fixed_data: array keyed by fix_type → timestamp, fx ['fix_ai_vis' => '2026-04-12 21:00:00']
+     * Returnerer ['label', 'detail', 'priority'] — priority kan være 'resolved' for løste problemer.
+     */
+    private static function blog_recommendation(
+        ?float $pos, int $clicks, int $impressions, float $ctr, bool $ai,
+        array $fixed_data = []
+    ) : array {
+        // Hvilke rec_labels ophæves af hvilke fix_types?
+        static $fix_resolves = [
+            'fix_ai_vis'  => [ 'Øg AI-synlighed', 'Mangler AI-synlighed' ],
+            'fix_ctr'     => [ 'Optimer title & CTR' ],
+            'fix_content' => [ 'Tæt på side 1', 'Svag placering', 'Meget lav synlighed' ],
+            'fix_rewrite' => [ 'Tæt på side 1', 'Svag placering', 'Meget lav synlighed' ],
+        ];
+
+        // Helper: er labelen dækket af et gemt fix?
+        $is_fixed = static function( string $label ) use ( $fixed_data, $fix_resolves ) : bool {
+            foreach ( $fixed_data as $ft => $ts ) {
+                if ( in_array( $label, $fix_resolves[ $ft ] ?? [], true ) ) return true;
+            }
+            return false;
+        };
+
+        // "Ikke i GSC" løses via indexering (ikke AI-fix) — håndteres i get_blog_insights()
         if ( $pos === null ) {
             return [
                 'Ikke i GSC',
@@ -369,60 +411,51 @@ class RZPA_Database {
                 'high',
             ];
         }
+
         if ( $pos <= 3 ) {
             if ( ! $ai ) {
-                return [
-                    'Mangler AI-synlighed',
-                    'Fremragende Google-placering! Men siden nævnes ikke i AI-søgninger. Tilføj en FAQ-sektion og brug schema.org/FAQPage markup.',
-                    'medium',
-                ];
+                $label  = 'Mangler AI-synlighed';
+                $detail = 'Fremragende Google-placering! Men siden nævnes ikke i AI-søgninger. Tilføj en FAQ-sektion og brug schema.org/FAQPage markup.';
+                $prio   = 'medium';
+                return $is_fixed( $label ) ? [ '✅ AI-synlighed fikset', $detail, 'resolved' ] : [ $label, $detail, $prio ];
             }
-            return [
-                'Top performer 🏆',
-                'Siden rangerer suverænt på Google og er synlig i AI-søgninger. Vedligehold indholdet og byg backlinks for at fastholde positionen.',
-                'low',
-            ];
+            return [ 'Top performer 🏆', 'Siden rangerer suverænt på Google og er synlig i AI-søgninger. Vedligehold indholdet og byg backlinks for at fastholde positionen.', 'low' ];
         }
+
         if ( $pos <= 10 ) {
             if ( $impressions > 300 && $ctr < 2.0 ) {
-                return [
-                    'Optimer title & CTR',
-                    'Siden er på side 1 men har lav CTR. Forbedr title tag: tilføj tal, power words og søgeordet tidligt. Opdater meta description med en klar CTA.',
-                    'high',
-                ];
+                $label  = 'Optimer title & CTR';
+                $detail = 'Siden er på side 1 men har lav CTR. Forbedr title tag: tilføj tal, power words og søgeordet tidligt. Opdater meta description med en klar CTA.';
+                $prio   = 'high';
+                return $is_fixed( $label ) ? [ '✅ Title & CTR fikset', $detail, 'resolved' ] : [ $label, $detail, $prio ];
             }
             if ( ! $ai ) {
-                return [
-                    'Øg AI-synlighed',
-                    'God Google-placering. For at blive nævnt af ChatGPT og Gemini: tilføj "Hvad er ...?"-afsnit, bullet points og FAQ med structured data.',
-                    'medium',
-                ];
+                $label  = 'Øg AI-synlighed';
+                $detail = 'God Google-placering. For at blive nævnt af ChatGPT og Gemini: tilføj "Hvad er ...?"-afsnit, bullet points og FAQ med structured data.';
+                $prio   = 'medium';
+                return $is_fixed( $label ) ? [ '✅ AI-synlighed fikset', $detail, 'resolved' ] : [ $label, $detail, $prio ];
             }
-            return [
-                'Side 1 ✅',
-                'Stærk placering og AI-synlighed. Tilføj interne links fra nyere blogindlæg og opdater med frisk data for at holde positionen.',
-                'low',
-            ];
+            return [ 'Side 1 ✅', 'Stærk placering og AI-synlighed. Tilføj interne links fra nyere blogindlæg og opdater med frisk data for at holde positionen.', 'low' ];
         }
+
         if ( $pos <= 20 ) {
-            return [
-                'Tæt på side 1',
-                'Siden er på side 2 — kun få forbedringer fra side 1. Opdater indholdet (min. 800 ord), optimer H2-struktur og tilføj 2-3 interne links.',
-                'high',
-            ];
+            $label  = 'Tæt på side 1';
+            $detail = 'Siden er på side 2 — kun få forbedringer fra side 1. Opdater indholdet (min. 800 ord), optimer H2-struktur og tilføj 2-3 interne links.';
+            $prio   = 'high';
+            return $is_fixed( $label ) ? [ '✅ Indhold fikset', $detail, 'resolved' ] : [ $label, $detail, $prio ];
         }
+
         if ( $pos <= 50 ) {
-            return [
-                'Svag placering',
-                'Siden rangerer svagt. Genskriv med fokus på primært søgeord i H1/intro, tilføj mere unikt indhold og byg interne + eksterne links.',
-                'high',
-            ];
+            $label  = 'Svag placering';
+            $detail = 'Siden rangerer svagt. Genskriv med fokus på primært søgeord i H1/intro, tilføj mere unikt indhold og byg interne + eksterne links.';
+            $prio   = 'high';
+            return $is_fixed( $label ) ? [ '✅ Indhold fikset', $detail, 'resolved' ] : [ $label, $detail, $prio ];
         }
-        return [
-            'Meget lav synlighed',
-            'Siden er næsten usynlig på Google. Overvej en komplet omskrivning: research søgeord, skriv mindst 1.000 ord og tilføj billeder med alt-tekst.',
-            'high',
-        ];
+
+        $label  = 'Meget lav synlighed';
+        $detail = 'Siden er næsten usynlig på Google. Overvej en komplet omskrivning: research søgeord, skriv mindst 1.000 ord og tilføj billeder med alt-tekst.';
+        $prio   = 'high';
+        return $is_fixed( $label ) ? [ '✅ Indhold omskrevet', $detail, 'resolved' ] : [ $label, $detail, $prio ];
     }
 
     /** Månedlig SEO-statistik – bruges til trend-graf */

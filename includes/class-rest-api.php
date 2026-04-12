@@ -415,7 +415,12 @@ class RZPA_REST_API {
         $body = json_decode( wp_remote_retrieve_body( $index_res ), true );
 
         if ( $code === 200 ) {
-            return self::ok( [ 'queued' => true, 'url' => $url ] );
+            // Gem tidsstempel for indekseringsanmodning så UI kan vise "⏳ Afventer" på tværs af page loads
+            $pid = url_to_postid( $url );
+            if ( $pid ) {
+                update_post_meta( $pid, '_rzpa_indexing_requested', current_time( 'mysql' ) );
+            }
+            return self::ok( [ 'queued' => true, 'url' => $url, 'post_id' => $pid ?: null ] );
         }
 
         // Scope-fejl fra Indexing API
@@ -828,19 +833,26 @@ PROMPT;
                 return new WP_REST_Response( [ 'ok' => false, 'error' => 'Ukendt fix_type: ' . $fix_type ], 400 );
         }
 
-        // Gem tidsstempel for seneste AI-fix på dette indlæg
-        $fixed_at = current_time( 'mysql' );
-        update_post_meta( $post_id, '_rzpa_ai_fixed', $fixed_at );
+        // Gem fix_type + tidsstempel — JSON keyed by fix_type (merge, aldrig overskriv andre fix-typer)
+        $fixed_at   = current_time( 'mysql' );
+        $fixed_raw  = get_post_meta( $post_id, '_rzpa_ai_fixed', true );
+        $fixed_data = ( $fixed_raw && is_string( $fixed_raw ) && str_starts_with( trim( $fixed_raw ), '{' ) )
+            ? ( json_decode( $fixed_raw, true ) ?: [] )
+            : [];                           // backward compat: gammel streng ignoreres
+        $fixed_data[ $fix_type ] = $fixed_at;
+        update_post_meta( $post_id, '_rzpa_ai_fixed', wp_json_encode( $fixed_data ) );
 
         return new WP_REST_Response( [
-            'ok'               => true,
-            'post_id'          => $post_id,
-            'label'            => $label,
-            'edit_url'         => admin_url( "post.php?post={$post_id}&action=edit" ),
-            'changes'          => array_values( $changes ),
-            'new_title'        => $new_title,
-            'new_meta'         => $new_meta,
-            'fixed_at'         => $fixed_at,
+            'ok'          => true,
+            'post_id'     => $post_id,
+            'label'       => $label,
+            'edit_url'    => admin_url( "post.php?post={$post_id}&action=edit" ),
+            'changes'     => array_values( $changes ),
+            'new_title'   => $new_title,
+            'new_meta'    => $new_meta,
+            'fixed_at'    => $fixed_at,
+            'fix_type'    => $fix_type,
+            'fixed_types' => array_keys( $fixed_data ),
         ], 200 );
     }
 
