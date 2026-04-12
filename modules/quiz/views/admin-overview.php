@@ -110,6 +110,7 @@ $tab = $tab ?? 'submissions';
           <th style="padding:14px 16px;text-align:left;font-weight:500;color:#555555;font-size:12px">Profil</th>
           <th style="padding:14px 16px;text-align:left;font-weight:500;color:#555555;font-size:12px">GDPR</th>
           <th style="padding:14px 16px;text-align:left;font-weight:500;color:#555555;font-size:12px">Tidspunkt</th>
+          <th style="padding:14px 16px;text-align:left;font-weight:500;color:#555555;font-size:12px">Status</th>
           <th style="padding:14px 16px;"></th>
         </tr>
       </thead>
@@ -139,6 +140,31 @@ $tab = $tab ?? 'submissions';
           <td style="padding:12px 16px;color:#44445a;font-size:12px">
             <?php echo esc_html( wp_date( 'd.m.Y H:i', strtotime( $s['created_at'] ) ) ); ?>
           </td>
+          <td style="padding:10px 14px;white-space:nowrap" id="rzpa-status-cell-<?php echo (int) $s['id']; ?>">
+            <?php
+            $cs = $s['candidate_status'] ?? null;
+            $status_labels = [
+                'interessant'     => [ 'label' => '⭐ Interessant',      'color' => '#CCFF00', 'bg' => 'rgba(204,255,0,.08)',  'border' => 'rgba(204,255,0,.25)' ],
+                'maaske'          => [ 'label' => '🤔 Måske',            'color' => '#ffaa33', 'bg' => 'rgba(255,170,51,.08)', 'border' => 'rgba(255,170,51,.25)' ],
+                'ikke_interessant'=> [ 'label' => '✗ Ikke interessant',  'color' => '#888888', 'bg' => 'rgba(255,255,255,.04)','border' => 'rgba(255,255,255,.1)' ],
+            ];
+            ?>
+            <div class="rzpa-candidate-status" data-id="<?php echo (int) $s['id']; ?>" data-status="<?php echo esc_attr( $cs ?? '' ); ?>" data-name="<?php echo esc_attr( $s['name'] ); ?>" data-email="<?php echo esc_attr( $s['email'] ?? '' ); ?>">
+              <?php if ( $cs && isset( $status_labels[ $cs ] ) ) : $sl = $status_labels[ $cs ]; ?>
+                <button class="rzpa-status-pill rzpa-status-set" style="color:<?php echo $sl['color']; ?>;background:<?php echo $sl['bg']; ?>;border-color:<?php echo $sl['border']; ?>">
+                  <?php echo $sl['label']; ?> ▾
+                </button>
+              <?php else : ?>
+                <button class="rzpa-status-pill rzpa-status-unset">Sæt status ▾</button>
+              <?php endif; ?>
+              <?php if ( $cs === 'interessant' ) : ?>
+                <button class="rzpa-send-mail-btn" data-id="<?php echo (int) $s['id']; ?>"
+                  style="margin-top:4px;display:block;font-size:11px;font-weight:600;padding:4px 12px;border-radius:999px;border:1px solid rgba(204,255,0,.3);background:rgba(204,255,0,.06);color:#CCFF00;cursor:pointer;font-family:inherit;transition:all .15s">
+                  <?php echo $s['mail_sent_at'] ? '✓ Mail sendt' : '✉ Send invitation'; ?>
+                </button>
+              <?php endif; ?>
+            </div>
+          </td>
           <td style="padding:10px 14px;white-space:nowrap">
             <button onclick="rzpaToggleDetail(<?php echo (int) $s['id']; ?>)"
                     id="rzpa-btn-<?php echo (int) $s['id']; ?>"
@@ -160,7 +186,7 @@ $tab = $tab ?? 'submissions';
           </td>
         </tr>
         <tr id="rzpa-detail-<?php echo (int) $s['id']; ?>" style="display:none">
-          <td colspan="8" style="padding:0;border-bottom:2px solid rgba(204,255,0,.12)">
+          <td colspan="9" style="padding:0;border-bottom:2px solid rgba(204,255,0,.12)">
             <div id="rzpa-detail-body-<?php echo (int) $s['id']; ?>" style="padding:24px 28px;background:#0d0d11">
               <div style="color:#8888a0;font-size:13px">Henter data…</div>
             </div>
@@ -495,3 +521,170 @@ $tab = $tab ?? 'submissions';
   <?php endif; ?>
 
 </div>
+
+<!-- ── Kandidat-status dropdown ────────────────────────────────── -->
+<div id="rzpa-status-dropdown" style="display:none;position:fixed;z-index:9999;background:#1a1a1a;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:6px;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+  <button class="rzpa-sd-item" data-val="">⊘ Ingen status</button>
+  <button class="rzpa-sd-item" data-val="interessant">⭐ Interessant</button>
+  <button class="rzpa-sd-item" data-val="maaske">🤔 Måske</button>
+  <button class="rzpa-sd-item" data-val="ikke_interessant">✗ Ikke interessant</button>
+</div>
+
+<!-- ── Mail modal ───────────────────────────────────────────────── -->
+<div id="rzpa-mail-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);align-items:center;justify-content:center">
+  <div style="background:#161616;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:32px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;position:relative">
+    <h2 style="margin:0 0 6px;font-size:20px;font-weight:700;color:#fff">✉ Send invitation</h2>
+    <div id="rzpa-mail-to-label" style="font-size:13px;color:#888;margin-bottom:24px"></div>
+
+    <label style="display:block;font-size:12px;color:#888;margin-bottom:6px">Emne</label>
+    <input id="rzpa-mail-subject" type="text" style="width:100%;background:#111;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;font-family:inherit;margin-bottom:18px;box-sizing:border-box" />
+
+    <label style="display:block;font-size:12px;color:#888;margin-bottom:6px">Besked</label>
+    <textarea id="rzpa-mail-body" rows="12" style="width:100%;background:#111;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px 14px;color:#fff;font-size:14px;font-family:inherit;resize:vertical;box-sizing:border-box;line-height:1.6"></textarea>
+
+    <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
+      <button id="rzpa-mail-cancel" style="padding:10px 22px;border-radius:999px;border:1px solid rgba(255,255,255,.15);background:transparent;color:#888;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuller</button>
+      <button id="rzpa-mail-send" style="padding:10px 28px;border-radius:999px;border:none;background:#CCFF00;color:#000;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✉ Send</button>
+    </div>
+    <div id="rzpa-mail-feedback" style="margin-top:12px;font-size:13px;display:none"></div>
+  </div>
+</div>
+
+<style>
+.rzpa-status-pill {
+  font-size:11px;font-weight:600;padding:4px 12px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);
+  color:#666;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;
+}
+.rzpa-status-pill:hover { border-color:rgba(255,255,255,.2);color:#aaa; }
+.rzpa-sd-item {
+  display:block;width:100%;text-align:left;padding:8px 14px;font-size:13px;
+  background:none;border:none;color:#ccc;cursor:pointer;border-radius:8px;
+  font-family:inherit;transition:background .12s;
+}
+.rzpa-sd-item:hover { background:rgba(255,255,255,.07); }
+</style>
+
+<script>
+(function() {
+  var nonce = '<?php echo esc_js( wp_create_nonce( 'wp_rest' ) ); ?>';
+  var dropdown = document.getElementById('rzpa-status-dropdown');
+  var mailModal = document.getElementById('rzpa-mail-modal');
+  var currentStatusTarget = null;
+  var currentMailId = null;
+
+  var defaultSubject = 'Vi vil gerne invitere dig til Rezponz 👋';
+  var defaultBody = function(name) {
+    return 'Hej ' + name + ',\n\n'
+      + 'Tak fordi du har udfyldt vores profil-quiz! Vi kunne rigtig godt tænke os at lære dig bedre at kende.\n\n'
+      + 'Vi vil gerne invitere dig til at komme forbi vores kontor i Aalborg, så du kan se, hvad vi laver, '
+      + 'møde teamet og stille alle de spørgsmål, du måtte have. Der er ingen forpligtelser — det er blot en '
+      + 'uformel snak over en kop kaffe ☕\n\n'
+      + 'Har du lyst, så svar blot på denne mail med et tidspunkt, der passer dig — eller ring til os.\n\n'
+      + 'Vi glæder os til at høre fra dig!\n\n'
+      + 'Med venlig hilsen\n'
+      + 'Lie Svenningsen\n'
+      + 'Rezponz · lie@rezponz.dk';
+  };
+
+  // ── Status dropdown ──────────────────────────────────────────────
+  document.querySelectorAll('.rzpa-candidate-status .rzpa-status-pill').forEach(function(pill) {
+    pill.addEventListener('click', function(e) {
+      e.stopPropagation();
+      currentStatusTarget = pill.closest('.rzpa-candidate-status');
+      var rect = pill.getBoundingClientRect();
+      dropdown.style.top  = (rect.bottom + window.scrollY + 6) + 'px';
+      dropdown.style.left = rect.left + 'px';
+      dropdown.style.display = 'block';
+    });
+  });
+
+  document.querySelectorAll('.rzpa-sd-item').forEach(function(item) {
+    item.addEventListener('click', function() {
+      if (!currentStatusTarget) return;
+      var id  = parseInt(currentStatusTarget.dataset.id);
+      var val = item.dataset.val;
+      dropdown.style.display = 'none';
+      fetch('/wp-json/rzpa/v1/quiz/submission/' + id + '/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce },
+        body: JSON.stringify({ status: val || null })
+      }).then(function(r) { return r.json(); }).then(function() {
+        // Reload the page to reflect new status
+        window.location.reload();
+      });
+    });
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!dropdown.contains(e.target)) dropdown.style.display = 'none';
+  });
+
+  // ── Send mail ────────────────────────────────────────────────────
+  document.querySelectorAll('.rzpa-send-mail-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var cell = btn.closest('[id^="rzpa-status-cell-"]');
+      var wrap = cell ? cell.querySelector('.rzpa-candidate-status') : null;
+      if (!wrap) return;
+      currentMailId   = parseInt(wrap.dataset.id);
+      var name        = wrap.dataset.name;
+      var email       = wrap.dataset.email;
+      document.getElementById('rzpa-mail-to-label').textContent = 'Til: ' + name + ' <' + email + '>';
+      document.getElementById('rzpa-mail-subject').value = defaultSubject;
+      document.getElementById('rzpa-mail-body').value    = defaultBody(name);
+      document.getElementById('rzpa-mail-feedback').style.display = 'none';
+      document.getElementById('rzpa-mail-send').textContent = '✉ Send';
+      document.getElementById('rzpa-mail-send').disabled = false;
+      mailModal.style.display = 'flex';
+    });
+  });
+
+  document.getElementById('rzpa-mail-cancel').addEventListener('click', function() {
+    mailModal.style.display = 'none';
+  });
+
+  document.getElementById('rzpa-mail-send').addEventListener('click', function() {
+    var sendBtn  = this;
+    var cell     = document.getElementById('rzpa-status-cell-' + currentMailId);
+    var wrap     = cell ? cell.querySelector('.rzpa-candidate-status') : null;
+    var email    = wrap ? wrap.dataset.email : '';
+    var subject  = document.getElementById('rzpa-mail-subject').value.trim();
+    var body     = document.getElementById('rzpa-mail-body').value.trim();
+    var feedback = document.getElementById('rzpa-mail-feedback');
+
+    if (!subject || !body) { feedback.style.display='block'; feedback.style.color='#ff5555'; feedback.textContent='Udfyld emne og besked.'; return; }
+
+    sendBtn.textContent = '⏳ Sender…';
+    sendBtn.disabled = true;
+    fetch('/wp-json/rzpa/v1/quiz/submission/' + currentMailId + '/send-mail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce },
+      body: JSON.stringify({ to: email, subject: subject, body: body })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.sent) {
+        feedback.style.display = 'block';
+        feedback.style.color = '#CCFF00';
+        feedback.textContent = '✓ Mail sendt til ' + email;
+        sendBtn.textContent = '✓ Sendt';
+        setTimeout(function() { mailModal.style.display = 'none'; window.location.reload(); }, 1500);
+      } else {
+        feedback.style.display = 'block';
+        feedback.style.color = '#ff5555';
+        feedback.textContent = d.error || 'Afsendelse fejlede – tjek SMTP-indstillinger.';
+        sendBtn.textContent = '✉ Send';
+        sendBtn.disabled = false;
+      }
+    })
+    .catch(function(err) {
+      feedback.style.display = 'block';
+      feedback.style.color = '#ff5555';
+      feedback.textContent = 'Netværksfejl: ' + err.message;
+      sendBtn.textContent = '✉ Send';
+      sendBtn.disabled = false;
+    });
+  });
+}());
+</script>

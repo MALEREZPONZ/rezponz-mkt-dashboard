@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class RZPA_Quiz_DB {
 
     const DB_VERSION_KEY = 'rzpa_quiz_db_ver';
-    const DB_VERSION     = '3';
+    const DB_VERSION     = '4';
 
     // ── Install / upgrade ──────────────────────────────────────────────────────
 
@@ -68,6 +68,8 @@ class RZPA_Quiz_DB {
             withdraw_token       VARCHAR(64),
             ip_address           VARCHAR(45),
             created_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
+            candidate_status     VARCHAR(20) DEFAULT NULL,
+            mail_sent_at         DATETIME DEFAULT NULL,
             PRIMARY KEY (id),
             KEY withdraw_token (withdraw_token(20)),
             KEY winning_profile_id (winning_profile_id)
@@ -453,7 +455,8 @@ class RZPA_Quiz_DB {
         $pt = $wpdb->prefix . 'rzpa_quiz_profiles';
         return $wpdb->get_results( $wpdb->prepare(
             "SELECT s.id, s.name, s.phone, s.email, s.consent, s.created_at,
-                    s.scores, p.title AS profile_title, p.color AS profile_color, p.icon_emoji
+                    s.scores, s.candidate_status, s.mail_sent_at,
+                    p.title AS profile_title, p.color AS profile_color, p.icon_emoji
              FROM {$st} s
              LEFT JOIN {$pt} p ON s.winning_profile_id = p.id
              ORDER BY s.created_at DESC
@@ -507,6 +510,29 @@ class RZPA_Quiz_DB {
     public static function count_submissions(): int {
         global $wpdb;
         return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}rzpa_quiz_submissions" );
+    }
+
+    public static function set_candidate_status( int $id, ?string $status ): bool {
+        global $wpdb;
+        $allowed = [ 'interessant', 'maaske', 'ikke_interessant', null ];
+        if ( ! in_array( $status, $allowed, true ) ) return false;
+        return false !== $wpdb->update(
+            $wpdb->prefix . 'rzpa_quiz_submissions',
+            [ 'candidate_status' => $status ],
+            [ 'id' => $id ],
+            [ $status === null ? 'NULL' : '%s' ],
+            [ '%d' ]
+        );
+    }
+
+    public static function mark_mail_sent( int $id ): bool {
+        global $wpdb;
+        return false !== $wpdb->update(
+            $wpdb->prefix . 'rzpa_quiz_submissions',
+            [ 'mail_sent_at' => current_time( 'mysql' ) ],
+            [ 'id' => $id ],
+            [ '%s' ], [ '%d' ]
+        );
     }
 
     public static function delete_submission( int $id ): bool {

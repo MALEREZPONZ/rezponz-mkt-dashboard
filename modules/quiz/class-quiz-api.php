@@ -30,6 +30,24 @@ class RZPA_Quiz_API {
                 'id' => [ 'validate_callback' => fn( $v ) => is_numeric( $v ) ],
             ],
         ] );
+
+        register_rest_route( 'rzpa/v1', '/quiz/submission/(?P<id>\d+)/status', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'set_status' ],
+            'permission_callback' => fn() => current_user_can( 'manage_options' ),
+            'args'                => [
+                'id' => [ 'validate_callback' => fn( $v ) => is_numeric( $v ) ],
+            ],
+        ] );
+
+        register_rest_route( 'rzpa/v1', '/quiz/submission/(?P<id>\d+)/send-mail', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'send_invitation' ],
+            'permission_callback' => fn() => current_user_can( 'manage_options' ),
+            'args'                => [
+                'id' => [ 'validate_callback' => fn( $v ) => is_numeric( $v ) ],
+            ],
+        ] );
     }
 
     // ── GET /quiz/submission/{id} ─────────────────────────────────────────────
@@ -40,6 +58,48 @@ class RZPA_Quiz_API {
             return new WP_REST_Response( [ 'error' => 'Ikke fundet' ], 404 );
         }
         return new WP_REST_Response( $data, 200 );
+    }
+
+    // ── POST /quiz/submission/{id}/status ────────────────────────────────────
+
+    public static function set_status( WP_REST_Request $req ): WP_REST_Response {
+        $id     = (int) $req['id'];
+        $status = sanitize_text_field( $req->get_json_params()['status'] ?? '' ) ?: null;
+        $ok     = RZPA_Quiz_DB::set_candidate_status( $id, $status ?: null );
+        return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 400 );
+    }
+
+    // ── POST /quiz/submission/{id}/send-mail ──────────────────────────────────
+
+    public static function send_invitation( WP_REST_Request $req ): WP_REST_Response {
+        $id      = (int) $req['id'];
+        $params  = $req->get_json_params();
+        $to      = sanitize_email( $params['to'] ?? '' );
+        $subject = sanitize_text_field( $params['subject'] ?? '' );
+        $body    = wp_kses_post( $params['body'] ?? '' );
+
+        if ( ! $to || ! is_email( $to ) ) {
+            return new WP_REST_Response( [ 'error' => 'Kandidaten har ingen e-mailadresse.' ], 400 );
+        }
+        if ( ! $subject || ! $body ) {
+            return new WP_REST_Response( [ 'error' => 'Emne og besked er påkrævet.' ], 400 );
+        }
+
+        $headers = [
+            'Content-Type: text/html; charset=UTF-8',
+            'From: Lie Svenningsen <' . self::ADMIN_EMAIL . '>',
+            'Reply-To: ' . self::ADMIN_EMAIL,
+        ];
+
+        $html_body = nl2br( esc_html( $body ) );
+        $sent = wp_mail( $to, $subject, $html_body, $headers );
+
+        if ( $sent ) {
+            RZPA_Quiz_DB::mark_mail_sent( $id );
+            RZPA_Quiz_DB::set_candidate_status( $id, 'interessant' );
+        }
+
+        return new WP_REST_Response( [ 'sent' => $sent ], $sent ? 200 : 500 );
     }
 
     // ── GET /quiz ─────────────────────────────────────────────────────────────
