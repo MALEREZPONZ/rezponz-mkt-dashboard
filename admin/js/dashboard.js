@@ -1295,18 +1295,23 @@ const RZPA_App = (() => {
         const chk = v => v == 1
           ? '<span style="color:#4ade80;font-size:15px">✓</span>'
           : '<span style="color:#2d2d2d;font-size:13px">✗</span>';
+        // Søgeord der allerede har fået oprettet FAQ/udkast (gemt i localStorage)
+        const kwDone = (() => { try { return JSON.parse(localStorage.getItem('rzpa_kw_done') || '[]'); } catch(e) { return []; } })();
         kwTbody.innerHTML = keywords.map(k => {
           const filter  = k.has_ai_overview == 1 ? 'has_ai' : 'missing';
           const kwEnc   = encodeURIComponent(JSON.stringify([k.keyword]));
           const fixType = k.has_ai_overview != 1 ? 'faq_pages' : k.has_featured_snippet != 1 ? 'featured_snippet' : k.has_paa != 1 ? 'paa_sections' : null;
           const fixLbl  = k.has_ai_overview != 1 ? 'Opret FAQ' : k.has_featured_snippet != 1 ? 'Opret udkast' : k.has_paa != 1 ? 'Opret Q&A' : '';
-          const fixBtn  = fixType ? `<button class="rzpa-kw-fix-btn" data-fix-type="${fixType}" data-fix-kw="${kwEnc}" style="margin-left:6px;font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid rgba(204,255,0,.25);background:rgba(204,255,0,.06);color:var(--neon);cursor:pointer;white-space:nowrap">${fixLbl}</button>` : '';
+          // Vis "Kladde oprettet" badge hvis allerede behandlet denne session/reload
+          const isDone  = kwDone.includes(k.keyword);
+          const doneHtml = isDone ? `<span style="margin-left:6px;font-size:10px;color:#4ade80;white-space:nowrap">✓ Kladde oprettet</span>` : '';
+          const fixBtn  = (!isDone && fixType) ? `<button class="rzpa-kw-fix-btn" data-fix-type="${fixType}" data-fix-kw="${kwEnc}" style="margin-left:6px;font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid rgba(204,255,0,.25);background:rgba(204,255,0,.06);color:var(--neon);cursor:pointer;white-space:nowrap">${fixLbl}</button>` : '';
           return `<tr data-filter="${filter}">
             <td style="padding-left:20px;font-weight:500;color:#e5e5e5">${k.keyword}</td>
             <td style="text-align:center">${chk(k.has_ai_overview)}</td>
             <td style="text-align:center">${chk(k.has_featured_snippet)}</td>
             <td style="text-align:center">${chk(k.has_paa)}</td>
-            <td style="font-size:12px;color:#999">${kwNextStep(k)}${fixBtn}</td>
+            <td style="font-size:12px;color:#999">${kwNextStep(k)}${fixBtn}${doneHtml}</td>
             <td style="text-align:center">${kwPriority(k)}</td>
           </tr>`;
         }).join('');
@@ -1323,7 +1328,20 @@ const RZPA_App = (() => {
             try {
               const res = await api('/ai/fix-action', { method: 'POST', body: JSON.stringify({ type, keywords: kws }) });
               if (res.ok && res.edit_url) {
-                btn.outerHTML = `<a href="${res.edit_url}" target="_blank" style="margin-left:6px;font-size:10px;color:#4ade80;text-decoration:none;white-space:nowrap">✓ Fikset →</a>`;
+                // Gem i localStorage så "Kladde oprettet" vises ved næste reload
+                try {
+                  const done = JSON.parse(localStorage.getItem('rzpa_kw_done') || '[]');
+                  if (!done.includes(kws[0])) { done.push(kws[0]); localStorage.setItem('rzpa_kw_done', JSON.stringify(done)); }
+                } catch(e) {}
+                const tr = btn.closest('tr');
+                // Vis link + fade rækken ned
+                btn.outerHTML = `<a href="${res.edit_url}" target="_blank" style="margin-left:6px;font-size:10px;color:#4ade80;text-decoration:none;white-space:nowrap">✓ Kladde klar →</a>`;
+                if (tr) {
+                  tr.style.transition = 'opacity .6s, background .6s';
+                  tr.style.opacity = '0.35';
+                  tr.style.background = 'rgba(74,222,128,.03)';
+                  setTimeout(() => { if (tr.parentNode) tr.remove(); }, 2500);
+                }
               } else {
                 btn.textContent = '✗';
                 btn.title = res.message || '';
