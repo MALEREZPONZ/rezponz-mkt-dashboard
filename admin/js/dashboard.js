@@ -4060,7 +4060,8 @@ const RZPA_App = (() => {
                   <span class="rzpa-blog-rec-dot">${priDot(post.priority)}</span>
                   <span class="rzpa-blog-rec-label">${post.rec_label}</span>
                   ${!post.has_gsc ? `<button class="rzpa-index-btn" data-url="${post.url}" title="Bed Google om at indeksere denne side">↗ Indekser</button>` : ''}
-                  ${BLOG_FIX_MAP[post.rec_label] && post.post_id ? `<button class="rzpa-blog-fix-btn rzpa-index-btn" data-post-id="${post.post_id}" data-fix-type="${BLOG_FIX_MAP[post.rec_label]}" data-keyword="${encodeURIComponent(post.title)}" style="border-color:rgba(204,255,0,.3);color:var(--neon)">⚡ Fiks</button>` : ''}
+                  ${post.fixed_at ? (() => { const d = new Date(post.fixed_at); const lbl = d.toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'}); return `<span class="rzpa-fixed-badge" title="AI fikset ${post.fixed_at}">✓ ${lbl}</span>`; })() : ''}
+                  ${BLOG_FIX_MAP[post.rec_label] && post.post_id ? `<button class="rzpa-blog-fix-btn rzpa-index-btn" data-post-id="${post.post_id}" data-fix-type="${BLOG_FIX_MAP[post.rec_label]}" data-keyword="${encodeURIComponent(post.title)}" style="${post.fixed_at ? 'border-color:rgba(74,222,128,.25);color:#4ade80;opacity:.75' : 'border-color:rgba(204,255,0,.3);color:var(--neon)'}">${post.fixed_at ? '🔄 Fiks igen' : '⚡ Fiks'}</button>` : ''}
                 </td>
               </tr>
               <tr class="rzpa-blog-expand-row" id="expand-${post.post_id}" style="display:none">
@@ -4134,7 +4135,7 @@ const RZPA_App = (() => {
           const keyword  = decodeURIComponent(btn.dataset.keyword || '');
           // Fix 5: Inkluder Elementor-advarsel i confirm-dialog
           const shortKw = keyword.length > 50 ? keyword.substring(0, 50) + '…' : keyword;
-          if (!confirm(`AI vil forbedre "${shortKw || 'dette indlæg'}".\n\nÆndringerne publiceres direkte – du kan fortryde via Rediger → Revisioner.\n\nNB: På Elementor-sider opdateres titel og meta med det samme, men brødtekst kræver manuel redigering i Elementor for at blive synlig på forsiden.\n\nFortsæt?`)) return;
+          if (!confirm(`AI vil forbedre "${shortKw || 'dette indlæg'}".\n\nÆndringerne publiceres direkte – du kan fortryde via Rediger → Revisioner.\n\nFortsæt?`)) return;
 
           if (!postId || isNaN(parseInt(postId))) return;
           btn.disabled = true;
@@ -4153,8 +4154,22 @@ const RZPA_App = (() => {
             const res = await api('/ai/fix-post', { method: 'POST', body: JSON.stringify({ post_id: parseInt(postId), fix_type: fixType, keyword }) });
             clearInterval(timer);
             if (res.ok) {
-              // Erstat knap med grønt success-link (Fix 1: esc() på AI-strenge)
-              btn.outerHTML = `<a href="${res.edit_url}" target="_blank" class="rzpa-index-btn" style="text-decoration:none;color:#4ade80;border-color:rgba(74,222,128,.3)">✓ ${esc(res.label) || 'Fikset'} →</a>`;
+              // Erstat knap med grønt success-link + opdater fixed-badge
+              const today = new Date().toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'});
+              const recCell = btn.closest('td');
+              // Fjern eksisterende badge og opdater/indsæt nyt
+              recCell?.querySelectorAll('.rzpa-fixed-badge').forEach(b => b.remove());
+              const badge = document.createElement('span');
+              badge.className = 'rzpa-fixed-badge';
+              badge.title = `AI fikset ${res.fixed_at || new Date().toISOString()}`;
+              badge.textContent = `✓ ${today}`;
+              btn.replaceWith(badge);
+              const link = document.createElement('a');
+              link.href = res.edit_url; link.target = '_blank';
+              link.className = 'rzpa-index-btn';
+              link.style.cssText = 'text-decoration:none;color:#4ade80;border-color:rgba(74,222,128,.3)';
+              link.textContent = `✓ ${esc(res.label) || 'Fikset'} →`;
+              badge.after(link);
 
               // Vis fix-summary i expand-rækken
               const expandRow = document.getElementById(`expand-${postId}`);

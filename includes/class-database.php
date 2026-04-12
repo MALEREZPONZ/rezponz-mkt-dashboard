@@ -348,6 +348,7 @@ class RZPA_Database {
                 'rec_label'   => $rec_label,
                 'rec_detail'  => $rec_detail,
                 'priority'    => $priority,
+                'fixed_at'    => get_post_meta( $post->ID, '_rzpa_ai_fixed', true ) ?: null,
             ];
         }
 

@@ -627,13 +627,16 @@ PROMPT;
                 }
                 $faq_count   = substr_count( $faq_html, '<h2' );
                 $faq_html   .= self::build_faq_schema( $faq_html );
-                $new_content = $post->post_content . "\n\n<!-- rzpa-faq -->\n<h2>Ofte stillede spørgsmål</h2>\n" . $faq_html;
+                $faq_append  = "\n\n<!-- rzpa-faq -->\n<h2>Ofte stillede spørgsmål</h2>\n" . $faq_html;
+                $new_content = $post->post_content . $faq_append;
                 $result      = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
-                $changes = [
+                $el_updated = self::maybe_update_elementor( $post_id, $faq_append, 'append' );
+                $changes = array_filter( [
                     "FAQ-sektion tilføjet ({$faq_count} spørgsmål og svar)",
                     'FAQ Schema markup (JSON-LD) tilføjet – øger AI-synlighed',
-                ];
+                    $el_updated ? 'Elementor tekst-widget opdateret (synlig på forsiden)' : '',
+                ] );
                 $label = 'FAQ-sektion tilføjet';
                 break;
 
@@ -667,13 +670,16 @@ PROMPT;
                     $changes = [ 'Snippet-intro er allerede i indlægget – ingen ændringer' ];
                     break;
                 }
-                $new_content = "<!-- rzpa-snippet -->\n" . $snippet_html . "\n\n" . $post->post_content;
-                $result      = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ], true );
+                $snippet_prepend = "<!-- rzpa-snippet -->\n" . $snippet_html . "\n\n";
+                $new_content     = $snippet_prepend . $post->post_content;
+                $result          = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
-                $changes = [
+                $el_updated = self::maybe_update_elementor( $post_id, $snippet_html . "\n\n", 'append' );
+                $changes = array_filter( [
                     'Direkte svar-afsnit tilføjet øverst (45-55 ord)',
                     'Optimeret til Google Featured Snippet-format (H2 + P)',
-                ];
+                    $el_updated ? 'Elementor tekst-widget opdateret (synlig på forsiden)' : '',
+                ] );
                 $label = 'Snippet-sektion tilføjet';
                 break;
 
@@ -705,13 +711,16 @@ PROMPT;
                 }
                 $paa_count   = substr_count( $paa_html, '<h2' );
                 $paa_html   .= self::build_faq_schema( $paa_html );
-                $new_content = $post->post_content . "\n\n<!-- rzpa-paa -->\n" . $paa_html;
+                $paa_append  = "\n\n<!-- rzpa-paa -->\n" . $paa_html;
+                $new_content = $post->post_content . $paa_append;
                 $result      = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
-                $changes = [
+                $el_updated = self::maybe_update_elementor( $post_id, $paa_append, 'append' );
+                $changes = array_filter( [
                     "\"Folk spørger også\"-sektion tilføjet ({$paa_count} spørgsmål)",
                     'FAQ Schema markup (JSON-LD) tilføjet',
-                ];
+                    $el_updated ? 'Elementor tekst-widget opdateret (synlig på forsiden)' : '',
+                ] );
                 $label = 'Q&A-sektion tilføjet';
                 break;
 
@@ -752,12 +761,14 @@ PROMPT;
                 $new_html .= "\n\n<!-- rzpa-faq -->\n" . self::build_faq_schema_from_section( $new_html );
                 $result     = wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_html ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
+                $el_updated = self::maybe_update_elementor( $post_id, $new_html, 'replace' );
                 $word_count = str_word_count( wp_strip_all_tags( $new_html ) );
                 $changes    = array_filter( [
                     $new_title ? "Titel opdateret: \"{$new_title}\"" : '',
                     "Indhold udvidet til ~{$word_count} ord med H2-sektioner",
                     'FAQ-sektion (3 spørgsmål) og CTA tilføjet',
                     'FAQ Schema markup (JSON-LD) tilføjet',
+                    $el_updated ? 'Elementor tekst-widget opdateret (synlig på forsiden)' : '',
                 ] );
                 $label = 'Indhold forbedret og udvidet';
                 break;
@@ -800,6 +811,7 @@ PROMPT;
                 $rewrite .= "\n\n" . self::build_faq_schema_from_section( $rewrite );
                 $result   = wp_update_post( [ 'ID' => $post_id, 'post_content' => $rewrite ], true );
                 if ( is_wp_error( $result ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $result->get_error_message() ], 500 );
+                $el_updated = self::maybe_update_elementor( $post_id, $rewrite, 'replace' );
                 $word_count = str_word_count( wp_strip_all_tags( $rewrite ) );
                 $changes    = array_filter( [
                     $new_title ? "Ny titel: \"{$new_title}\"" : '',
@@ -807,6 +819,7 @@ PROMPT;
                     '5-7 H2-sektioner med fakta og praktisk vejledning',
                     'FAQ-sektion (5 spørgsmål) og CTA til Rezponz',
                     'FAQ Schema markup (JSON-LD) tilføjet',
+                    $el_updated ? 'Elementor tekst-widget opdateret (synlig på forsiden)' : '',
                 ] );
                 $label = 'Indlæg omskrevet';
                 break;
@@ -815,14 +828,19 @@ PROMPT;
                 return new WP_REST_Response( [ 'ok' => false, 'error' => 'Ukendt fix_type: ' . $fix_type ], 400 );
         }
 
+        // Gem tidsstempel for seneste AI-fix på dette indlæg
+        $fixed_at = current_time( 'mysql' );
+        update_post_meta( $post_id, '_rzpa_ai_fixed', $fixed_at );
+
         return new WP_REST_Response( [
-            'ok'       => true,
-            'post_id'   => $post_id,
-            'label'     => $label,
-            'edit_url'  => admin_url( "post.php?post={$post_id}&action=edit" ),
-            'changes'   => array_values( $changes ),
-            'new_title' => $new_title,
-            'new_meta'  => $new_meta,
+            'ok'               => true,
+            'post_id'          => $post_id,
+            'label'            => $label,
+            'edit_url'         => admin_url( "post.php?post={$post_id}&action=edit" ),
+            'changes'          => array_values( $changes ),
+            'new_title'        => $new_title,
+            'new_meta'         => $new_meta,
+            'fixed_at'         => $fixed_at,
         ], 200 );
     }
 
@@ -848,6 +866,80 @@ PROMPT;
     private static function strip_md_fences( string $text ): string {
         $text = preg_replace( '/^```(?:html|json)?\s*/i', '', trim( $text ) );
         return preg_replace( '/\s*```$/', '', $text );
+    }
+
+    // ── Elementor: opdater text-editor widget med nyt indhold ─────────────────
+
+    /**
+     * Forsøger at opdatere _elementor_data for $post_id med det nye HTML.
+     * $mode = 'replace' erstatter indholdet i den største text-editor widget.
+     * $mode = 'append'  tilføjer HTML i slutningen af samme widget.
+     * Returnerer true hvis en widget blev opdateret.
+     */
+    private static function maybe_update_elementor( int $post_id, string $new_html, string $mode = 'replace' ): bool {
+        if ( get_post_meta( $post_id, '_elementor_edit_mode', true ) !== 'builder' ) {
+            return false;
+        }
+        $data_raw = get_post_meta( $post_id, '_elementor_data', true );
+        if ( ! $data_raw ) return false;
+
+        $data = json_decode( $data_raw, true );
+        if ( ! is_array( $data ) ) return false;
+
+        // Find alle text-editor widgets
+        $found = [];
+        self::find_elementor_text_editors( $data, $found );
+        if ( empty( $found ) ) return false;
+
+        // Vælg den widget der har mest indhold (mest sandsynlig hoved-tekst)
+        usort( $found, static fn( $a, $b ) => $b['len'] - $a['len'] );
+
+        $updated = self::set_elementor_widget_by_id( $data, $found[0]['id'], $new_html, $mode );
+        if ( $updated ) {
+            update_post_meta( $post_id, '_elementor_data', wp_slash( wp_json_encode( $data ) ) );
+            // Ryd Elementors CSS-cache for dette indlæg
+            delete_post_meta( $post_id, '_elementor_css' );
+            // Ryd global Elementor-filcache hvis tilgængelig
+            if ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->files_manager ) ) {
+                \Elementor\Plugin::$instance->files_manager->clear_cache();
+            }
+        }
+        return $updated;
+    }
+
+    /** Rekursivt: saml alle text-editor widgets med id og indholdsLængde. */
+    private static function find_elementor_text_editors( array $elements, array &$found ): void {
+        foreach ( $elements as $el ) {
+            if ( ( $el['elType'] ?? '' ) === 'widget' && ( $el['widgetType'] ?? '' ) === 'text-editor' ) {
+                $found[] = [
+                    'id'  => $el['id'],
+                    'len' => mb_strlen( $el['settings']['editor'] ?? '' ),
+                ];
+            }
+            if ( ! empty( $el['elements'] ) && is_array( $el['elements'] ) ) {
+                self::find_elementor_text_editors( $el['elements'], $found );
+            }
+        }
+    }
+
+    /** Rekursivt: find widget med $id og sæt nyt indhold. */
+    private static function set_elementor_widget_by_id( array &$elements, string $id, string $new_html, string $mode ): bool {
+        foreach ( $elements as &$el ) {
+            if ( ( $el['elType'] ?? '' ) === 'widget' && ( $el['widgetType'] ?? '' ) === 'text-editor' && ( $el['id'] ?? '' ) === $id ) {
+                if ( $mode === 'append' ) {
+                    $el['settings']['editor'] = ( $el['settings']['editor'] ?? '' ) . "\n" . $new_html;
+                } else {
+                    $el['settings']['editor'] = $new_html;
+                }
+                return true;
+            }
+            if ( ! empty( $el['elements'] ) && is_array( $el['elements'] ) ) {
+                if ( self::set_elementor_widget_by_id( $el['elements'], $id, $new_html, $mode ) ) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static function build_faq_schema( string $html ): string {

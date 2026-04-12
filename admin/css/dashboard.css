@@ -1529,10 +1529,15 @@ body.wp-admin #wpbody-content > .wrap {
 .rzpa-blog-rec-cell {
   display: flex; align-items: center; gap: 6px;
   white-space: nowrap;
-  max-width: 200px;
+  max-width: 220px;
 }
 .rzpa-blog-rec-dot  { font-size: 10px; flex-shrink: 0; }
 .rzpa-blog-rec-label { font-size: 12px; color: var(--text-muted); }
+.rzpa-fixed-badge {
+  font-size: 10px; font-weight: 600; color: #4ade80;
+  border: 1px solid rgba(74,222,128,.25); border-radius: 4px;
+  padding: 1px 6px; white-space: nowrap; flex-shrink: 0;
+}
 
 /* Expand row */
 .rzpa-blog-expand-row td { padding: 0; background: var(--bg-100); }
