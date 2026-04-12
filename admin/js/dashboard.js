@@ -1381,6 +1381,7 @@ const RZPA_App = (() => {
 
   if (el('page-rekruttering')) {
     let rekrutDays = 30;
+    const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
     const rekrutDaysSel = el('rekrut-days');
     const rekrutRefresh = el('rekrut-refresh');
