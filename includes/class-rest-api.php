@@ -748,7 +748,7 @@ Krav:
 - Afslut med en FAQ-sektion (3 spørgsmål) og call-to-action om Rezponz
 - Skriv KUN HTML. Ingen markdown.
 PROMPT;
-                $new_html = self::openai_generate( $prompt, $api_key, 1800 );
+                $new_html = self::openai_generate( $prompt, $api_key, 5000 );
                 if ( is_wp_error( $new_html ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $new_html->get_error_message() ], 500 );
 
                 $new_html = wp_kses_post( self::strip_md_fences( $new_html ) );
@@ -798,7 +798,7 @@ Krav:
 - Tydelig call-to-action til Rezponz til sidst
 - Skriv KUN HTML. Ingen markdown.
 PROMPT;
-                $rewrite = self::openai_generate( $prompt, $api_key, 2500 );
+                $rewrite = self::openai_generate( $prompt, $api_key, 7000 );
                 if ( is_wp_error( $rewrite ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $rewrite->get_error_message() ], 500 );
 
                 $rewrite = wp_kses_post( self::strip_md_fences( $rewrite ) );
@@ -895,11 +895,11 @@ PROMPT;
     }
 
     private static function openai_generate( string $prompt, string $api_key, int $max_tokens = 2000 ): string|\WP_Error {
-        if ( function_exists( 'set_time_limit' ) ) set_time_limit( 120 ); // Forhindrer PHP timeout ved lange AI-svar
+        if ( function_exists( 'set_time_limit' ) ) set_time_limit( 180 );
         $res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
             'headers' => [ 'Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json' ],
             'body'    => wp_json_encode( [ 'model' => 'gpt-4.1-mini', 'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ], 'max_tokens' => $max_tokens, 'temperature' => 0.5 ] ),
-            'timeout' => 90,
+            'timeout' => 120,
         ] );
         if ( is_wp_error( $res ) ) return $res;
         $code = wp_remote_retrieve_response_code( $res );
@@ -907,8 +907,19 @@ PROMPT;
             $err = json_decode( wp_remote_retrieve_body( $res ), true );
             return new WP_Error( 'openai_http', $err['error']['message'] ?? 'OpenAI fejl ' . $code );
         }
-        $body = json_decode( wp_remote_retrieve_body( $res ), true );
-        return trim( $body['choices'][0]['message']['content'] ?? '' );
+        $body          = json_decode( wp_remote_retrieve_body( $res ), true );
+        $finish_reason = $body['choices'][0]['finish_reason'] ?? 'stop';
+        $content       = trim( $body['choices'][0]['message']['content'] ?? '' );
+
+        // Detect truncation: GPT stoppede pga. token-grænse (ikke pga. naturlig afslutning)
+        if ( $finish_reason === 'length' ) {
+            return new WP_Error(
+                'openai_truncated',
+                'AI-svaret blev afskåret (for langt). Prøv igen — indholdet genereres i kortere afsnit. (finish_reason=length, max_tokens=' . $max_tokens . ')'
+            );
+        }
+
+        return $content;
     }
 
     private static function strip_md_fences( string $text ): string {
