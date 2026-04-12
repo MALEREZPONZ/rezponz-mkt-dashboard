@@ -948,17 +948,29 @@ const RZPA_App = (() => {
     });
 
     el('rzpa-log-submit')?.addEventListener('click', async () => {
+      const btn = el('rzpa-log-submit');
       const data = {
-        platform:          el('log_platform')?.value,
-        query:             el('log_query')?.value,
+        platform:          el('log_platform')?.value || 'ChatGPT',
+        query:             el('log_query')?.value?.trim(),
         response_text:     el('log_response')?.value,
         rezponz_mentioned: el('log_mentioned')?.checked ? 1 : 0,
         notes:             el('log_notes')?.value,
       };
-      if (!data.query) { alert('Forespørgsel er påkrævet'); return; }
-      await api('/ai/manual-logs', { method: 'POST', body: JSON.stringify(data) });
-      el('rzpa-log-form').style.display = 'none';
-      loadAI(days);
+      if (!data.query) { alert('Søgeforespørgsel er påkrævet'); return; }
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Gemmer…'; }
+      try {
+        const res = await api('/ai/manual-logs', { method: 'POST', body: JSON.stringify(data) });
+        if (btn) { btn.textContent = '✓ Gemt'; }
+        setTimeout(() => {
+          const form = el('rzpa-log-form');
+          if (form) form.style.display = 'none';
+          if (btn) { btn.disabled = false; btn.textContent = 'Gem log'; }
+          loadAI(days);
+        }, 800);
+      } catch(err) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Gem log'; }
+        alert('Fejl ved gem: ' + (err.message || 'Ukendt fejl'));
+      }
     });
   }
 
