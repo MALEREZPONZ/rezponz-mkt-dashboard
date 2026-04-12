@@ -330,7 +330,7 @@ $has_openai = ! empty( $opts['openai_api_key'] );
 
     var ts = new Date().toLocaleString('da-DK',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
     return '<div class="rzpa-ai-suggestions">'+items+'</div>'
-      + '<div class="rzpa-ai-strat-info">🤖 Genereret af GPT-4o mini · '+ts+' · Baseret på dine eksisterende blogindlæg og Rezponz\' rekrutteringsfokus</div>';
+      + '<div class="rzpa-ai-strat-info">🤖 Genereret af GPT-4.1 mini · '+ts+' · Baseret på dine eksisterende blogindlæg og Rezponz\' rekrutteringsfokus</div>';
   }
 
   function getDays() {

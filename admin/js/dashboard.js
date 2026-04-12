@@ -3947,8 +3947,8 @@ const RZPA_App = (() => {
       html += `</tbody></table></div>`;
       container.innerHTML = html;
 
-      // Indekser-knapper
-      container.querySelectorAll('.rzpa-index-btn').forEach(btn => {
+      // Indekser-knapper (ekskl. Fiks-knapper der deler rzpa-index-btn styling)
+      container.querySelectorAll('.rzpa-index-btn:not(.rzpa-blog-fix-btn)').forEach(btn => {
         btn.addEventListener('click', async e => {
           e.stopPropagation();
           const url = btn.dataset.url;

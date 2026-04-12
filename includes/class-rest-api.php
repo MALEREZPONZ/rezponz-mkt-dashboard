@@ -575,7 +575,7 @@ Krav:
 - Svar på 45-65 ord pr. spørgsmål – direkte og faktabaseret
 - Skriv KUN HTML (h2, p). Ingen markdown, ingen forklaringer.
 PROMPT;
-                $faq_html = self::openai_generate( $prompt, $api_key, 1200 );
+                $faq_html = self::openai_generate( $prompt, $api_key, 900 );
                 if ( is_wp_error( $faq_html ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $faq_html->get_error_message() ], 500 );
 
                 $faq_html  = self::strip_md_fences( $faq_html );
@@ -654,7 +654,7 @@ Krav:
 - Afslut med en FAQ-sektion (3 spørgsmål) og call-to-action om Rezponz
 - Skriv KUN HTML. Ingen markdown.
 PROMPT;
-                $new_html = self::openai_generate( $prompt, $api_key, 2500 );
+                $new_html = self::openai_generate( $prompt, $api_key, 1800 );
                 if ( is_wp_error( $new_html ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $new_html->get_error_message() ], 500 );
 
                 $new_html = self::strip_md_fences( $new_html );
@@ -683,7 +683,7 @@ Krav:
 - FAQ-sektion (5 spørgsmål) og tydelig call-to-action til Rezponz
 - Skriv KUN HTML. Ingen markdown.
 PROMPT;
-                $rewrite = self::openai_generate( $prompt, $api_key, 3500 );
+                $rewrite = self::openai_generate( $prompt, $api_key, 2000 );
                 if ( is_wp_error( $rewrite ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $rewrite->get_error_message() ], 500 );
 
                 $rewrite = self::strip_md_fences( $rewrite );
@@ -711,6 +711,7 @@ PROMPT;
     // ── Hjælpere ──────────────────────────────────────────────────────────────
 
     private static function openai_generate( string $prompt, string $api_key, int $max_tokens = 2000 ): string|\WP_Error {
+        @set_time_limit( 120 ); // Forhindrer PHP timeout ved lange AI-svar (Curanet shared hosting)
         $res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
             'headers' => [ 'Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json' ],
             'body'    => wp_json_encode( [ 'model' => 'gpt-4.1-mini', 'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ], 'max_tokens' => $max_tokens, 'temperature' => 0.5 ] ),
