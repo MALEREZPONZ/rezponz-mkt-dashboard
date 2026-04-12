@@ -191,6 +191,32 @@ body.wp-admin #wpbody-content > .wrap {
 }
 .btn-ghost:hover { border-color: var(--neon); color: var(--neon); background: var(--glass-hover); }
 
+/* ── Fiks-knapper (inline action per handlingsplan-item / blog-row) ─────── */
+.rzpa-fiks-btn {
+  display: inline-block;
+  font-size: 11px; font-weight: 600;
+  padding: 4px 10px; border-radius: 6px;
+  border: 1px solid rgba(204,255,0,.3);
+  background: rgba(204,255,0,.07);
+  color: var(--neon);
+  cursor: pointer; white-space: nowrap;
+  text-decoration: none;
+  font-family: inherit;
+  transition: all .15s;
+  line-height: 1.4;
+}
+.rzpa-fiks-btn:hover:not(:disabled) {
+  background: rgba(204,255,0,.14);
+  border-color: rgba(204,255,0,.55);
+  color: var(--neon);
+}
+.rzpa-fiks-btn:disabled { opacity: .5; cursor: default; }
+.rzpa-fiks-done {
+  border-color: rgba(74,222,128,.35) !important;
+  background: rgba(74,222,128,.07) !important;
+  color: #4ade80 !important;
+}
+
 /* ══════════════════════════════════════════════════════
    KPI grid
    ══════════════════════════════════════════════════════ */

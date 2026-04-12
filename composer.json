@@ -1,0 +1,12 @@
+{
+  "name": "rezponz/analytics",
+  "description": "Rezponz Marketing Intelligence Dashboard",
+  "require": {
+    "dompdf/dompdf": "^2.0"
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "preferred-install": "dist",
+    "sort-packages": true
+  }
+}

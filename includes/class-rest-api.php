@@ -287,6 +287,16 @@ class RZPA_REST_API {
             'callback'            => [ __CLASS__, 'blog_request_indexing' ],
             'permission_callback' => $cap,
         ] );
+        register_rest_route( self::NS, '/ai/fix-action', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'ai_fix_action' ],
+            'permission_callback' => $cap,
+        ] );
+        register_rest_route( self::NS, '/ai/fix-post', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'ai_fix_post' ],
+            'permission_callback' => $cap,
+        ] );
     }
 
     private static function days( WP_REST_Request $r ) : int {
@@ -405,6 +415,335 @@ class RZPA_REST_API {
 
         $err_msg = $body['error']['message'] ?? ( 'API fejl ' . $code );
         return new WP_Error( 'indexing_error', $err_msg, [ 'status' => $code ?: 502 ] );
+    }
+
+    // ── POST /ai/fix-action ───────────────────────────────────────────────────
+    // Handlingsplan-niveau: finder eksisterende post for søgeord og opdaterer den,
+    // eller opretter ny (kun faq_pages opretter altid ny).
+    public static function ai_fix_action( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['openai_api_key'] ) ) {
+            return new WP_Error( 'no_openai', 'Tilføj en OpenAI API-nøgle under Indstillinger for at bruge auto-fix.', [ 'status' => 400 ] );
+        }
+
+        $params   = $r->get_json_params();
+        $type     = sanitize_text_field( $params['type'] ?? '' );
+        $keywords = array_filter( array_map( 'sanitize_text_field', (array) ( $params['keywords'] ?? [] ) ) );
+
+        if ( ! $type ) {
+            return new WP_Error( 'missing_type', 'Mangler type.', [ 'status' => 400 ] );
+        }
+
+        $top     = array_slice( $keywords, 0, 5 );
+        $kw_list = implode( ', ', $top );
+
+        // featured_snippet + paa_sections: opdatér eksisterende post hvis muligt
+        if ( in_array( $type, [ 'featured_snippet', 'paa_sections' ], true ) ) {
+            $post_id = self::find_post_for_keyword( $top[0] ?? '' );
+            if ( $post_id ) {
+                $fix_map = [
+                    'featured_snippet' => 'fix_snippet',
+                    'paa_sections'     => 'fix_paa',
+                ];
+                return self::apply_ai_fix_to_post( $post_id, $fix_map[ $type ], $top[0], $opts['openai_api_key'] );
+            }
+            // Ingen eksisterende post – fald igennem og opret ny
+        }
+
+        // faq_pages (og fallback): opret ny FAQ-post med AI-skrevet indhold
+        $prompt = <<<PROMPT
+Du er SEO-skribent for Rezponz – et dansk firma der tilbyder kundeservice outsourcing, medarbejderrekruttering og vikarer til virksomheder.
+
+Skriv en komplet FAQ-artikel på dansk der svarer autoritativt på søgninger om: {$kw_list}
+
+Regler:
+- Brug <h1> til den overordnede sidetitel
+- Brug <h2> til hvert spørgsmål (formulér som et konkret spørgsmål)
+- Skriv svar i <p>-tags: præcist, faktabaseret, 50-80 ord pr. svar – ingen indledning, gå direkte til sagen
+- Afslut med en kort <p> call-to-action der nævner Rezponz
+- Skriv KUN HTML (h1, h2, p). Ingen markdown, ingen forklaringer, ingen kommentarer.
+PROMPT;
+
+        $html = self::openai_generate( $prompt, $opts['openai_api_key'], 3000 );
+        if ( is_wp_error( $html ) ) return $html;
+
+        $html  = self::strip_md_fences( $html );
+        $title = 'FAQ: ' . implode( ' – ', array_slice( $top, 0, 3 ) );
+        if ( preg_match( '/<h1[^>]*>(.*?)<\/h1>/is', $html, $m ) ) {
+            $title = wp_strip_all_tags( $m[1] );
+            $html  = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $html, 1 );
+        }
+        $html .= self::build_faq_schema( $html );
+
+        $pid = wp_insert_post( [ 'post_title' => $title, 'post_content' => $html, 'post_status' => 'draft', 'post_type' => 'post' ] );
+        if ( is_wp_error( $pid ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $pid->get_error_message() ], 500 );
+
+        return new WP_REST_Response( [ 'ok' => true, 'post_id' => $pid, 'title' => $title, 'edit_url' => admin_url( "post.php?post={$pid}&action=edit" ), 'created' => true ], 200 );
+    }
+
+    // ── POST /ai/fix-post ─────────────────────────────────────────────────────
+    // Opdaterer et specifikt WP-indlæg baseret på problemtype.
+    public static function ai_fix_post( WP_REST_Request $r ) {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['openai_api_key'] ) ) {
+            return new WP_Error( 'no_openai', 'Tilføj en OpenAI API-nøgle under Indstillinger for at bruge auto-fix.', [ 'status' => 400 ] );
+        }
+
+        $params   = $r->get_json_params();
+        $post_id  = (int) ( $params['post_id'] ?? 0 );
+        $fix_type = sanitize_text_field( $params['fix_type'] ?? '' );
+        $keyword  = sanitize_text_field( $params['keyword'] ?? '' );
+
+        if ( ! $post_id || ! $fix_type ) {
+            return new WP_Error( 'missing_params', 'Mangler post_id eller fix_type.', [ 'status' => 400 ] );
+        }
+
+        return self::apply_ai_fix_to_post( $post_id, $fix_type, $keyword, $opts['openai_api_key'] );
+    }
+
+    // ── Hjælper: find WP-post der matcher et søgeord ──────────────────────────
+    private static function find_post_for_keyword( string $keyword ): int {
+        if ( ! $keyword ) return 0;
+        $posts = get_posts( [
+            's'           => $keyword,
+            'post_status' => 'publish',
+            'post_type'   => 'post',
+            'numberposts' => 1,
+        ] );
+        return ! empty( $posts ) ? (int) $posts[0]->ID : 0;
+    }
+
+    // ── Hjælper: anvend AI-fix på specifik post ───────────────────────────────
+    private static function apply_ai_fix_to_post( int $post_id, string $fix_type, string $keyword, string $api_key ): WP_REST_Response {
+        $post = get_post( $post_id );
+        if ( ! $post ) {
+            return new WP_REST_Response( [ 'ok' => false, 'error' => 'Indlæg ikke fundet.' ], 404 );
+        }
+
+        $title   = $post->post_title;
+        $content = wp_strip_all_tags( $post->post_content );
+        // Begræns kontekst til 1500 tegn for at spare tokens
+        $excerpt = mb_substr( $content, 0, 1500 );
+
+        switch ( $fix_type ) {
+            case 'fix_ctr':
+                // Generer bedre title + meta description
+                $prompt = <<<PROMPT
+Du er SEO-specialist for Rezponz – et dansk kundeservice outsourcing firma.
+
+Indlæg: "{$title}"
+Primært søgeord: {$keyword}
+Nuværende indhold (uddrag): {$excerpt}
+
+Opgave: Skriv et optimeret SEO title tag og en meta description der øger CTR i Google.
+
+Krav:
+- Title: max 60 tegn, søgeordet tidligt, brug tal eller power words hvis relevant
+- Meta: 140-155 tegn, klar CTA, søgeordet inkluderet
+- Svar i dette JSON-format (ingen anden tekst):
+{"title": "...", "meta": "..."}
+PROMPT;
+                $json = self::openai_generate( $prompt, $api_key, 300 );
+                if ( is_wp_error( $json ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $json->get_error_message() ], 500 );
+
+                $data = json_decode( self::strip_md_fences( $json ), true );
+                if ( ! empty( $data['title'] ) ) {
+                    wp_update_post( [ 'ID' => $post_id, 'post_title' => sanitize_text_field( $data['title'] ) ] );
+                }
+                if ( ! empty( $data['meta'] ) ) {
+                    // Yoast SEO meta description
+                    update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_text_field( $data['meta'] ) );
+                    // SEOPress fallback
+                    update_post_meta( $post_id, '_seopress_titles_desc', sanitize_text_field( $data['meta'] ) );
+                }
+                $label = 'Title og meta opdateret';
+                break;
+
+            case 'fix_ai_vis':
+                // Tilføj FAQ-sektion med schema for AI-synlighed
+                $prompt = <<<PROMPT
+Du er SEO-skribent for Rezponz – et dansk firma der tilbyder kundeservice outsourcing og rekruttering.
+
+Eksisterende blogindlæg: "{$title}"
+Søgeord: {$keyword}
+Indhold (uddrag): {$excerpt}
+
+Opgave: Skriv en FAQ-sektion der tilføjes nederst i indlægget for at øge AI-synlighed.
+
+Krav:
+- 4-5 H2-spørgsmål der er naturlige opfølgningsspørgsmål til indlæggets emne
+- Svar på 45-65 ord pr. spørgsmål – direkte og faktabaseret
+- Skriv KUN HTML (h2, p). Ingen markdown, ingen forklaringer.
+PROMPT;
+                $faq_html = self::openai_generate( $prompt, $api_key, 1200 );
+                if ( is_wp_error( $faq_html ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $faq_html->get_error_message() ], 500 );
+
+                $faq_html  = self::strip_md_fences( $faq_html );
+                $faq_html .= self::build_faq_schema( $faq_html );
+                $new_content = $post->post_content . "\n\n<h2>Ofte stillede spørgsmål</h2>\n" . $faq_html;
+                wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ] );
+                $label = 'FAQ-sektion tilføjet';
+                break;
+
+            case 'fix_snippet':
+                // Tilføj/omskriv intro-afsnit til Featured Snippet-format
+                $prompt = <<<PROMPT
+Du er SEO-skribent for Rezponz – et dansk firma der tilbyder kundeservice outsourcing og rekruttering.
+
+Eksisterende blogindlæg: "{$title}"
+Søgeord: {$keyword}
+Indhold (uddrag): {$excerpt}
+
+Opgave: Skriv et nyt indledningsafsnit optimeret til Featured Snippet.
+
+Krav:
+- Start med en <h2> der er søgeordets primære spørgsmål ("Hvad er {$keyword}?")
+- Direkte svar i <p> på præcis 45-55 ord – ingen indledning, gå direkte til svaret
+- Skriv KUN HTML (h2, p). Ingen markdown.
+PROMPT;
+                $snippet_html = self::openai_generate( $prompt, $api_key, 400 );
+                if ( is_wp_error( $snippet_html ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $snippet_html->get_error_message() ], 500 );
+
+                $snippet_html = self::strip_md_fences( $snippet_html );
+                $new_content  = $snippet_html . "\n\n" . $post->post_content;
+                wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ] );
+                $label = 'Snippet-sektion tilføjet';
+                break;
+
+            case 'fix_paa':
+                // Tilføj Q&A-sektion til "Folk spørger også"
+                $prompt = <<<PROMPT
+Du er SEO-skribent for Rezponz – et dansk firma der tilbyder kundeservice outsourcing og rekruttering.
+
+Eksisterende blogindlæg: "{$title}"
+Søgeord: {$keyword}
+Indhold (uddrag): {$excerpt}
+
+Opgave: Skriv 5 "Folk spørger også"-spørgsmål og svar der tilføjes til indlægget.
+
+Krav:
+- H2 med naturlige brugerspørgsmål folk stiller om dette emne
+- Svar i <p> på 35-50 ord – direkte og præcist
+- Skriv KUN HTML (h2, p). Ingen markdown.
+PROMPT;
+                $paa_html = self::openai_generate( $prompt, $api_key, 900 );
+                if ( is_wp_error( $paa_html ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $paa_html->get_error_message() ], 500 );
+
+                $paa_html  = self::strip_md_fences( $paa_html );
+                $paa_html .= self::build_faq_schema( $paa_html );
+                $new_content = $post->post_content . "\n\n" . $paa_html;
+                wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_content ] );
+                $label = 'Q&A-sektion tilføjet';
+                break;
+
+            case 'fix_content':
+                // Udvid og forbedre eksisterende indhold
+                $prompt = <<<PROMPT
+Du er SEO-skribent for Rezponz – et dansk firma der tilbyder kundeservice outsourcing og rekruttering.
+
+Eksisterende blogindlæg: "{$title}"
+Søgeord: {$keyword}
+Nuværende indhold: {$excerpt}
+
+Opgave: Genskriv og udvid dette indlæg til mindst 800 ord. Bevar tonen og emnet.
+
+Krav:
+- <h1> med optimeret titel (søgeord tidligt)
+- Inddel med logiske <h2>-sektioner
+- Mindst 800 ord med værdifuldt, faktabaseret indhold
+- Afslut med en FAQ-sektion (3 spørgsmål) og call-to-action om Rezponz
+- Skriv KUN HTML. Ingen markdown.
+PROMPT;
+                $new_html = self::openai_generate( $prompt, $api_key, 2500 );
+                if ( is_wp_error( $new_html ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $new_html->get_error_message() ], 500 );
+
+                $new_html = self::strip_md_fences( $new_html );
+                if ( preg_match( '/<h1[^>]*>(.*?)<\/h1>/is', $new_html, $m ) ) {
+                    wp_update_post( [ 'ID' => $post_id, 'post_title' => wp_strip_all_tags( $m[1] ) ] );
+                    $new_html = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $new_html, 1 );
+                }
+                $new_html .= self::build_faq_schema( $new_html );
+                wp_update_post( [ 'ID' => $post_id, 'post_content' => $new_html ] );
+                $label = 'Indhold forbedret og udvidet';
+                break;
+
+            case 'fix_rewrite':
+                // Komplet omskrivning
+                $prompt = <<<PROMPT
+Du er SEO-skribent for Rezponz – et dansk firma der tilbyder kundeservice outsourcing og rekruttering.
+
+Omskriv dette blogindlæg komplet til en stærk SEO-artikel på mindst 1.000 ord.
+Titel: "{$title}"
+Søgeord: {$keyword}
+
+Krav:
+- <h1> med kraftfuld, søgeordsoptimeret titel
+- 5-7 <h2>-sektioner med substans
+- Fakta, fordele, og praktisk vejledning
+- FAQ-sektion (5 spørgsmål) og tydelig call-to-action til Rezponz
+- Skriv KUN HTML. Ingen markdown.
+PROMPT;
+                $rewrite = self::openai_generate( $prompt, $api_key, 3500 );
+                if ( is_wp_error( $rewrite ) ) return new WP_REST_Response( [ 'ok' => false, 'error' => $rewrite->get_error_message() ], 500 );
+
+                $rewrite = self::strip_md_fences( $rewrite );
+                if ( preg_match( '/<h1[^>]*>(.*?)<\/h1>/is', $rewrite, $m ) ) {
+                    wp_update_post( [ 'ID' => $post_id, 'post_title' => wp_strip_all_tags( $m[1] ) ] );
+                    $rewrite = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $rewrite, 1 );
+                }
+                $rewrite .= self::build_faq_schema( $rewrite );
+                wp_update_post( [ 'ID' => $post_id, 'post_content' => $rewrite ] );
+                $label = 'Indlæg omskrevet';
+                break;
+
+            default:
+                return new WP_REST_Response( [ 'ok' => false, 'error' => 'Ukendt fix_type: ' . $fix_type ], 400 );
+        }
+
+        return new WP_REST_Response( [
+            'ok'       => true,
+            'post_id'  => $post_id,
+            'label'    => $label,
+            'edit_url' => admin_url( "post.php?post={$post_id}&action=edit" ),
+        ], 200 );
+    }
+
+    // ── Hjælpere ──────────────────────────────────────────────────────────────
+
+    private static function openai_generate( string $prompt, string $api_key, int $max_tokens = 2000 ): string|\WP_Error {
+        $res = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
+            'headers' => [ 'Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json' ],
+            'body'    => wp_json_encode( [ 'model' => 'gpt-4o-mini', 'messages' => [ [ 'role' => 'user', 'content' => $prompt ] ], 'max_tokens' => $max_tokens, 'temperature' => 0.5 ] ),
+            'timeout' => 90,
+        ] );
+        if ( is_wp_error( $res ) ) return $res;
+        $code = wp_remote_retrieve_response_code( $res );
+        if ( $code !== 200 ) {
+            $err = json_decode( wp_remote_retrieve_body( $res ), true );
+            return new WP_Error( 'openai_http', $err['error']['message'] ?? 'OpenAI fejl ' . $code );
+        }
+        $body = json_decode( wp_remote_retrieve_body( $res ), true );
+        return trim( $body['choices'][0]['message']['content'] ?? '' );
+    }
+
+    private static function strip_md_fences( string $text ): string {
+        $text = preg_replace( '/^```(?:html|json)?\s*/i', '', trim( $text ) );
+        return preg_replace( '/\s*```$/', '', $text );
+    }
+
+    private static function build_faq_schema( string $html ): string {
+        $items = [];
+        preg_match_all( '/<h2[^>]*>(.*?)<\/h2>\s*(?:<p[^>]*>(.*?)<\/p>)/is', $html, $matches, PREG_SET_ORDER );
+        foreach ( $matches as $m ) {
+            $q = wp_strip_all_tags( $m[1] );
+            $a = wp_strip_all_tags( $m[2] );
+            if ( $q && $a ) {
+                $items[] = [ '@type' => 'Question', 'name' => $q, 'acceptedAnswer' => [ '@type' => 'Answer', 'text' => $a ] ];
+            }
+        }
+        if ( empty( $items ) ) return '';
+        $schema = wp_json_encode( [ '@context' => 'https://schema.org', '@type' => 'FAQPage', 'mainEntity' => $items ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
+        return "\n\n<script type=\"application/ld+json\">\n{$schema}\n</script>";
     }
 
     public static function blog_ai_suggestions( WP_REST_Request $r ) {

@@ -48,6 +48,50 @@ class RZPA_Quiz_API {
                 'id' => [ 'validate_callback' => fn( $v ) => is_numeric( $v ) ],
             ],
         ] );
+
+        register_rest_route( 'rzpa/v1', '/quiz/email-template', [
+            'methods'             => 'GET',
+            'callback'            => [ __CLASS__, 'get_email_template' ],
+            'permission_callback' => fn() => current_user_can( 'manage_options' ),
+        ] );
+
+        register_rest_route( 'rzpa/v1', '/quiz/email-template', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'save_email_template' ],
+            'permission_callback' => fn() => current_user_can( 'manage_options' ),
+        ] );
+    }
+
+    // ── Standardskabelon ─────────────────────────────────────────────────────
+
+    private static function default_template(): array {
+        return [
+            'subject' => 'Vi vil gerne invitere dig til Rezponz 👋',
+            'body'    => "Hej {navn},\n\nTak fordi du har udfyldt vores profil-quiz! Vi kunne rigtig godt tænke os at lære dig bedre at kende.\n\nVi vil gerne invitere dig til at komme forbi vores kontor i Aalborg, så du kan se, hvad vi laver, møde teamet og stille alle de spørgsmål, du måtte have. Der er ingen forpligtelser — det er blot en uformel snak over en kop kaffe ☕\n\nHar du lyst, så svar blot på denne mail med et tidspunkt, der passer dig — eller ring til os.\n\nVi glæder os til at høre fra dig!",
+        ];
+    }
+
+    // ── GET /quiz/email-template ──────────────────────────────────────────────
+
+    public static function get_email_template( WP_REST_Request $req ): WP_REST_Response {
+        $saved = get_option( 'rzpa_quiz_invite_tpl', [] );
+        $tpl   = array_merge( self::default_template(), $saved );
+        return new WP_REST_Response( [ 'ok' => true, 'template' => $tpl ], 200 );
+    }
+
+    // ── POST /quiz/email-template ─────────────────────────────────────────────
+
+    public static function save_email_template( WP_REST_Request $req ): WP_REST_Response {
+        $p       = $req->get_json_params();
+        $subject = sanitize_text_field( $p['subject'] ?? '' );
+        $body    = sanitize_textarea_field( $p['body'] ?? '' );
+
+        if ( ! $subject || ! $body ) {
+            return new WP_REST_Response( [ 'ok' => false, 'error' => 'Emne og besked er påkrævet.' ], 400 );
+        }
+
+        update_option( 'rzpa_quiz_invite_tpl', [ 'subject' => $subject, 'body' => $body ] );
+        return new WP_REST_Response( [ 'ok' => true ], 200 );
     }
 
     // ── GET /quiz/submission/{id} ─────────────────────────────────────────────
@@ -76,7 +120,7 @@ class RZPA_Quiz_API {
         $params  = $req->get_json_params();
         $to      = sanitize_email( $params['to'] ?? '' );
         $subject = sanitize_text_field( $params['subject'] ?? '' );
-        $body    = wp_kses_post( $params['body'] ?? '' );
+        $body    = sanitize_textarea_field( $params['body'] ?? '' );
 
         if ( ! $to || ! is_email( $to ) ) {
             return new WP_REST_Response( [ 'error' => 'Kandidaten har ingen e-mailadresse.' ], 400 );
@@ -91,8 +135,11 @@ class RZPA_Quiz_API {
             'Reply-To: ' . self::ADMIN_EMAIL,
         ];
 
-        $html_body = nl2br( esc_html( $body ) );
-        $sent = wp_mail( $to, $subject, $html_body, $headers );
+        $logo_url   = esc_url( RZPA_URL . 'assets/Rezponz-logo.png' );
+        $body_html  = nl2br( esc_html( $body ) );
+        $html_email = self::build_html_email( $body_html, $logo_url );
+
+        $sent = wp_mail( $to, $subject, $html_email, $headers );
 
         if ( $sent ) {
             RZPA_Quiz_DB::mark_mail_sent( $id );
@@ -100,6 +147,61 @@ class RZPA_Quiz_API {
         }
 
         return new WP_REST_Response( [ 'sent' => $sent ], $sent ? 200 : 500 );
+    }
+
+    private static function build_html_email( string $body_html, string $logo_url ): string {
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="da">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:600px;width:100%">
+
+        <!-- Header med logo -->
+        <tr>
+          <td style="background:#0a0a0a;padding:24px 32px">
+            <img src="{$logo_url}" alt="Rezponz" style="height:36px;display:block">
+          </td>
+        </tr>
+
+        <!-- Brødtekst -->
+        <tr>
+          <td style="padding:36px 32px 24px;color:#222222;font-size:15px;line-height:1.7">
+            {$body_html}
+          </td>
+        </tr>
+
+        <!-- Signatur -->
+        <tr>
+          <td style="padding:0 32px 32px">
+            <table cellpadding="0" cellspacing="0" style="border-top:1px solid #e8e8e8;padding-top:20px;width:100%">
+              <tr>
+                <td style="vertical-align:middle">
+                  <img src="{$logo_url}" alt="Rezponz" style="height:28px;display:block;margin-bottom:8px">
+                  <span style="font-size:14px;font-weight:700;color:#111">Lie Svenningsen</span><br>
+                  <span style="font-size:13px;color:#666">Rezponz</span><br>
+                  <a href="mailto:lie@rezponz.dk" style="font-size:13px;color:#5d8089;text-decoration:none">lie@rezponz.dk</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f9f9f9;padding:16px 32px;border-top:1px solid #eeeeee;font-size:12px;color:#aaaaaa;text-align:center">
+            Rezponz · Aalborg · <a href="https://rezponz.dk" style="color:#aaa;text-decoration:none">rezponz.dk</a>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+HTML;
     }
 
     // ── GET /quiz ─────────────────────────────────────────────────────────────

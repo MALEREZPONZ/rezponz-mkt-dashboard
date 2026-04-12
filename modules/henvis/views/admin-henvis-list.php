@@ -227,7 +227,7 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
     <thead>
       <tr>
         <th style="width:36px;text-align:center">
-          <input type="checkbox" id="rzpz-check-all" title="Vælg alle" style="cursor:pointer;width:15px;height:15px;accent-color:#f59e0b">
+          <input type="checkbox" id="rzpz-check-all" title="Vælg alle" style="cursor:pointer;width:15px;height:15px;accent-color:#ffaa33">
         </th>
         <th>#</th>
         <th>Dato</th>
@@ -268,7 +268,7 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
         <td style="text-align:center">
           <?php if ( $r->status === 'hired' && ! $bonus_sent ) : ?>
             <input type="checkbox" class="rzpz-batch-cb" value="<?php echo $row_id; ?>"
-                   style="cursor:pointer;width:15px;height:15px;accent-color:#f59e0b">
+                   style="cursor:pointer;width:15px;height:15px;accent-color:#ffaa33">
           <?php endif; ?>
         </td>
         <td><?php echo $row_id; ?></td>
@@ -338,7 +338,7 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
               <input type="hidden" name="action"      value="rzpz_henvis_delete">
               <input type="hidden" name="referral_id" value="<?php echo $row_id; ?>">
               <?php wp_nonce_field( 'rzpz_henvis_delete' ); ?>
-              <button type="submit" class="rzpz-btn-xs" style="color:#f87171;border-color:#f8717140" title="Slet henvisning">🗑️</button>
+              <button type="submit" class="rzpz-btn-xs" style="color:#ff5555;border-color:#ff555540" title="Slet henvisning">🗑️</button>
             </form>
           </div>
           <?php if ( $has_note ) : ?>

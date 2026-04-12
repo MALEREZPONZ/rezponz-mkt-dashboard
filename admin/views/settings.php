@@ -166,7 +166,7 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
         'response_type' => 'code',
         'scope'         => 'https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/indexing',
         'access_type'   => 'offline',
-        'prompt'        => 'consent',
+        'prompt'        => 'select_account consent',
     ] );
 
     // Success / error beskeder

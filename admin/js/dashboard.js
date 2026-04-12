@@ -970,6 +970,8 @@ const RZPA_App = (() => {
         title: 'Tilføj SerpAPI-nøgle for at aktivere AI-tracking',
         desc:  'Uden SerpAPI-nøgle tracker vi ikke din faktiske synlighed. Gå til Indstillinger → SerpAPI og indsæt din nøgle.',
         impact: 'Kritisk',
+        type: 'settings_link',
+        fixLabel: '⚙️ Indstillinger',
       });
     }
     if (hasKey && !total && tracked.length) {
@@ -978,6 +980,8 @@ const RZPA_App = (() => {
         title: 'Klik "Sync SerpAPI" for at hente din synlighed',
         desc:  `Du har ${tracked.length} søgeord konfigureret men ingen synlighedsdata endnu. Tryk knappen øverst til højre.`,
         impact: 'Kritisk',
+        type: 'sync_btn',
+        fixLabel: '⟳ Sync nu',
       });
     }
     if (noAI.length > 0) {
@@ -987,6 +991,9 @@ const RZPA_App = (() => {
         title: `Skriv FAQ-sider til ${noAI.length} søgeord der mangler AI Overview`,
         desc:  `${kws}${noAI.length > 3 ? ` og ${noAI.length - 3} andre` : ''} udløser ikke AI Overview. Lav en dedikeret FAQ-side pr. søgeord med direkte, autoritative svar på 300–500 ord. Google AI henter fra præcise, strukturerede svar.`,
         impact: 'Høj effekt',
+        type: 'faq_pages',
+        fixLabel: 'Opret FAQ-udkast',
+        fixKw: noAI.map(k => k.keyword),
       });
     }
     if (noSnip.length > 0 && total > 0) {
@@ -995,6 +1002,9 @@ const RZPA_App = (() => {
         title: `Strukturér ${noSnip.length} sider til Featured Snippet`,
         desc:  'Google foretrækker svar i korte afsnit på 40–60 ord eller som lister/tabeller. Brug H2-overskrifter med spørgsmålsformat ("Hvad er…?") og svar direkte nedenunder uden indledning.',
         impact: 'Høj effekt',
+        type: 'featured_snippet',
+        fixLabel: 'Opret optimeringsudkast',
+        fixKw: noSnip.map(k => k.keyword),
       });
     }
     if (noPAA.length > 0 && total > 0) {
@@ -1003,6 +1013,9 @@ const RZPA_App = (() => {
         title: `Tilføj Q&A-sektion på ${noPAA.length} sider for "Folk spørger også"`,
         desc:  '"Folk spørger også"-boksen drives af relaterede spørgsmål. Tilføj 5–8 Q&A-par på dine vigtigste sider og implementér FAQPage Schema Markup (JSON-LD) for at øge sandsynligheden markant.',
         impact: 'Middel effekt',
+        type: 'paa_sections',
+        fixLabel: 'Opret Q&A-udkast',
+        fixKw: noPAA.map(k => k.keyword),
       });
     }
     if (logData.length === 0) {
@@ -1011,6 +1024,8 @@ const RZPA_App = (() => {
         title: 'Log dine første ChatGPT/Perplexity-testsvar',
         desc:  'Test manuelt: spørg ChatGPT "Hvem tilbyder kundeservice outsourcing i Danmark?" og log svaret nedenfor. Det giver dig konkret indsigt i om AI-assistenter kender Rezponz.',
         impact: 'Vigtig data',
+        type: 'scroll_logs',
+        fixLabel: '📋 Åbn logform',
       });
     }
     if (logData.length > 0 && mentioned === 0) {
@@ -1157,15 +1172,72 @@ const RZPA_App = (() => {
       if (!actions.length) {
         planEl.innerHTML = '<div style="padding:16px 0;color:#4ade80;font-size:13px">✅ Ingen kritiske handlinger – din AI-synlighed ser stærk ud!</div>';
       } else {
-        planEl.innerHTML = actions.map((a, i) => `
+        planEl.innerHTML = actions.map((a, i) => {
+          const storeKey = a.type ? `rzpa_fiks_${a.type}` : null;
+          const stored   = storeKey ? (() => { try { return localStorage.getItem(storeKey); } catch(e) { return null; } })() : null;
+          let fixBtn = '';
+          if (a.type === 'settings_link') {
+            fixBtn = `<a href="${RZPA?.settingsUrl||'#'}" class="rzpa-fiks-btn">${a.fixLabel}</a>`;
+          } else if (a.type === 'sync_btn') {
+            fixBtn = `<button class="rzpa-fiks-btn" onclick="document.getElementById('rzpa-ai-sync')?.click()">${a.fixLabel}</button>`;
+          } else if (a.type === 'scroll_logs') {
+            fixBtn = `<button class="rzpa-fiks-btn rzpa-fiks-scroll" data-target="rzpa-manual-log-form">${a.fixLabel}</button>`;
+          } else if (a.type && stored) {
+            try {
+              const d = JSON.parse(stored);
+              fixBtn = `<a href="${d.url}" target="_blank" class="rzpa-fiks-btn rzpa-fiks-done">✓ Udkast oprettet →</a>`;
+            } catch(e) {}
+          } else if (a.type) {
+            fixBtn = `<button class="rzpa-fiks-btn" data-fix-type="${a.type}" data-fix-kw="${encodeURIComponent(JSON.stringify(a.fixKw||[]))}">${a.fixLabel}</button>`;
+          }
+          return `
           <div style="display:flex;gap:14px;align-items:flex-start;padding:14px 16px;background:rgba(255,255,255,.03);border-radius:10px;border-left:3px solid ${a.color}">
             <div style="width:22px;height:22px;border-radius:50%;background:${a.color}22;border:1px solid ${a.color}55;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:800;color:${a.color}">${i+1}</div>
             <div style="flex:1;min-width:0">
               <div style="font-size:13px;font-weight:600;color:#e5e5e5;margin-bottom:4px">${a.title}</div>
               <div style="font-size:12px;color:#777;line-height:1.55">${a.desc}</div>
             </div>
-            <span style="font-size:10px;padding:3px 9px;border-radius:10px;background:${a.color}18;color:${a.color};white-space:nowrap;flex-shrink:0;margin-top:2px">${a.impact}</span>
-          </div>`).join('');
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+              <span style="font-size:10px;padding:3px 9px;border-radius:10px;background:${a.color}18;color:${a.color};white-space:nowrap">${a.impact}</span>
+              ${fixBtn}
+            </div>
+          </div>`;
+        }).join('');
+
+        // Scroll-knapper
+        planEl.querySelectorAll('.rzpa-fiks-scroll').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const t = document.getElementById(btn.dataset.target);
+            if (t) t.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          });
+        });
+
+        // API fix-knapper
+        planEl.querySelectorAll('[data-fix-type]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const type = btn.dataset.fixType;
+            const keywords = (() => { try { return JSON.parse(decodeURIComponent(btn.dataset.fixKw || '%5B%5D')); } catch(e) { return []; } })();
+            btn.disabled = true;
+            btn.textContent = '⏳ Fikser…';
+            try {
+              const res = await api('/ai/fix-action', { method: 'POST', body: JSON.stringify({ type, keywords }) });
+              if (res.ok && res.edit_url) {
+                try { localStorage.setItem(`rzpa_fiks_${type}`, JSON.stringify({ url: res.edit_url, title: res.title })); } catch(e) {}
+                btn.outerHTML = `<a href="${res.edit_url}" target="_blank" class="rzpa-fiks-btn rzpa-fiks-done">✓ Fikset – se udkast →</a>`;
+              } else {
+                const msg = res.message || res.data?.message || '✗ Fejl';
+                btn.textContent = msg.length > 30 ? '✗ Fejl' : msg;
+                btn.title = msg;
+                btn.style.color = '#ff5555';
+                btn.disabled = false;
+              }
+            } catch(err) {
+              btn.textContent = '✗ Fejl';
+              btn.style.color = '#ff5555';
+              btn.disabled = false;
+            }
+          });
+        });
       }
     }
 
@@ -1194,17 +1266,47 @@ const RZPA_App = (() => {
           ? '<span style="color:#4ade80;font-size:15px">✓</span>'
           : '<span style="color:#2d2d2d;font-size:13px">✗</span>';
         kwTbody.innerHTML = keywords.map(k => {
-          const filter = k.has_ai_overview == 1 ? 'has_ai' : 'missing';
+          const filter  = k.has_ai_overview == 1 ? 'has_ai' : 'missing';
+          const kwEnc   = encodeURIComponent(JSON.stringify([k.keyword]));
+          const fixType = k.has_ai_overview != 1 ? 'faq_pages' : k.has_featured_snippet != 1 ? 'featured_snippet' : k.has_paa != 1 ? 'paa_sections' : null;
+          const fixLbl  = k.has_ai_overview != 1 ? 'Opret FAQ' : k.has_featured_snippet != 1 ? 'Opret udkast' : k.has_paa != 1 ? 'Opret Q&A' : '';
+          const fixBtn  = fixType ? `<button class="rzpa-kw-fix-btn" data-fix-type="${fixType}" data-fix-kw="${kwEnc}" style="margin-left:6px;font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid rgba(204,255,0,.25);background:rgba(204,255,0,.06);color:var(--neon);cursor:pointer;white-space:nowrap">${fixLbl}</button>` : '';
           return `<tr data-filter="${filter}">
             <td style="padding-left:20px;font-weight:500;color:#e5e5e5">${k.keyword}</td>
             <td style="text-align:center">${chk(k.has_ai_overview)}</td>
             <td style="text-align:center">${chk(k.has_featured_snippet)}</td>
             <td style="text-align:center">${chk(k.has_paa)}</td>
-            <td style="font-size:12px;color:#999">${kwNextStep(k)}</td>
+            <td style="font-size:12px;color:#999">${kwNextStep(k)}${fixBtn}</td>
             <td style="text-align:center">${kwPriority(k)}</td>
           </tr>`;
         }).join('');
         if (kwCount) kwCount.textContent = `${total} søgeord`;
+
+        // Klik-handler for per-søgeord Fiks-knapper
+        kwTbody.querySelectorAll('.rzpa-kw-fix-btn').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            e.stopPropagation();
+            const type = btn.dataset.fixType;
+            const kws  = (() => { try { return JSON.parse(decodeURIComponent(btn.dataset.fixKw || '%5B%5D')); } catch(err) { return []; } })();
+            btn.disabled = true;
+            btn.textContent = '⏳';
+            try {
+              const res = await api('/ai/fix-action', { method: 'POST', body: JSON.stringify({ type, keywords: kws }) });
+              if (res.ok && res.edit_url) {
+                btn.outerHTML = `<a href="${res.edit_url}" target="_blank" style="margin-left:6px;font-size:10px;color:#4ade80;text-decoration:none;white-space:nowrap">✓ Fikset →</a>`;
+              } else {
+                btn.textContent = '✗';
+                btn.title = res.message || '';
+                btn.style.color = '#ff5555';
+                btn.disabled = false;
+              }
+            } catch(err) {
+              btn.textContent = '✗';
+              btn.style.color = '#ff5555';
+              btn.disabled = false;
+            }
+          });
+        });
       }
     }
 
@@ -3742,6 +3844,17 @@ const RZPA_App = (() => {
       container.style.gridTemplateColumns = 'repeat(5, 1fr)';
     }
 
+    // Mapper rec_label → fix_type der matches med PHP's apply_ai_fix_to_post()
+    const BLOG_FIX_MAP = {
+      'Ikke i GSC':           'fix_content',
+      'Optimer title & CTR':  'fix_ctr',
+      'Øg AI-synlighed':      'fix_ai_vis',
+      'Mangler AI-synlighed': 'fix_ai_vis',
+      'Tæt på side 1':        'fix_content',
+      'Svag placering':       'fix_content',
+      'Meget lav synlighed':  'fix_rewrite',
+    };
+
     function renderBlogTable(posts, container) {
       if (!posts.length) {
         container.innerHTML = '<div class="rzpa-empty-state">Ingen indlæg matcher det valgte filter.</div>';
@@ -3814,6 +3927,7 @@ const RZPA_App = (() => {
                   <span class="rzpa-blog-rec-dot">${priDot(post.priority)}</span>
                   <span class="rzpa-blog-rec-label">${post.rec_label}</span>
                   ${!post.has_gsc ? `<button class="rzpa-index-btn" data-url="${post.url}" title="Bed Google om at indeksere denne side">↗ Indekser</button>` : ''}
+                  ${BLOG_FIX_MAP[post.rec_label] && post.post_id ? `<button class="rzpa-blog-fix-btn rzpa-index-btn" data-post-id="${post.post_id}" data-fix-type="${BLOG_FIX_MAP[post.rec_label]}" data-keyword="${encodeURIComponent(post.title)}" style="border-color:rgba(204,255,0,.3);color:var(--neon)">⚡ Fiks</button>` : ''}
                 </td>
               </tr>
               <tr class="rzpa-blog-expand-row" id="expand-${post.post_id}" style="display:none">
@@ -3861,6 +3975,34 @@ const RZPA_App = (() => {
         });
       });
 
+      // ⚡ Fiks-knapper på blogindlæg
+      container.querySelectorAll('.rzpa-blog-fix-btn').forEach(btn => {
+        btn.addEventListener('click', async e => {
+          e.stopPropagation();
+          const postId   = btn.dataset.postId;
+          const fixType  = btn.dataset.fixType;
+          const keyword  = decodeURIComponent(btn.dataset.keyword || '');
+          btn.disabled = true;
+          btn.textContent = '⏳ Fikser…';
+          try {
+            const res = await api('/ai/fix-post', { method: 'POST', body: JSON.stringify({ post_id: parseInt(postId), fix_type: fixType, keyword }) });
+            if (res.ok) {
+              btn.outerHTML = `<a href="${res.edit_url}" target="_blank" class="rzpa-index-btn" style="text-decoration:none;color:#4ade80;border-color:rgba(74,222,128,.3)">✓ ${res.label || 'Fikset'} →</a>`;
+            } else {
+              const msg = res.message || res.data?.message || '✗ Fejl';
+              btn.textContent = msg.length > 20 ? '✗ Fejl' : msg;
+              btn.title = msg;
+              btn.style.color = '#ff5555';
+              btn.disabled = false;
+            }
+          } catch(err) {
+            btn.textContent = '✗ Fejl';
+            btn.style.color = '#ff5555';
+            btn.disabled = false;
+          }
+        });
+      });
+
       // Klik på række → toggle udvidet anbefaling
       container.querySelectorAll('.rzpa-blog-row').forEach(row => {
         row.addEventListener('click', () => {
@@ -3897,9 +4039,13 @@ const RZPA_App = (() => {
           body: JSON.stringify({ days }),
         });
 
+        // WP_Error format: { code, message, data: { status } }
+        if (r.code && r.message) throw new Error(r.message);
+        if (r.success === false && r.error) throw new Error(r.error);
+
         const suggestions = r.data ?? r;
         if (!Array.isArray(suggestions) || !suggestions.length) {
-          throw new Error('Ingen forslag modtaget fra AI.');
+          throw new Error('Ingen forslag modtaget fra AI. Tjek at OpenAI API-nøgle er sat under Indstillinger.');
         }
 
         aiResult.innerHTML = renderAISuggestions(suggestions);

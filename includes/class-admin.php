@@ -252,6 +252,7 @@ class RZPA_Admin {
             'meta_account_id' => sanitize_text_field( get_option( 'rzpa_settings', [] )['meta_ad_account_id'] ?? '' ),
             'settingsUrl'     => admin_url( 'admin.php?page=rzpa-settings' ),
             'adminPostUrl'    => admin_url( 'admin-post.php' ),
+            'adminUrl'        => admin_url(),
             'pdfNonce'        => wp_create_nonce( 'rzpa_pdf_download' ),
         ] );
     }

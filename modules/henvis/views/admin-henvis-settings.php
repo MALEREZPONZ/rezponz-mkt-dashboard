@@ -777,7 +777,7 @@ table.rzpz-mgr-table { width:100%; border-collapse:collapse; }
   <!-- Tips -->
   <div class="rzpz-hs-card" style="border-color:#CCFF0030">
     <h2>💡 Tips til brug af QR-koden</h2>
-    <ul style="color:#888;font-size:13px;line-height:2;padding-left:20px;margin:0">
+    <ul style="color:#8888a0;font-size:13px;line-height:2;padding-left:20px;margin:0">
       <li>Print QR-koden og hæng den op på kontoret</li>
       <li>Indsæt den i onboarding-materialer til nye medarbejdere</li>
       <li>Del den på interne Slack/Teams-kanaler</li>

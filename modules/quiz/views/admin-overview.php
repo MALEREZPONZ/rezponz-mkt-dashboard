@@ -520,6 +520,124 @@ $tab = $tab ?? 'submissions';
 
   <?php endif; ?>
 
+  <?php if ( $tab === 'email' ) : ?>
+  <!-- ── Invitations-skabelon ──────────────────────────────────────────────── -->
+  <div style="margin-top:28px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:28px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <h2 style="margin:0;font-size:16px;font-weight:800;color:#f0f0f2">✉️ Invitations-mail skabelon</h2>
+      <span style="font-size:11px;color:#555">Brug <code style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.07);padding:1px 6px;border-radius:5px;color:#CCFF00">{navn}</code> som pladsholder for kandidatens navn</span>
+    </div>
+    <p style="margin:0 0 22px;font-size:13px;color:#888">Redigér den mail der sendes via "Send invitation"-knappen på en kandidat sat til <strong style="color:#CCFF00">Interessant ⭐</strong>. Signaturen med Rezponz-logo tilføjes automatisk.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">
+
+      <!-- Editor -->
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:6px">Emne</label>
+        <input id="rzpa-tpl-subject" type="text"
+               style="width:100%;background:#111116;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 14px;font-size:14px;color:#f0f0f2;outline:none;font-family:inherit;margin-bottom:16px;box-sizing:border-box;transition:border-color .18s"
+               onfocus="this.style.borderColor='#CCFF00'" onblur="this.style.borderColor='rgba(255,255,255,.07)'">
+
+        <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:6px">Besked</label>
+        <textarea id="rzpa-tpl-body" rows="12"
+                  style="width:100%;background:#111116;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px 14px;font-size:14px;color:#f0f0f2;font-family:inherit;resize:vertical;box-sizing:border-box;line-height:1.65;outline:none;transition:border-color .18s"
+                  onfocus="this.style.borderColor='#CCFF00'" onblur="this.style.borderColor='rgba(255,255,255,.07)'"></textarea>
+
+        <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
+          <button id="rzpa-tpl-save" style="background:#CCFF00;color:#000;border:none;border-radius:999px;padding:11px 28px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s">
+            💾 Gem skabelon
+          </button>
+          <span id="rzpa-tpl-status" style="font-size:13px;display:none"></span>
+        </div>
+      </div>
+
+      <!-- Email preview -->
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:10px">Forhåndsvisning</div>
+        <div style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.4)">
+          <!-- Header -->
+          <div style="background:#0a0a0a;padding:14px 20px">
+            <img src="<?php echo esc_url( RZPA_URL . 'assets/Rezponz-logo.png' ); ?>" alt="Rezponz" style="height:28px;display:block">
+          </div>
+          <!-- Body preview -->
+          <div style="padding:20px;font-size:13px;color:#222;line-height:1.7;font-family:Arial,sans-serif">
+            <div id="rzpa-tpl-preview-body" style="white-space:pre-wrap;margin-bottom:16px"></div>
+          </div>
+          <!-- Signature preview -->
+          <div style="padding:0 20px 16px;border-top:1px solid #eee;margin:0 20px">
+            <div style="padding-top:14px;display:flex;align-items:center;gap:10px">
+              <img src="<?php echo esc_url( RZPA_URL . 'assets/Rezponz-logo.png' ); ?>" alt="Rezponz" style="height:22px">
+              <div style="font-size:12px;color:#555;line-height:1.5">
+                <strong style="color:#111">Lie Svenningsen</strong><br>
+                Rezponz · <a href="mailto:lie@rezponz.dk" style="color:#5d8089">lie@rezponz.dk</a>
+              </div>
+            </div>
+          </div>
+          <!-- Footer -->
+          <div style="background:#f9f9f9;padding:10px 20px;border-top:1px solid #eee;font-size:11px;color:#aaa;text-align:center">
+            Rezponz · Aalborg · rezponz.dk
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    var nonce  = '<?php echo esc_js( wp_create_nonce( 'wp_rest' ) ); ?>';
+    var apiBase = '<?php echo esc_js( rest_url( 'rzpa/v1' ) ); ?>';
+    var subjectEl = document.getElementById('rzpa-tpl-subject');
+    var bodyEl    = document.getElementById('rzpa-tpl-body');
+    var previewEl = document.getElementById('rzpa-tpl-preview-body');
+    var saveBtn   = document.getElementById('rzpa-tpl-save');
+    var statusEl  = document.getElementById('rzpa-tpl-status');
+
+    // Live preview
+    function updatePreview() {
+      if (previewEl) previewEl.textContent = (bodyEl.value || '').replace(/\{navn\}/g, 'Mathilde');
+    }
+    bodyEl.addEventListener('input', updatePreview);
+
+    // Hent gemt skabelon
+    fetch(apiBase + '/quiz/email-template', { headers: { 'X-WP-Nonce': nonce } })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.ok && d.template) {
+          subjectEl.value = d.template.subject || '';
+          bodyEl.value    = d.template.body    || '';
+          updatePreview();
+        }
+      });
+
+    // Gem skabelon
+    saveBtn.addEventListener('click', function() {
+      saveBtn.disabled = true;
+      saveBtn.textContent = '⏳ Gemmer…';
+      fetch(apiBase + '/quiz/email-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce },
+        body: JSON.stringify({ subject: subjectEl.value, body: bodyEl.value })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 Gem skabelon';
+        statusEl.style.display = 'inline';
+        if (d.ok) {
+          statusEl.textContent = '✓ Gemt';
+          statusEl.style.color = '#CCFF00';
+        } else {
+          statusEl.textContent = d.error || '✗ Fejl';
+          statusEl.style.color = '#ff5555';
+        }
+        setTimeout(function() { statusEl.style.display = 'none'; }, 3000);
+      });
+    });
+  })();
+  </script>
+  <?php endif; ?>
+
 </div>
 
 <!-- ── Kandidat-status dropdown ────────────────────────────────── -->
@@ -573,18 +691,16 @@ $tab = $tab ?? 'submissions';
   var currentStatusTarget = null;
   var currentMailId = null;
 
-  var defaultSubject = 'Vi vil gerne invitere dig til Rezponz 👋';
+  var apiBase = '<?php echo esc_js( rest_url( 'rzpa/v1' ) ); ?>';
+  // Skabelon hentes fra DB (fallback til standard hvis ikke gemt endnu)
+  var cachedTpl = { subject: 'Vi vil gerne invitere dig til Rezponz 👋', body: 'Hej {navn},\n\nTak fordi du har udfyldt vores profil-quiz!' };
+  fetch(apiBase + '/quiz/email-template', { headers: { 'X-WP-Nonce': nonce } })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (d.ok && d.template) cachedTpl = d.template; });
+
+  var defaultSubject = function() { return cachedTpl.subject || ''; };
   var defaultBody = function(name) {
-    return 'Hej ' + name + ',\n\n'
-      + 'Tak fordi du har udfyldt vores profil-quiz! Vi kunne rigtig godt tænke os at lære dig bedre at kende.\n\n'
-      + 'Vi vil gerne invitere dig til at komme forbi vores kontor i Aalborg, så du kan se, hvad vi laver, '
-      + 'møde teamet og stille alle de spørgsmål, du måtte have. Der er ingen forpligtelser — det er blot en '
-      + 'uformel snak over en kop kaffe ☕\n\n'
-      + 'Har du lyst, så svar blot på denne mail med et tidspunkt, der passer dig — eller ring til os.\n\n'
-      + 'Vi glæder os til at høre fra dig!\n\n'
-      + 'Med venlig hilsen\n'
-      + 'Lie Svenningsen\n'
-      + 'Rezponz · lie@rezponz.dk';
+    return (cachedTpl.body || '').replace(/\{navn\}/g, name);
   };
 
   // ── Status dropdown ──────────────────────────────────────────────
@@ -631,7 +747,7 @@ $tab = $tab ?? 'submissions';
       var name        = wrap.dataset.name;
       var email       = wrap.dataset.email;
       document.getElementById('rzpa-mail-to-label').textContent = 'Til: ' + name + ' <' + email + '>';
-      document.getElementById('rzpa-mail-subject').value = defaultSubject;
+      document.getElementById('rzpa-mail-subject').value = defaultSubject();
       document.getElementById('rzpa-mail-body').value    = defaultBody(name);
       document.getElementById('rzpa-mail-feedback').style.display = 'none';
       document.getElementById('rzpa-mail-send').textContent = '✉ Send';
