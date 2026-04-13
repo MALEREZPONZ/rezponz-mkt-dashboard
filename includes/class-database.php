@@ -149,6 +149,30 @@ class RZPA_Database {
             KEY idx_source (source)
         ) $c;" );
 
+        // ── Tilpassede sitemaps ────────────────────────────────────────────────
+        dbDelta( "CREATE TABLE {$wpdb->prefix}rzpa_sitemaps (
+            id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            name        VARCHAR(100) NOT NULL,
+            slug        VARCHAR(100) NOT NULL,
+            description TEXT,
+            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY idx_slug (slug)
+        ) $c;" );
+
+        dbDelta( "CREATE TABLE {$wpdb->prefix}rzpa_sitemap_urls (
+            id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            sitemap_id  BIGINT UNSIGNED NOT NULL,
+            url         TEXT NOT NULL,
+            priority    DECIMAL(2,1) DEFAULT 0.5,
+            changefreq  VARCHAR(20) DEFAULT 'weekly',
+            lastmod     DATE NULL,
+            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_sitemap (sitemap_id)
+        ) $c;" );
+
         update_option( 'rzpa_db_version', RZPA_DB_VER );
     }
 
@@ -920,5 +944,128 @@ class RZPA_Database {
             "SELECT source, status, message, MAX(synced_at) AS synced_at FROM $t GROUP BY source",
             ARRAY_A
         ) ?: [];
+    }
+
+    // ── Sitemaps ─────────────────────────────────────────────────────────────
+
+    /** Hent alle sitemaps med url-tæller. */
+    public static function get_sitemaps(): array {
+        global $wpdb;
+        $s = $wpdb->prefix . 'rzpa_sitemaps';
+        $u = $wpdb->prefix . 'rzpa_sitemap_urls';
+        return $wpdb->get_results(
+            "SELECT s.*, COUNT(u.id) AS url_count
+             FROM {$s} s
+             LEFT JOIN {$u} u ON u.sitemap_id = s.id
+             GROUP BY s.id
+             ORDER BY s.created_at DESC"
+        ) ?: [];
+    }
+
+    /** Hent ét sitemap på ID. */
+    public static function get_sitemap( int $id ): ?object {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_sitemaps';
+        return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$t} WHERE id = %d", $id ) ) ?: null;
+    }
+
+    /** Hent ét sitemap på slug. */
+    public static function get_sitemap_by_slug( string $slug ): ?object {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_sitemaps';
+        return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$t} WHERE slug = %s", $slug ) ) ?: null;
+    }
+
+    /** Opret nyt sitemap – returnerer nyt ID eller false. */
+    public static function create_sitemap( string $name, string $slug, string $description = '' ): int|false {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_sitemaps';
+        $ok = $wpdb->insert( $t, [
+            'name'        => sanitize_text_field( $name ),
+            'slug'        => sanitize_key( $slug ),
+            'description' => sanitize_textarea_field( $description ),
+            'created_at'  => current_time( 'mysql' ),
+            'updated_at'  => current_time( 'mysql' ),
+        ] );
+        return $ok ? (int) $wpdb->insert_id : false;
+    }
+
+    /** Opdater eksisterende sitemap. */
+    public static function update_sitemap( int $id, string $name, string $slug, string $description = '' ): bool {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_sitemaps';
+        return (bool) $wpdb->update( $t, [
+            'name'        => sanitize_text_field( $name ),
+            'slug'        => sanitize_key( $slug ),
+            'description' => sanitize_textarea_field( $description ),
+            'updated_at'  => current_time( 'mysql' ),
+        ], [ 'id' => $id ] );
+    }
+
+    /** Slet sitemap og alle tilhørende URLs (ON DELETE CASCADE). */
+    public static function delete_sitemap( int $id ): bool {
+        global $wpdb;
+        // Slet URLs manuelt (kræver ikke FK-support)
+        $wpdb->delete( $wpdb->prefix . 'rzpa_sitemap_urls', [ 'sitemap_id' => $id ] );
+        return (bool) $wpdb->delete( $wpdb->prefix . 'rzpa_sitemaps', [ 'id' => $id ] );
+    }
+
+    // ── Sitemap URLs ─────────────────────────────────────────────────────────
+
+    /** Hent alle URLs for et sitemap, sorteret efter prioritet. */
+    public static function get_sitemap_urls( int $sitemap_id ): array {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_sitemap_urls';
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM {$t} WHERE sitemap_id = %d ORDER BY priority DESC, id ASC",
+            $sitemap_id
+        ) ) ?: [];
+    }
+
+    /** Tilføj én URL til et sitemap. */
+    public static function add_sitemap_url(
+        int $sitemap_id,
+        string $url,
+        float $priority   = 0.5,
+        string $changefreq = 'weekly',
+        ?string $lastmod  = null
+    ): int|false {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_sitemap_urls';
+
+        if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) return false;
+
+        $data = [
+            'sitemap_id' => $sitemap_id,
+            'url'        => esc_url_raw( $url ),
+            'priority'   => round( min( 1.0, max( 0.0, $priority ) ), 1 ),
+            'changefreq' => in_array( $changefreq, RZPA_Sitemap_Manager::CHANGEFREQ_OPTIONS, true ) ? $changefreq : 'weekly',
+            'created_at' => current_time( 'mysql' ),
+        ];
+
+        if ( $lastmod ) {
+            $data['lastmod'] = sanitize_text_field( $lastmod );
+        }
+
+        $ok = $wpdb->insert( $t, $data );
+        return $ok ? (int) $wpdb->insert_id : false;
+    }
+
+    /** Slet én URL. */
+    public static function delete_sitemap_url( int $url_id ): bool {
+        global $wpdb;
+        return (bool) $wpdb->delete( $wpdb->prefix . 'rzpa_sitemap_urls', [ 'id' => $url_id ] );
+    }
+
+    /** Bulk-tilføj URLs fra en newline-separeret streng. Returnerer antal tilføjede. */
+    public static function bulk_add_sitemap_urls( int $sitemap_id, string $raw, float $priority = 0.5, string $changefreq = 'weekly' ): int {
+        $lines = array_filter( array_map( 'trim', explode( "\n", $raw ) ) );
+        $count = 0;
+        foreach ( $lines as $url ) {
+            if ( self::add_sitemap_url( $sitemap_id, $url, $priority, $changefreq ) ) {
+                $count++;
+            }
+        }
+        return $count;
     }
 }

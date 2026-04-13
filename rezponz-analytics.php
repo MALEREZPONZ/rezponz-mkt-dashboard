@@ -14,11 +14,11 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '2.9.9' );
+define( 'RZPA_VERSION',     '3.0.0' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
-define( 'RZPA_DB_VER',      '4' );
+define( 'RZPA_DB_VER',      '5' );
 
 // Composer / vendor autoloader (DomPDF m.fl.)
 if ( file_exists( RZPA_DIR . 'vendor/autoload.php' ) ) {
@@ -34,6 +34,7 @@ require_once RZPA_DIR . 'includes/api/class-meta-ads.php';
 require_once RZPA_DIR . 'includes/api/class-snapchat-ads.php';
 require_once RZPA_DIR . 'includes/api/class-tiktok-ads.php';
 require_once RZPA_DIR . 'includes/api/class-google-ads.php';
+require_once RZPA_DIR . 'includes/class-sitemap-manager.php';
 require_once RZPA_DIR . 'includes/class-rest-api.php';
 require_once RZPA_DIR . 'includes/class-admin.php';
 
@@ -97,6 +98,8 @@ register_activation_hook( __FILE__, function () {
     RZLQ_DB::install();
     RZLQ_Dept::install();
     RZPA_SEO_DB::install();
+    // Registrér sitemap rewrite-regel og flush ved aktivering
+    RZPA_Sitemap_Manager::flush_rules();
 } );
 register_deactivation_hook( __FILE__, [ 'RZPA_Scheduler', 'clear_crons' ] );
 
@@ -165,6 +168,7 @@ add_action( 'plugins_loaded', function () {
     RZPA_REST_API::init();
     RZPA_Scheduler::init();
     RZPA_Rekruttering::init();
+    RZPA_Sitemap_Manager::init();
 
     // Crew module – auto-install tables if missing or outdated
     if ( get_option( RZPZ_Crew_DB::DB_VERSION_KEY ) !== RZPZ_Crew_DB::DB_VERSION ) {

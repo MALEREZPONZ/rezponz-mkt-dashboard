@@ -64,6 +64,25 @@ class RZPA_REST_API {
             ] );
         }
 
+        // Sitemaps
+        foreach ( [
+            [ 'sitemaps',                           'GET',    'sitemaps_list'       ],
+            [ 'sitemaps',                           'POST',   'sitemaps_create'     ],
+            [ 'sitemaps/(?P<id>\d+)',                'GET',    'sitemaps_get'        ],
+            [ 'sitemaps/(?P<id>\d+)',                'PUT',    'sitemaps_update'     ],
+            [ 'sitemaps/(?P<id>\d+)',                'DELETE', 'sitemaps_delete'     ],
+            [ 'sitemaps/(?P<id>\d+)/urls',           'GET',    'sitemaps_urls_list'  ],
+            [ 'sitemaps/(?P<id>\d+)/urls',           'POST',   'sitemaps_urls_add'   ],
+            [ 'sitemaps/(?P<id>\d+)/urls/bulk',      'POST',   'sitemaps_urls_bulk'  ],
+            [ 'sitemaps/urls/(?P<url_id>\d+)',        'DELETE', 'sitemaps_url_delete' ],
+        ] as [ $path, $method, $cb ] ) {
+            register_rest_route( self::NS, '/' . $path, [
+                'methods'             => $method,
+                'callback'            => [ __CLASS__, $cb ],
+                'permission_callback' => $cap,
+            ] );
+        }
+
         // Ads platforms
         foreach ( [ 'meta', 'snap', 'tiktok' ] as $platform ) {
             register_rest_route( self::NS, "/{$platform}/campaigns", [
@@ -2646,5 +2665,146 @@ Svar KUN med et JSON-array — ingen tekst rundt om. Hvert element skal have pr�
 
         set_transient( $ck, $text, 4 * HOUR_IN_SECONDS );
         return self::ok( [ 'analysis' => $text ] );
+    }
+
+    // ── Sitemap REST handlers ─────────────────────────────────────────────────
+
+    public static function sitemaps_list(): WP_REST_Response {
+        $rows = RZPA_Database::get_sitemaps();
+        // Tilføj XML-url til hvert sitemap
+        foreach ( $rows as &$row ) {
+            $row->xml_url = RZPA_Sitemap_Manager::sitemap_url( $row->slug );
+        }
+        unset( $row );
+        return self::ok( $rows );
+    }
+
+    public static function sitemaps_get( WP_REST_Request $r ): WP_REST_Response|WP_Error {
+        $sitemap = RZPA_Database::get_sitemap( (int) $r['id'] );
+        if ( ! $sitemap ) {
+            return new WP_Error( 'not_found', 'Sitemap ikke fundet.', [ 'status' => 404 ] );
+        }
+        $sitemap->xml_url  = RZPA_Sitemap_Manager::sitemap_url( $sitemap->slug );
+        $sitemap->urls     = RZPA_Database::get_sitemap_urls( (int) $sitemap->id );
+        return self::ok( $sitemap );
+    }
+
+    public static function sitemaps_create( WP_REST_Request $r ): WP_REST_Response|WP_Error {
+        $p    = $r->get_json_params();
+        $name = sanitize_text_field( $p['name'] ?? '' );
+        if ( ! $name ) {
+            return new WP_Error( 'missing_name', 'Navn er påkrævet.', [ 'status' => 400 ] );
+        }
+        $slug = ! empty( $p['slug'] )
+            ? sanitize_key( $p['slug'] )
+            : RZPA_Sitemap_Manager::generate_slug( $name );
+
+        // Kontrollér at slug er unikt
+        if ( RZPA_Database::get_sitemap_by_slug( $slug ) ) {
+            $slug = $slug . '-' . time();
+        }
+
+        $desc = sanitize_textarea_field( $p['description'] ?? '' );
+        $id   = RZPA_Database::create_sitemap( $name, $slug, $desc );
+
+        if ( ! $id ) {
+            return new WP_Error( 'db_error', 'Kunne ikke oprette sitemap.', [ 'status' => 500 ] );
+        }
+
+        $sitemap          = RZPA_Database::get_sitemap( $id );
+        $sitemap->xml_url = RZPA_Sitemap_Manager::sitemap_url( $slug );
+        return new WP_REST_Response( [ 'ok' => true, 'sitemap' => $sitemap ], 201 );
+    }
+
+    public static function sitemaps_update( WP_REST_Request $r ): WP_REST_Response|WP_Error {
+        $id      = (int) $r['id'];
+        $sitemap = RZPA_Database::get_sitemap( $id );
+        if ( ! $sitemap ) {
+            return new WP_Error( 'not_found', 'Sitemap ikke fundet.', [ 'status' => 404 ] );
+        }
+
+        $p    = $r->get_json_params();
+        $name = sanitize_text_field( $p['name'] ?? $sitemap->name );
+        $slug = ! empty( $p['slug'] )
+            ? sanitize_key( $p['slug'] )
+            : $sitemap->slug;
+        $desc = sanitize_textarea_field( $p['description'] ?? $sitemap->description );
+
+        RZPA_Database::update_sitemap( $id, $name, $slug, $desc );
+        $updated          = RZPA_Database::get_sitemap( $id );
+        $updated->xml_url = RZPA_Sitemap_Manager::sitemap_url( $updated->slug );
+        return self::ok( [ 'sitemap' => $updated ] );
+    }
+
+    public static function sitemaps_delete( WP_REST_Request $r ): WP_REST_Response|WP_Error {
+        $id = (int) $r['id'];
+        if ( ! RZPA_Database::get_sitemap( $id ) ) {
+            return new WP_Error( 'not_found', 'Sitemap ikke fundet.', [ 'status' => 404 ] );
+        }
+        RZPA_Database::delete_sitemap( $id );
+        return self::ok( [ 'deleted' => true, 'id' => $id ] );
+    }
+
+    public static function sitemaps_urls_list( WP_REST_Request $r ): WP_REST_Response|WP_Error {
+        $id = (int) $r['id'];
+        if ( ! RZPA_Database::get_sitemap( $id ) ) {
+            return new WP_Error( 'not_found', 'Sitemap ikke fundet.', [ 'status' => 404 ] );
+        }
+        return self::ok( RZPA_Database::get_sitemap_urls( $id ) );
+    }
+
+    public static function sitemaps_urls_add( WP_REST_Request $r ): WP_REST_Response|WP_Error {
+        $sitemap_id = (int) $r['id'];
+        if ( ! RZPA_Database::get_sitemap( $sitemap_id ) ) {
+            return new WP_Error( 'not_found', 'Sitemap ikke fundet.', [ 'status' => 404 ] );
+        }
+
+        $p          = $r->get_json_params();
+        $url        = sanitize_url( $p['url'] ?? '' );
+        $priority   = (float) ( $p['priority'] ?? 0.5 );
+        $changefreq = sanitize_key( $p['changefreq'] ?? 'weekly' );
+        $lastmod    = sanitize_text_field( $p['lastmod'] ?? '' ) ?: null;
+
+        if ( ! $url || ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
+            return new WP_Error( 'invalid_url', 'Ugyldig URL.', [ 'status' => 400 ] );
+        }
+
+        $url_id = RZPA_Database::add_sitemap_url( $sitemap_id, $url, $priority, $changefreq, $lastmod );
+        if ( ! $url_id ) {
+            return new WP_Error( 'db_error', 'Kunne ikke tilføje URL.', [ 'status' => 500 ] );
+        }
+
+        return new WP_REST_Response( [
+            'ok'    => true,
+            'id'    => $url_id,
+            'urls'  => RZPA_Database::get_sitemap_urls( $sitemap_id ),
+        ], 201 );
+    }
+
+    public static function sitemaps_urls_bulk( WP_REST_Request $r ): WP_REST_Response|WP_Error {
+        $sitemap_id = (int) $r['id'];
+        if ( ! RZPA_Database::get_sitemap( $sitemap_id ) ) {
+            return new WP_Error( 'not_found', 'Sitemap ikke fundet.', [ 'status' => 404 ] );
+        }
+
+        $p          = $r->get_json_params();
+        $raw        = sanitize_textarea_field( $p['urls'] ?? '' );
+        $priority   = (float) ( $p['priority'] ?? 0.5 );
+        $changefreq = sanitize_key( $p['changefreq'] ?? 'weekly' );
+
+        if ( ! $raw ) {
+            return new WP_Error( 'missing_urls', 'Ingen URLs angivet.', [ 'status' => 400 ] );
+        }
+
+        $count = RZPA_Database::bulk_add_sitemap_urls( $sitemap_id, $raw, $priority, $changefreq );
+        return self::ok( [
+            'added' => $count,
+            'urls'  => RZPA_Database::get_sitemap_urls( $sitemap_id ),
+        ] );
+    }
+
+    public static function sitemaps_url_delete( WP_REST_Request $r ): WP_REST_Response {
+        RZPA_Database::delete_sitemap_url( (int) $r['url_id'] );
+        return self::ok( [ 'deleted' => true ] );
     }
 }

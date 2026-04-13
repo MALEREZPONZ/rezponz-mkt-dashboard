@@ -116,6 +116,7 @@ class RZPA_Admin {
 
         // ── Sektion: System ──────────────────────────────────────────────────
         add_submenu_page( 'rzpa-dashboard', '', '⚙️ System', $cap, 'rzpa-section-system', [ __CLASS__, 'page_dashboard' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Sitemaps – Rezponz',         'Sitemaps',         $cap, 'rzpa-sitemaps',   [ __CLASS__, 'page_sitemaps' ] );
         add_submenu_page( 'rzpa-dashboard', 'Indstillinger – Rezponz',    'Indstillinger',    $cap, 'rzpa-settings',   [ __CLASS__, 'page_settings' ] );
     }
 
@@ -409,5 +410,6 @@ class RZPA_Admin {
     public static function page_snap()      { include RZPA_DIR . 'admin/views/snap-ads.php'; }
     public static function page_tiktok()    { include RZPA_DIR . 'admin/views/tiktok-ads.php'; }
     public static function page_rapport()   { include RZPA_DIR . 'admin/views/rapport.php'; }
+    public static function page_sitemaps()  { include RZPA_DIR . 'admin/views/sitemaps.php'; }
     public static function page_settings()  { include RZPA_DIR . 'admin/views/settings.php'; }
 }
