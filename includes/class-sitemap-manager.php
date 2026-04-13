@@ -19,6 +19,29 @@ class RZPA_Sitemap_Manager {
         add_action( 'init',              [ __CLASS__, 'register_rewrite_rule' ] );
         add_filter( 'query_vars',        [ __CLASS__, 'register_query_var' ] );
         add_action( 'template_redirect', [ __CLASS__, 'serve_sitemap_xml' ] );
+
+        // Auto-flush hvis rewrite-reglen ikke er registreret endnu (fx efter ny upload)
+        add_action( 'init', [ __CLASS__, 'maybe_flush_rules' ], 99 );
+    }
+
+    /**
+     * Flush rewrite-regler én gang hvis rzpa_sitemap query var mangler i de gemte regler.
+     * Sætter en transient så vi ikke flusher ved hvert request.
+     */
+    public static function maybe_flush_rules(): void {
+        if ( get_transient( 'rzpa_sitemap_rules_flushed' ) ) return;
+        $rules = get_option( 'rewrite_rules', [] );
+        $found = false;
+        foreach ( array_keys( $rules ?: [] ) as $pattern ) {
+            if ( str_contains( $pattern, 'sitemap-' ) && str_contains( $pattern, 'rzpa_sitemap' ) ) {
+                $found = true;
+                break;
+            }
+        }
+        if ( ! $found ) {
+            flush_rewrite_rules( false );
+        }
+        set_transient( 'rzpa_sitemap_rules_flushed', 1, DAY_IN_SECONDS );
     }
 
     // ── Rewrite ──────────────────────────────────────────────────────────────
