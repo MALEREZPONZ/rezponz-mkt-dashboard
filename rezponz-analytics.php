@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      3.0.4
+ * Version:      3.1.0
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '3.0.4' );
+define( 'RZPA_VERSION',     '3.1.0' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -82,6 +82,13 @@ if ( ! $rzpa_seo_load_error ) {
     define( 'RZPA_SEO_ENGINE_ENABLED', false );
 }
 
+// ── Blog Generator Module ────────────────────────────────────────────────────
+require_once RZPA_DIR . 'includes/class-ai-helper.php';
+require_once RZPA_DIR . 'modules/blog-generator/class-blog-gen-db.php';
+require_once RZPA_DIR . 'modules/blog-generator/class-blog-gen-api.php';
+require_once RZPA_DIR . 'modules/blog-generator/class-blog-gen-admin.php';
+require_once RZPA_DIR . 'modules/blog-generator/class-blog-gen.php';
+
 // ── Profil-Quiz Module ───────────────────────────────────────────────────────
 require_once RZPA_DIR . 'modules/quiz/class-quiz-db.php';
 require_once RZPA_DIR . 'modules/quiz/class-quiz-pdf.php';
@@ -98,10 +105,24 @@ register_activation_hook( __FILE__, function () {
     RZLQ_DB::install();
     RZLQ_Dept::install();
     RZPA_SEO_DB::install();
+    RZPA_Blog_Gen_DB::install();
     // Registrér sitemap rewrite-regel og flush ved aktivering
     RZPA_Sitemap_Manager::flush_rules();
 } );
 register_deactivation_hook( __FILE__, [ 'RZPA_Scheduler', 'clear_crons' ] );
+
+// ── Blog Generator: gem indstilling via AJAX ─────────────────────────────────
+add_action( 'wp_ajax_rzpa_save_blog_gen_setting', function () {
+    if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden', 403 );
+    $key   = sanitize_key( $_POST['key'] ?? '' );
+    $value = wp_unslash( $_POST['value'] ?? '' );
+    $allowed = [ 'blog_gen_brand_voice', 'blog_gen_category', 'blog_gen_default_type', 'blog_gen_default_words' ];
+    if ( ! in_array( $key, $allowed, true ) ) wp_die( 'Invalid key', 400 );
+    $opts         = get_option( 'rzpa_settings', [] );
+    $opts[ $key ] = sanitize_textarea_field( $value );
+    update_option( 'rzpa_settings', $opts );
+    wp_send_json_success();
+} );
 
 // ── FAQ Schema markup output i <head> for posts med _rzpa_faq_schema ────────────
 add_action( 'wp_head', function () {
@@ -222,6 +243,12 @@ add_action( 'plugins_loaded', function () {
             } );
         }
     }
+
+    // Blog Generator module
+    if ( get_option( RZPA_Blog_Gen_DB::DB_VERSION_KEY ) !== RZPA_Blog_Gen_DB::DB_VERSION ) {
+        RZPA_Blog_Gen_DB::install();
+    }
+    RZPA_Blog_Gen::init();
 
     // ── Auto-opdatering via GitHub ──────────────────────────────────────────
     $opts  = get_option( 'rzpa_settings', [] );
