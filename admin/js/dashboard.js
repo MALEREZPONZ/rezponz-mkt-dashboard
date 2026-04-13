@@ -4135,9 +4135,11 @@ const RZPA_App = (() => {
                   <span class="rzpa-blog-rec-label">${post.rec_label}</span>
                   ${post.has_gsc
                     ? ''
-                    : post.indexing_requested
-                      ? `<span class="rzpa-index-btn" style="cursor:default;opacity:.7;color:var(--neon);border-color:rgba(204,255,0,.2)" title="Indekseringsanmodning sendt ${new Date(post.indexing_requested).toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'})} – afventer Google">⏳ Afventer Google</span><button class="rzpa-check-index-btn" data-url="${post.url}" title="Tjek om Google har indekseret siden endnu" style="margin-left:4px">↺ Tjek</button>`
-                      : `<button class="rzpa-index-btn" data-url="${post.url}" title="Bed Google om at indeksere denne side">↗ Indekser</button>`}
+                    : post.indexing_confirmed
+                      ? `<span class="rzpa-index-btn" style="cursor:default;color:#4ade80;border-color:rgba(74,222,128,.25)" title="Bekræftet indekseret af Google – data vises i GSC når siden begynder at ranke for søgninger (typisk 2-6 uger)">✓ Indekseret</span>`
+                      : post.indexing_requested
+                        ? `<span class="rzpa-index-btn" style="cursor:default;opacity:.7;color:var(--neon);border-color:rgba(204,255,0,.2)" title="Indekseringsanmodning sendt ${new Date(post.indexing_requested).toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'})} – afventer Google">⏳ Afventer Google</span><button class="rzpa-check-index-btn" data-url="${post.url}" title="Tjek om Google har indekseret siden endnu" style="margin-left:4px">↺ Tjek</button>`
+                        : `<button class="rzpa-index-btn" data-url="${post.url}" title="Bed Google om at indeksere denne side">↗ Indekser</button>`}
                   ${post.fixed_at ? (() => { const d = new Date(post.fixed_at); const lbl = d.toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'}); return `<span class="rzpa-fixed-badge" title="AI fikset ${post.fixed_at}">✓ ${lbl}</span>`; })() : ''}
                   ${BLOG_FIX_MAP[post.rec_label] && post.post_id && post.priority !== 'resolved' && post.priority !== 'pending' ? `<button class="rzpa-blog-fix-btn rzpa-index-btn" data-post-id="${post.post_id}" data-fix-type="${BLOG_FIX_MAP[post.rec_label]}" data-keyword="${encodeURIComponent(post.title)}" style="${post.fixed_at ? 'border-color:rgba(74,222,128,.25);color:#4ade80;opacity:.75' : 'border-color:rgba(204,255,0,.3);color:var(--neon)'}">${post.fixed_at ? '🔄 Fiks igen' : '⚡ Fiks'}</button>` : ''}
                 </td>

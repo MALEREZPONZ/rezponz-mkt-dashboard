@@ -520,11 +520,12 @@ class RZPA_REST_API {
         $last_crawl   = $index_result['lastCrawlTime'] ?? null;
         $is_indexed   = $verdict === 'PASS';
 
-        // Hvis indekseret: ryd _rzpa_indexing_requested post meta
+        // Hvis indekseret: gem bekræftelse og ryd afventer-meta
         if ( $is_indexed ) {
             $pid = url_to_postid( $url );
             if ( $pid ) {
                 delete_post_meta( $pid, '_rzpa_indexing_requested' );
+                update_post_meta( $pid, '_rzpa_indexing_confirmed', current_time( 'mysql' ) );
             }
         }
 

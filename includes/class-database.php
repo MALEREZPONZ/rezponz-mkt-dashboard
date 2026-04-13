@@ -363,11 +363,17 @@ class RZPA_Database {
                 $position, $clicks, $impressions, $ctr, $ai_visible, $fixed_data
             );
 
-            // Indekserings-state: afventer (meta sat) → grøn (GSC bekræftet via $gsc !== null)
-            $indexing_requested = get_post_meta( $post->ID, '_rzpa_indexing_requested', true ) ?: null;
-            if ( $rec_label === 'Ikke i GSC' && $indexing_requested ) {
-                $rec_label = '⏳ Indeksering afventer';
-                $priority  = 'pending';
+            // Indekserings-state: afventer → bekræftet indekseret (men ingen GSC-data endnu) → GSC har data
+            $indexing_requested  = get_post_meta( $post->ID, '_rzpa_indexing_requested', true ) ?: null;
+            $indexing_confirmed  = get_post_meta( $post->ID, '_rzpa_indexing_confirmed', true ) ?: null;
+            if ( $rec_label === 'Ikke i GSC' ) {
+                if ( $indexing_confirmed ) {
+                    $rec_label = '✓ Indekseret';
+                    $priority  = 'low';
+                } elseif ( $indexing_requested ) {
+                    $rec_label = '⏳ Indeksering afventer';
+                    $priority  = 'pending';
+                }
             }
 
             $result[] = [
@@ -390,6 +396,7 @@ class RZPA_Database {
                 'fixed_at'            => ! empty( $fixed_data ) ? max( $fixed_data ) : null,
                 'fixed_types'         => array_keys( $fixed_data ),
                 'indexing_requested'  => $indexing_requested,
+                'indexing_confirmed'  => $indexing_confirmed,
             ];
         }
 
