@@ -316,6 +316,11 @@ class RZPA_REST_API {
             'callback'            => [ __CLASS__, 'blog_request_indexing' ],
             'permission_callback' => $cap,
         ] );
+        register_rest_route( self::NS, '/blog/check-index-status', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'blog_check_index_status' ],
+            'permission_callback' => $cap,
+        ] );
         register_rest_route( self::NS, '/ai/fix-action', [
             'methods'             => 'POST',
             'callback'            => [ __CLASS__, 'ai_fix_action' ],
@@ -449,6 +454,86 @@ class RZPA_REST_API {
 
         $err_msg = $body['error']['message'] ?? ( 'API fejl ' . $code );
         return new WP_Error( 'indexing_error', $err_msg, [ 'status' => $code ?: 502 ] );
+    }
+
+    // ── POST /blog/check-index-status ────────────────────────────────────────
+    // Tjekker faktisk indekserings-status via GSC URL Inspection API
+    public static function blog_check_index_status( WP_REST_Request $r ): WP_REST_Response|WP_Error {
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['google_client_id'] ) || empty( $opts['google_refresh_token'] ) ) {
+            return new WP_Error( 'no_gsc', 'Google er ikke forbundet under Indstillinger.', [ 'status' => 400 ] );
+        }
+
+        $url = sanitize_url( $r->get_json_params()['url'] ?? '' );
+        if ( ! $url || ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
+            return new WP_Error( 'bad_url', 'Ugyldig URL.', [ 'status' => 400 ] );
+        }
+
+        // Hent access token
+        $token_res = wp_remote_post( 'https://oauth2.googleapis.com/token', [
+            'body' => [
+                'client_id'     => $opts['google_client_id'],
+                'client_secret' => $opts['google_client_secret'] ?? '',
+                'refresh_token' => $opts['google_refresh_token'],
+                'grant_type'    => 'refresh_token',
+            ],
+            'timeout' => 15,
+        ] );
+        if ( is_wp_error( $token_res ) ) {
+            return new WP_Error( 'token_error', $token_res->get_error_message(), [ 'status' => 502 ] );
+        }
+        $token_body   = json_decode( wp_remote_retrieve_body( $token_res ), true );
+        $access_token = $token_body['access_token'] ?? '';
+        if ( ! $access_token ) {
+            return new WP_Error( 'token_error', $token_body['error_description'] ?? ( $token_body['error'] ?? 'Kunne ikke hente access token' ), [ 'status' => 502 ] );
+        }
+
+        // Kald GSC URL Inspection API
+        $site_url    = trailingslashit( get_site_url() );
+        $inspect_res = wp_remote_post( 'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect', [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $access_token,
+                'Content-Type'  => 'application/json',
+            ],
+            'body'    => wp_json_encode( [
+                'inspectionUrl' => $url,
+                'siteUrl'       => $site_url,
+            ] ),
+            'timeout' => 20,
+        ] );
+
+        if ( is_wp_error( $inspect_res ) ) {
+            return new WP_Error( 'inspect_error', $inspect_res->get_error_message(), [ 'status' => 502 ] );
+        }
+
+        $code = wp_remote_retrieve_response_code( $inspect_res );
+        $body = json_decode( wp_remote_retrieve_body( $inspect_res ), true );
+
+        if ( $code !== 200 ) {
+            $msg = $body['error']['message'] ?? ( 'API fejl ' . $code );
+            return new WP_Error( 'inspect_error', $msg, [ 'status' => $code ?: 502 ] );
+        }
+
+        $index_result = $body['inspectionResult']['indexStatusResult'] ?? [];
+        $verdict      = $index_result['verdict']       ?? '';
+        $coverage     = $index_result['coverageState'] ?? 'Ukendt';
+        $last_crawl   = $index_result['lastCrawlTime'] ?? null;
+        $is_indexed   = $verdict === 'PASS';
+
+        // Hvis indekseret: ryd _rzpa_indexing_requested post meta
+        if ( $is_indexed ) {
+            $pid = url_to_postid( $url );
+            if ( $pid ) {
+                delete_post_meta( $pid, '_rzpa_indexing_requested' );
+            }
+        }
+
+        return new WP_REST_Response( [
+            'indexed'    => $is_indexed,
+            'coverage'   => $coverage,
+            'last_crawl' => $last_crawl,
+            'url'        => $url,
+        ], 200 );
     }
 
     // ── POST /ai/fix-action ───────────────────────────────────────────────────

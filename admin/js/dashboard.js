@@ -4136,7 +4136,7 @@ const RZPA_App = (() => {
                   ${post.has_gsc
                     ? ''
                     : post.indexing_requested
-                      ? `<span class="rzpa-index-btn" style="cursor:default;opacity:.7;color:var(--neon);border-color:rgba(204,255,0,.2)" title="Indekseringsanmodning sendt ${new Date(post.indexing_requested).toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'})} – afventer Google">⏳ Afventer Google</span>`
+                      ? `<span class="rzpa-index-btn" style="cursor:default;opacity:.7;color:var(--neon);border-color:rgba(204,255,0,.2)" title="Indekseringsanmodning sendt ${new Date(post.indexing_requested).toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'})} – afventer Google">⏳ Afventer Google</span><button class="rzpa-check-index-btn" data-url="${post.url}" title="Tjek om Google har indekseret siden endnu" style="margin-left:4px">↺ Tjek</button>`
                       : `<button class="rzpa-index-btn" data-url="${post.url}" title="Bed Google om at indeksere denne side">↗ Indekser</button>`}
                   ${post.fixed_at ? (() => { const d = new Date(post.fixed_at); const lbl = d.toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'}); return `<span class="rzpa-fixed-badge" title="AI fikset ${post.fixed_at}">✓ ${lbl}</span>`; })() : ''}
                   ${BLOG_FIX_MAP[post.rec_label] && post.post_id && post.priority !== 'resolved' && post.priority !== 'pending' ? `<button class="rzpa-blog-fix-btn rzpa-index-btn" data-post-id="${post.post_id}" data-fix-type="${BLOG_FIX_MAP[post.rec_label]}" data-keyword="${encodeURIComponent(post.title)}" style="${post.fixed_at ? 'border-color:rgba(74,222,128,.25);color:#4ade80;opacity:.75' : 'border-color:rgba(204,255,0,.3);color:var(--neon)'}">${post.fixed_at ? '🔄 Fiks igen' : '⚡ Fiks'}</button>` : ''}
@@ -4172,9 +4172,8 @@ const RZPA_App = (() => {
           try {
             const res = await api('/blog/request-indexing', { method: 'POST', body: JSON.stringify({ url }) });
             if (res.queued || res.data?.queued) {
-              // Erstat knap med "⏳ Afventer Google" span
-              const now = new Date().toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'});
-              btn.outerHTML = `<span class="rzpa-index-btn" style="cursor:default;opacity:.7;color:var(--neon);border-color:rgba(204,255,0,.2)" title="Indekseringsanmodning sendt – afventer Google crawling (24-48 timer)">⏳ Afventer Google</span>`;
+              // Erstat knap med "⏳ Afventer Google" span + Tjek-knap
+              btn.outerHTML = `<span class="rzpa-index-btn" style="cursor:default;opacity:.7;color:var(--neon);border-color:rgba(204,255,0,.2)" title="Indekseringsanmodning sendt – afventer Google crawling (24-48 timer)">⏳ Afventer Google</span><button class="rzpa-check-index-btn" data-url="${url}" title="Tjek om Google har indekseret siden endnu" style="margin-left:4px">↺ Tjek</button>`;
               // Opdater rec_label i samme række til "⏳ Indeksering afventer"
               const recCell = btn.closest?.('td') || document.querySelector(`[data-url="${url}"]`)?.closest('tr')?.querySelector('.rzpa-blog-rec-cell');
               const labelEl = btn.closest('tr')?.querySelector('.rzpa-blog-rec-label');
@@ -4208,6 +4207,49 @@ const RZPA_App = (() => {
             btn.style.color = '#ff5555';
             btn.title = err.message || 'Tjek konsollen for detaljer';
             btn.disabled = false;
+          }
+        });
+      });
+
+      // ↺ Tjek indeksering-knapper
+      container.querySelectorAll('.rzpa-check-index-btn').forEach(btn => {
+        btn.addEventListener('click', async e => {
+          e.stopPropagation();
+          const url  = btn.dataset.url;
+          const row  = btn.closest('tr');
+          const cell = btn.closest('td');
+          btn.textContent = '⏳';
+          btn.disabled = true;
+          try {
+            const res = await api('/blog/check-index-status', { method: 'POST', body: JSON.stringify({ url }) });
+            if (res.indexed) {
+              // Siden er indekseret — vis grøn bekræftelse og fjern Tjek-knap
+              const awaitSpan = cell?.querySelector('.rzpa-index-btn');
+              if (awaitSpan) awaitSpan.remove();
+              const crawlDate = res.last_crawl ? new Date(res.last_crawl).toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit'}) : '';
+              btn.outerHTML = `<span class="rzpa-index-btn" style="cursor:default;color:#4ade80;border-color:rgba(74,222,128,.25)" title="Indekseret af Google${crawlDate ? ' – sidst crawlet ' + crawlDate : ''}">✓ Indekseret</span>`;
+              const labelEl = row?.querySelector('.rzpa-blog-rec-label');
+              const dotEl   = row?.querySelector('.rzpa-blog-rec-dot');
+              if (labelEl) labelEl.textContent = '✓ Indekseret';
+              if (dotEl)   dotEl.textContent = '✓';
+              const entry = allPosts?.find(p => p.url === url);
+              if (entry) { entry.indexing_requested = null; entry.rec_label = '✓ Indekseret'; entry.priority = 'resolved'; entry.has_gsc = true; }
+            } else {
+              // Ikke indekseret endnu — vis coverage state kortvarigt
+              const coverage = res.coverage || 'Afventer Google';
+              const shortCov = coverage.length > 22 ? coverage.substring(0,22)+'…' : coverage;
+              btn.textContent = shortCov;
+              btn.title = coverage + ' – prøv igen om 24-48 timer';
+              btn.style.color = '#f59e0b';
+              btn.disabled = false;
+              setTimeout(() => { btn.textContent = '↺ Tjek'; btn.style.color = ''; }, 4000);
+            }
+          } catch(err) {
+            btn.textContent = '✗ Fejl';
+            btn.style.color = '#ff5555';
+            btn.title = err.message || 'Netværksfejl';
+            btn.disabled = false;
+            setTimeout(() => { btn.textContent = '↺ Tjek'; btn.style.color = ''; }, 3000);
           }
         });
       });
