@@ -2671,12 +2671,11 @@ Svar KUN med et JSON-array â€” ingen tekst rundt om. Hvert element skal have prÃ
 
     public static function sitemaps_list(): WP_REST_Response {
         $rows = RZPA_Database::get_sitemaps();
-        // TilfÃ¸j XML-url til hvert sitemap
         foreach ( $rows as &$row ) {
             $row->xml_url = RZPA_Sitemap_Manager::sitemap_url( $row->slug );
         }
         unset( $row );
-        return self::ok( $rows );
+        return new WP_REST_Response( $rows, 200 );
     }
 
     public static function sitemaps_get( WP_REST_Request $r ): WP_REST_Response|WP_Error {
@@ -2684,9 +2683,9 @@ Svar KUN med et JSON-array â€” ingen tekst rundt om. Hvert element skal have prÃ
         if ( ! $sitemap ) {
             return new WP_Error( 'not_found', 'Sitemap ikke fundet.', [ 'status' => 404 ] );
         }
-        $sitemap->xml_url  = RZPA_Sitemap_Manager::sitemap_url( $sitemap->slug );
-        $sitemap->urls     = RZPA_Database::get_sitemap_urls( (int) $sitemap->id );
-        return self::ok( $sitemap );
+        $sitemap->xml_url = RZPA_Sitemap_Manager::sitemap_url( $sitemap->slug );
+        $sitemap->urls    = RZPA_Database::get_sitemap_urls( (int) $sitemap->id );
+        return new WP_REST_Response( $sitemap, 200 );
     }
 
     public static function sitemaps_create( WP_REST_Request $r ): WP_REST_Response|WP_Error {
@@ -2733,7 +2732,7 @@ Svar KUN med et JSON-array â€” ingen tekst rundt om. Hvert element skal have prÃ
         RZPA_Database::update_sitemap( $id, $name, $slug, $desc );
         $updated          = RZPA_Database::get_sitemap( $id );
         $updated->xml_url = RZPA_Sitemap_Manager::sitemap_url( $updated->slug );
-        return self::ok( [ 'sitemap' => $updated ] );
+        return new WP_REST_Response( [ 'ok' => true, 'sitemap' => $updated ], 200 );
     }
 
     public static function sitemaps_delete( WP_REST_Request $r ): WP_REST_Response|WP_Error {
@@ -2742,7 +2741,7 @@ Svar KUN med et JSON-array â€” ingen tekst rundt om. Hvert element skal have prÃ
             return new WP_Error( 'not_found', 'Sitemap ikke fundet.', [ 'status' => 404 ] );
         }
         RZPA_Database::delete_sitemap( $id );
-        return self::ok( [ 'deleted' => true, 'id' => $id ] );
+        return new WP_REST_Response( [ 'ok' => true, 'id' => $id ], 200 );
     }
 
     public static function sitemaps_urls_list( WP_REST_Request $r ): WP_REST_Response|WP_Error {
@@ -2750,7 +2749,7 @@ Svar KUN med et JSON-array â€” ingen tekst rundt om. Hvert element skal have prÃ
         if ( ! RZPA_Database::get_sitemap( $id ) ) {
             return new WP_Error( 'not_found', 'Sitemap ikke fundet.', [ 'status' => 404 ] );
         }
-        return self::ok( RZPA_Database::get_sitemap_urls( $id ) );
+        return new WP_REST_Response( RZPA_Database::get_sitemap_urls( $id ), 200 );
     }
 
     public static function sitemaps_urls_add( WP_REST_Request $r ): WP_REST_Response|WP_Error {
@@ -2797,14 +2796,15 @@ Svar KUN med et JSON-array â€” ingen tekst rundt om. Hvert element skal have prÃ
         }
 
         $count = RZPA_Database::bulk_add_sitemap_urls( $sitemap_id, $raw, $priority, $changefreq );
-        return self::ok( [
+        return new WP_REST_Response( [
+            'ok'    => true,
             'added' => $count,
             'urls'  => RZPA_Database::get_sitemap_urls( $sitemap_id ),
-        ] );
+        ], 200 );
     }
 
     public static function sitemaps_url_delete( WP_REST_Request $r ): WP_REST_Response {
         RZPA_Database::delete_sitemap_url( (int) $r['url_id'] );
-        return self::ok( [ 'deleted' => true ] );
+        return new WP_REST_Response( [ 'ok' => true ], 200 );
     }
 }
