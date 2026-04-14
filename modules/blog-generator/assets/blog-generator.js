@@ -209,18 +209,8 @@
   async function generateTopic(id) {
     const topic = allTopics.find(t => t.id === id);
     if (!topic) return;
-
-    if (!topic.image_id) {
-      openImagePicker(null, async (imgId) => {
-        if (imgId) {
-          topic.image_id  = imgId;
-          topic.image_url = mediaImages.find(m => m.id === imgId)?.thumb || '';
-        }
-        await _doGenerate(id, imgId);
-      });
-      return;
-    }
-    await _doGenerate(id, topic.image_id);
+    // Start generation immediately — image can be added afterwards
+    await _doGenerate(id, topic.image_id || null);
   }
 
   async function _doGenerate(id, imageId) {
@@ -626,6 +616,10 @@
 
     // Hent gemte værdier fra localized data (sættes ved siden af nonce i PHP)
     if (RZPA_BG.settings) {
+      if (el('bg-default-type') && RZPA_BG.settings.blog_gen_default_type)
+        el('bg-default-type').value = RZPA_BG.settings.blog_gen_default_type;
+      if (el('bg-default-words') && RZPA_BG.settings.blog_gen_default_words)
+        el('bg-default-words').value = RZPA_BG.settings.blog_gen_default_words;
       if (el('bg-elementor-template-id') && RZPA_BG.settings.blog_gen_elementor_template_id)
         el('bg-elementor-template-id').value = RZPA_BG.settings.blog_gen_elementor_template_id;
       if (el('bg-default-author-id') && RZPA_BG.settings.blog_gen_default_author)
@@ -660,8 +654,10 @@
   el('bg-save-settings').addEventListener('click', async () => {
     const settings = [
       { key: 'blog_gen_category',              value: el('bg-default-cat').value },
+      { key: 'blog_gen_default_type',          value: el('bg-default-type')?.value       || '' },
+      { key: 'blog_gen_default_words',         value: el('bg-default-words')?.value      || '' },
       { key: 'blog_gen_elementor_template_id', value: el('bg-elementor-template-id')?.value || '' },
-      { key: 'blog_gen_default_author',        value: el('bg-default-author-id')?.value || '' },
+      { key: 'blog_gen_default_author',        value: el('bg-default-author-id')?.value  || '' },
     ];
 
     try {

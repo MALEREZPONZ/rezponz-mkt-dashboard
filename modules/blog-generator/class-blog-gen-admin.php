@@ -30,6 +30,8 @@ class RZPA_Blog_Gen_Admin {
             'types'    => RZPA_Blog_Gen_DB::ARTICLE_TYPES,
             'targets'  => RZPA_Blog_Gen_DB::TARGETS,
             'settings' => [
+                'blog_gen_default_type'          => $opts['blog_gen_default_type']          ?? '',
+                'blog_gen_default_words'         => $opts['blog_gen_default_words']         ?? '',
                 'blog_gen_elementor_template_id' => $opts['blog_gen_elementor_template_id'] ?? '',
                 'blog_gen_default_author'        => $opts['blog_gen_default_author']        ?? '',
                 'blog_gen_brand_voice'           => $opts['blog_gen_brand_voice']           ?? '',
