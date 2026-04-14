@@ -345,10 +345,10 @@ class RZPZ_CRM_DB {
         $offset = isset( $filters['offset'] ) ? (int) $filters['offset'] : 0;
 
         $sql = "SELECT a.*, ap.first_name, ap.last_name, ap.email, ap.phone, ap.token,
-                       pos.title AS position_title
+                       COALESCE(pos.title, 'Generel ansøgning') AS position_title
                 FROM {$a} a
-                JOIN {$ap}  ap  ON a.applicant_id = ap.id
-                JOIN {$pos} pos ON a.position_id  = pos.id
+                JOIN {$ap}      ap  ON a.applicant_id = ap.id
+                LEFT JOIN {$pos} pos ON a.position_id  = pos.id AND a.position_id > 0
                 WHERE " . implode( ' AND ', $where ) . "
                 ORDER BY a.created_at DESC
                 LIMIT %d OFFSET %d";
@@ -367,10 +367,11 @@ class RZPZ_CRM_DB {
         return $wpdb->get_row( $wpdb->prepare(
             "SELECT a.*, ap.first_name, ap.last_name, ap.email, ap.phone, ap.address, ap.city,
                     ap.cover_letter, ap.cv_url, ap.notes, ap.token,
-                    pos.title AS position_title, pos.department
+                    COALESCE(pos.title, 'Generel ansøgning') AS position_title,
+                    COALESCE(pos.department, '')              AS department
              FROM {$a} a
-             JOIN {$ap}  ap  ON a.applicant_id = ap.id
-             JOIN {$pos} pos ON a.position_id  = pos.id
+             JOIN {$ap}      ap  ON a.applicant_id = ap.id
+             LEFT JOIN {$pos} pos ON a.position_id  = pos.id AND a.position_id > 0
              WHERE a.id = %d",
             $id
         ) ) ?: null;
@@ -378,13 +379,16 @@ class RZPZ_CRM_DB {
 
     public static function insert_application( int $applicant_id, int $position_id, string $source = 'other' ): int|false {
         global $wpdb;
-        // Forhindre dubletter (samme ansøger til samme stilling)
-        $existing = $wpdb->get_var( $wpdb->prepare(
-            "SELECT id FROM {$wpdb->prefix}rzpz_crm_applications
-             WHERE applicant_id = %d AND position_id = %d LIMIT 1",
-            $applicant_id, $position_id
-        ) );
-        if ( $existing ) return (int) $existing; // returnér eksisterende
+        // Forhindre dubletter (samme ansøger til samme specifikke stilling)
+        // position_id = 0 = generel ansøgning — tillad flere fra samme person
+        if ( $position_id > 0 ) {
+            $existing = $wpdb->get_var( $wpdb->prepare(
+                "SELECT id FROM {$wpdb->prefix}rzpz_crm_applications
+                 WHERE applicant_id = %d AND position_id = %d LIMIT 1",
+                $applicant_id, $position_id
+            ) );
+            if ( $existing ) return (int) $existing; // returnér eksisterende
+        }
 
         $wpdb->insert( $wpdb->prefix . 'rzpz_crm_applications', [
             'applicant_id' => $applicant_id,

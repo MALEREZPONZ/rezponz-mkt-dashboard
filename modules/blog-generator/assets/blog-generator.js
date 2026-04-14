@@ -532,19 +532,8 @@
       dayMap[day].push(t);
     });
 
-    // Også topics fra allTopics (lokal state) for evt. nytilføjede
-    // scheduled_for kan være ISO-string (fra toISOString()) eller MySQL datetime ("Y-m-d H:i:s")
-    allTopics.forEach(t => {
-      if (!t.scheduled_for) return;
-      const sf = t.scheduled_for.includes('T') ? t.scheduled_for : t.scheduled_for.replace(' ', 'T');
-      const d  = new Date(sf);
-      if (d.getFullYear() === calYear && d.getMonth() === calMonth) {
-        const day = d.getDate();
-        if (!dayMap[day]) dayMap[day] = [];
-        // undgå dubletter
-        if (!dayMap[day].find(x => x.id === t.id)) dayMap[day].push(t);
-      }
-    });
+    // API-svaret er altid frisk (fetches live) — ingen allTopics-loop nødvendig
+    // (den gamle løkke forårsagede dubletter ved type-mismatch i id-sammenligning)
 
     // Find 1. dag i måneden og antal dage
     const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
@@ -571,7 +560,7 @@
       const isToday = isThisMonth && d === today.getDate();
       const dateStr = `${calYear}-${String(calMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const eventsHtml = (dayMap[d] || []).map(t => {
-        const canRm = (t.status === 'queued' || t.status === 'failed');
+        const canRm = !!t.scheduled_for; // altid muligt at fjerne fra kalender uanset status
         return `<div class="bg-cal-event ${t.status || ''}" data-id="${t.id}" title="${escAttr(t.title)}">
           <span class="bg-cal-event-title">${escHtml(t.title.substring(0, 28))}${t.title.length > 28 ? '…' : ''}</span>
           ${canRm ? `<span class="bg-cal-event-rm" data-rm="${t.id}" title="Fjern fra kalender">✕</span>` : ''}

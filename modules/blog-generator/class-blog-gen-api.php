@@ -388,11 +388,6 @@ PROMPT;
                 $seo_desc  = sanitize_text_field( $meta['seo_desc']  ?? '' );
                 $focus_kw  = sanitize_text_field( $meta['focus_kw']  ?? $focus_kw );
                 $html      = substr( $raw, strlen( $jm[0] ) );
-
-                // Trim meta description til 155 tegn for Google SERP
-                if ( mb_strlen( $seo_desc ) > 155 ) {
-                    $seo_desc = mb_substr( $seo_desc, 0, 152 ) . '…';
-                }
             }
         }
 
@@ -403,6 +398,23 @@ PROMPT;
         // Konvertér resterende markdown → HTML + strip code fences
         $clean_html = self::markdown_to_html( $clean_html );
         $clean_html = wp_kses_post( $clean_html );
+
+        // ── Meta description + excerpt (beregn FØR wp_insert_post) ──────────────
+        // Trim til 155 tegn hvis AI leverede en beskrivelse
+        if ( $seo_desc && mb_strlen( $seo_desc ) > 155 ) {
+            $seo_desc = mb_substr( $seo_desc, 0, 152 ) . '…';
+        }
+        // Fallback: brug første <p>-tekst — undgår JSON-LD eller overskrifter
+        if ( ! $seo_desc && $clean_html ) {
+            if ( preg_match( '/<p[^>]*>(.*?)<\/p>/is', $clean_html, $pm ) ) {
+                $plain = wp_strip_all_tags( $pm[1] );
+            } else {
+                // Absolut fallback: strip alt HTML og Spring eventuelle JSON-blokke over
+                $plain = preg_replace( '/\{[^}]{0,800}\}/s', '', wp_strip_all_tags( $clean_html ) );
+            }
+            $plain    = preg_replace( '/\s+/', ' ', trim( $plain ) );
+            $seo_desc = mb_strlen( $plain ) > 155 ? mb_substr( $plain, 0, 152 ) . '…' : $plain;
+        }
 
         // ── Bestem post_status (draft / publish / future) ─────────────────────
         $publish_mode = (int) ( $topic->publish_immediately ?? 0 );
@@ -438,6 +450,7 @@ PROMPT;
             'post_title'   => wp_strip_all_tags( $topic->title ),
             'post_name'    => sanitize_title( $topic->title ),
             'post_content' => $clean_html,
+            'post_excerpt' => $seo_desc,   // vises i Yoast + bruges til liste-visning
             'post_status'  => $post_status,
             'post_type'    => 'post',
             'post_author'  => $author_id,
@@ -457,17 +470,9 @@ PROMPT;
             return;
         }
 
-        // ── SEO title + desc (skal defineres her — bruges både til meta og JSON-LD) ──
+        // ── SEO title + desc (allerede beregnet ovenfor — bruges til meta og JSON-LD) ──
         $yoast_title = $seo_title ?: ( $topic->title . ' | Rezponz' );
-        // Fallback meta description: første 155 tegn af clean content
-        if ( ! $seo_desc && $clean_html ) {
-            $plain       = wp_strip_all_tags( $clean_html );
-            $plain       = preg_replace( '/\s+/', ' ', trim( $plain ) );
-            $seo_desc    = mb_strlen( $plain ) > 155
-                ? mb_substr( $plain, 0, 152 ) . '…'
-                : $plain;
-        }
-        $yoast_desc  = $seo_desc;
+        $yoast_desc  = $seo_desc; // beregnet før wp_insert_post — aldrig JSON
 
         // ── FAQ schema ────────────────────────────────────────────────────────
         if ( $faq_schema ) update_post_meta( $post_id, '_rzpa_faq_schema', $faq_schema );
@@ -598,6 +603,7 @@ VIGTIGT:
 - FAQ: skriv ALTID med <h3>spørgsmål</h3><p>svar</p> — ALDRIG markdown **bold**
 - Brug KUN ren HTML — ingen ** asterisker, ingen # hashtags, ingen ``` backticks
 - Interne links: brug <a href="https://rezponz.dk/jobs">ankertekst</a> — ALDRIG [tekst](url)
+- Inkluder ALDRIG JSON-LD, schema.org eller @context i brødteksten — det håndteres automatisk
 PROMPT;
     }
 

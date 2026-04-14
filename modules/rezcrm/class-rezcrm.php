@@ -167,7 +167,7 @@ class RZPZ_RezCRM {
         if ( ! $applicant_id ) return new WP_REST_Response( [ 'message' => 'Ansøger-data mangler (navn + email påkrævet)' ], 400 );
 
         $position_id = (int) ( $data['position_id'] ?? 0 );
-        if ( ! $position_id ) return new WP_REST_Response( [ 'message' => 'position_id mangler' ], 400 );
+        // position_id = 0 er lovligt (generel ansøgning uden specifik stilling)
 
         $app_id = RZPZ_CRM_DB::insert_application( $applicant_id, $position_id, $data['source'] ?? 'other' );
         if ( ! $app_id ) return new WP_REST_Response( [ 'message' => 'Kunne ikke oprette ansøgning' ], 500 );
