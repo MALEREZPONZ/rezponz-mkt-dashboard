@@ -242,8 +242,8 @@
 (function(){
 'use strict';
 
-const apiBase = window.RZPZ?.apiBase || '/wp-json/rzpa/v1/';
-const nonce   = window.RZPZ?.nonce  || '';
+const apiBase = (window.RZPZ_CRM?.apiBase || '/wp-json/rzpa/v1/crm/').replace(/crm\/?$/, '');
+const nonce   = window.RZPZ_CRM?.nonce || '';
 
 async function api(path, opts = {}) {
     const res = await fetch(apiBase + path, {

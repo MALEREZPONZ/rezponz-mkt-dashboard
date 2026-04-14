@@ -40,7 +40,9 @@ class RZPZ_RezCRM {
     // ── Admin scripts/styles ─────────────────────────────────────────────────
 
     public static function enqueue( string $hook ): void {
+        // Kun indlæs på den principale CRM-side — ikke sub-sider (users, forms)
         if ( strpos( $hook, 'rzpa-rezcrm' ) === false ) return;
+        if ( strpos( $hook, 'rzpa-rezcrm-' ) !== false ) return;
 
         wp_enqueue_style(
             'rzpz-rezcrm',
