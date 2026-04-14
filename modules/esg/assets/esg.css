@@ -1,0 +1,1157 @@
+/**
+ * ESG Module Stylesheet
+ *
+ * All selectors are scoped to .rz-esg to avoid conflicts with the
+ * host WordPress theme. Class naming convention: rz-esg-{block}__{element}--{modifier}
+ *
+ * Structure:
+ *  1. CSS Custom Properties (design tokens)
+ *  2. Base / Reset (scoped)
+ *  3. Layout utilities (.rz-esg-container, .rz-esg-animate)
+ *  4. Shared components (buttons, badges, status chips, section headings)
+ *  5. Section 1 — Hero
+ *  6. Section 2 — ESG Tracks
+ *  7. Section 3 — Roadmap
+ *  8. Section 4 — Action Cards
+ *  9. Section 5 — Metrics toggle
+ * 10. Section 6 — Cases
+ * 11. Section 7 — FAQ
+ * 12. Section 8 — CTA
+ * 13. Animations & counter keyframes
+ * 14. Responsive breakpoints
+ * 15. Reduced motion overrides
+ *
+ * @package    RezponzAnalytics
+ * @subpackage ESG
+ * @since      3.5.9
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   1. CSS Custom Properties (design tokens)
+───────────────────────────────────────────────────────────────────────────── */
+.rz-esg {
+    --esg-teal:        #5d8089;
+    --esg-teal-light:  #eef5f6;
+    --esg-teal-mid:    #c5dde1;
+    --esg-navy:        #1a2332;
+    --esg-muted:       #6b7785;
+    --esg-border:      #e0eaed;
+    --esg-bg:          #ffffff;
+    --esg-bg-soft:     #f7faf9;
+
+    /* Status colours */
+    --esg-done:        #22c55e;
+    --esg-done-bg:     #f0fdf4;
+    --esg-ongoing:     #f59e0b;
+    --esg-ongoing-bg:  #fffbeb;
+    --esg-next:        #3b82f6;
+    --esg-next-bg:     #eff6ff;
+    --esg-target:      #7c3aed;
+    --esg-target-bg:   #f5f3ff;
+
+    /* Shape & shadow */
+    --esg-radius:      12px;
+    --esg-radius-lg:   20px;
+    --esg-shadow:      0 2px 16px rgba(0,0,0,.06);
+    --esg-shadow-hover:0 4px 24px rgba(0,0,0,.10);
+
+    /* Typography */
+    --esg-font:        'Outfit', 'Inter', system-ui, sans-serif;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   2. Base / Reset (scoped)
+───────────────────────────────────────────────────────────────────────────── */
+.rz-esg,
+.rz-esg *,
+.rz-esg *::before,
+.rz-esg *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+.rz-esg {
+    font-family: var(--esg-font);
+    color: var(--esg-navy);
+    background: var(--esg-bg);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+}
+
+.rz-esg ul,
+.rz-esg ol {
+    list-style: none;
+}
+
+.rz-esg a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.rz-esg img {
+    max-width: 100%;
+    display: block;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   3. Layout utilities
+───────────────────────────────────────────────────────────────────────────── */
+.rz-esg-container {
+    max-width: 1120px;
+    margin-inline: auto;
+    padding-inline: 24px;
+}
+
+/* Scroll-reveal base state */
+.rz-esg-animate {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity .5s ease, transform .5s ease;
+}
+
+.rz-esg-animate.rz-esg-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   4. Shared components
+───────────────────────────────────────────────────────────────────────────── */
+
+/* Section heading */
+.rz-esg-section-heading {
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 700;
+    color: var(--esg-navy);
+    margin-bottom: 8px;
+}
+
+.rz-esg-section-intro {
+    color: var(--esg-muted);
+    font-size: 1.05rem;
+    margin-bottom: 40px;
+}
+
+/* Buttons */
+.rz-esg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 28px;
+    border-radius: var(--esg-radius);
+    font-family: var(--esg-font);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: background .25s ease, color .25s ease, border-color .25s ease, box-shadow .25s ease;
+    text-decoration: none;
+}
+
+.rz-esg-btn:focus-visible {
+    outline: 3px solid var(--esg-teal);
+    outline-offset: 3px;
+}
+
+.rz-esg-btn--primary {
+    background: #fff;
+    color: var(--esg-teal);
+    border-color: #fff;
+}
+
+.rz-esg-btn--primary:hover {
+    background: var(--esg-teal-light);
+    border-color: var(--esg-teal-light);
+}
+
+.rz-esg-btn--secondary {
+    background: transparent;
+    color: #fff;
+    border-color: rgba(255,255,255,.6);
+}
+
+.rz-esg-btn--secondary:hover {
+    border-color: #fff;
+    background: rgba(255,255,255,.1);
+}
+
+/* Text buttons (toggle style) */
+.rz-esg-btn-text {
+    background: none;
+    border: none;
+    font-family: var(--esg-font);
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--esg-teal);
+    cursor: pointer;
+    padding: 6px 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color .25s ease;
+}
+
+.rz-esg-btn-text:hover {
+    color: var(--esg-navy);
+}
+
+.rz-esg-btn-text:focus-visible {
+    outline: 3px solid var(--esg-teal);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* Outline buttons */
+.rz-esg-btn-outline {
+    background: none;
+    border: 2px solid var(--esg-border);
+    border-radius: var(--esg-radius);
+    font-family: var(--esg-font);
+    font-size: .95rem;
+    font-weight: 600;
+    color: var(--esg-teal);
+    cursor: pointer;
+    padding: 10px 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: border-color .25s ease, background .25s ease;
+}
+
+.rz-esg-btn-outline:hover {
+    border-color: var(--esg-teal);
+    background: var(--esg-teal-light);
+}
+
+.rz-esg-btn-outline:focus-visible {
+    outline: 3px solid var(--esg-teal);
+    outline-offset: 2px;
+}
+
+/* Category / tag badges */
+.rz-esg-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+}
+
+.rz-esg-badge--miljø {
+    background: var(--esg-teal-light);
+    color: var(--esg-teal);
+}
+
+.rz-esg-badge--mennesker {
+    background: #eef1f8;
+    color: #3a4a6b;
+}
+
+.rz-esg-badge--governance {
+    background: var(--esg-target-bg);
+    color: var(--esg-target);
+}
+
+/* Status badges */
+.rz-esg-status {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .03em;
+}
+
+.rz-esg-status--done {
+    background: var(--esg-done-bg);
+    color: var(--esg-done);
+}
+
+.rz-esg-status--ongoing {
+    background: var(--esg-ongoing-bg);
+    color: var(--esg-ongoing);
+}
+
+.rz-esg-status--upcoming {
+    background: var(--esg-next-bg);
+    color: var(--esg-next);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   5. Section 1 — Hero
+───────────────────────────────────────────────────────────────────────────── */
+.rz-esg-hero {
+    background: linear-gradient(135deg, var(--esg-teal-light) 0%, #fff 60%);
+    padding-block: 80px;
+    overflow: hidden;
+}
+
+.rz-esg-hero__inner {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    margin-bottom: 48px;
+}
+
+.rz-esg-hero__heading {
+    font-size: clamp(2rem, 5vw, 3.25rem);
+    font-weight: 800;
+    color: var(--esg-navy);
+    line-height: 1.15;
+    margin-bottom: 16px;
+}
+
+.rz-esg-hero__intro {
+    font-size: clamp(1rem, 2vw, 1.2rem);
+    color: var(--esg-muted);
+    max-width: 560px;
+    line-height: 1.7;
+}
+
+/* Hero KPI block */
+.rz-esg-hero__kpi {
+    background: var(--esg-bg);
+    border: 1px solid var(--esg-border);
+    border-radius: var(--esg-radius-lg);
+    box-shadow: var(--esg-shadow);
+    padding: 32px 40px;
+    text-align: center;
+    align-self: flex-start;
+    min-width: 220px;
+}
+
+.rz-esg-hero__kpi-number {
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+.rz-esg-counter {
+    font-size: clamp(4rem, 10vw, 7rem);
+    font-weight: 800;
+    color: var(--esg-teal);
+    display: inline-block;
+    font-variant-numeric: tabular-nums;
+}
+
+.rz-esg-hero__kpi-label {
+    font-size: .95rem;
+    color: var(--esg-muted);
+    margin-bottom: 16px;
+}
+
+.rz-esg-hero__tagline {
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--esg-navy);
+    border-top: 1px solid var(--esg-border);
+    padding-top: 16px;
+}
+
+/* KPI chips row */
+.rz-esg-hero__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.rz-esg-chip {
+    background: var(--esg-bg);
+    border: 1px solid var(--esg-border);
+    border-radius: var(--esg-radius);
+    box-shadow: var(--esg-shadow);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    flex: 1 1 180px;
+    min-width: 160px;
+}
+
+.rz-esg-chip__value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--esg-navy);
+    font-variant-numeric: tabular-nums;
+}
+
+.rz-esg-chip__label {
+    font-size: .8rem;
+    color: var(--esg-muted);
+}
+
+.rz-esg-hero__trust {
+    font-size: .82rem;
+    color: var(--esg-muted);
+    font-style: italic;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   6. Section 2 — ESG Tracks
+───────────────────────────────────────────────────────────────────────────── */
+.rz-esg-tracks {
+    background: var(--esg-bg-soft);
+    padding-block: 80px;
+}
+
+.rz-esg-tracks__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+}
+
+.rz-esg-track-card {
+    background: var(--esg-bg);
+    border: 1px solid var(--esg-border);
+    border-radius: var(--esg-radius-lg);
+    box-shadow: var(--esg-shadow);
+    padding: 32px;
+    transition: box-shadow .25s ease, transform .25s ease;
+}
+
+.rz-esg-track-card:hover {
+    box-shadow: var(--esg-shadow-hover);
+    transform: translateY(-2px);
+}
+
+/* Accent left border per status */
+.rz-esg-track-card--ongoing {
+    border-left: 4px solid var(--esg-ongoing);
+}
+
+.rz-esg-track-card--done {
+    border-left: 4px solid var(--esg-done);
+}
+
+.rz-esg-track-card--upcoming {
+    border-left: 4px solid var(--esg-next);
+}
+
+.rz-esg-track-card__header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.rz-esg-track-card__icon {
+    font-size: 2rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.rz-esg-track-card__title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.rz-esg-track-card__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--esg-navy);
+}
+
+.rz-esg-track-card__intro {
+    color: var(--esg-muted);
+    margin-bottom: 24px;
+    font-size: .95rem;
+}
+
+/* KPI grid inside track card */
+.rz-esg-track-card__kpis {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+    padding: 16px;
+    background: var(--esg-bg-soft);
+    border-radius: var(--esg-radius);
+}
+
+.rz-esg-track-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.rz-esg-track-kpi__value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--esg-navy);
+    font-variant-numeric: tabular-nums;
+}
+
+.rz-esg-track-kpi__label {
+    font-size: .75rem;
+    color: var(--esg-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.rz-esg-track-card__practice {
+    font-size: .9rem;
+    color: var(--esg-navy);
+    background: var(--esg-teal-light);
+    border-radius: var(--esg-radius);
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    line-height: 1.6;
+}
+
+.rz-esg-track-card__meaning {
+    font-size: .88rem;
+    color: var(--esg-muted);
+    font-style: italic;
+    line-height: 1.6;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   7. Section 3 — Roadmap / Milepæle
+───────────────────────────────────────────────────────────────────────────── */
+.rz-esg-roadmap {
+    background: var(--esg-bg);
+    padding-block: 80px;
+    overflow: hidden;
+}
+
+/* Horizontal track container on desktop */
+.rz-esg-roadmap__track {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Vertical connecting line (mobile-first) */
+.rz-esg-roadmap__track::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--esg-teal-mid);
+    z-index: 0;
+}
+
+/* Milestone item */
+.rz-esg-milestone {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 0 0 40px 0;
+    position: relative;
+    z-index: 1;
+}
+
+.rz-esg-milestone:last-child {
+    padding-bottom: 0;
+}
+
+/* Dot */
+.rz-esg-milestone__dot {
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    position: relative;
+    z-index: 1;
+    background: var(--esg-bg);
+    border: 3px solid var(--esg-teal-mid);
+    transition: box-shadow .25s ease;
+}
+
+.rz-esg-milestone--done .rz-esg-milestone__dot {
+    background: var(--esg-teal);
+    border-color: var(--esg-teal);
+}
+
+.rz-esg-milestone--upcoming .rz-esg-milestone__dot {
+    border-style: dashed;
+    border-color: var(--esg-next);
+}
+
+.rz-esg-milestone--target .rz-esg-milestone__dot {
+    border-color: var(--esg-target);
+    box-shadow: 0 0 0 4px var(--esg-target-bg);
+}
+
+.rz-esg-milestone__dot-icon {
+    font-size: 1rem;
+}
+
+/* Content */
+.rz-esg-milestone__content {
+    flex: 1;
+    background: var(--esg-bg);
+    border: 1px solid var(--esg-border);
+    border-radius: var(--esg-radius);
+    box-shadow: var(--esg-shadow);
+    padding: 20px 24px;
+}
+
+.rz-esg-milestone__meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.rz-esg-milestone__year {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--esg-teal);
+}
+
+.rz-esg-milestone__tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.rz-esg-milestone__tag--done {
+    background: var(--esg-done-bg);
+    color: var(--esg-done);
+}
+
+.rz-esg-milestone__tag--upcoming {
+    background: var(--esg-next-bg);
+    color: var(--esg-next);
+}
+
+.rz-esg-milestone__tag--target {
+    background: var(--esg-target-bg);
+    color: var(--esg-target);
+}
+
+.rz-esg-milestone__title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--esg-navy);
+    margin-bottom: 6px;
+}
+
+.rz-esg-milestone__body {
+    font-size: .88rem;
+    color: var(--esg-muted);
+    line-height: 1.6;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   8. Section 4 — Action Cards (Indsatskort)
+───────────────────────────────────────────────────────────────────────────── */
+.rz-esg-actions {
+    background: var(--esg-bg-soft);
+    padding-block: 80px;
+}
+
+.rz-esg-actions__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+.rz-esg-action-card {
+    background: var(--esg-bg);
+    border: 1px solid var(--esg-border);
+    border-radius: var(--esg-radius-lg);
+    box-shadow: var(--esg-shadow);
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: box-shadow .25s ease;
+}
+
+.rz-esg-action-card:hover {
+    box-shadow: var(--esg-shadow-hover);
+}
+
+.rz-esg-action-card__top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.rz-esg-action-card__icon {
+    font-size: 1.75rem;
+    flex-shrink: 0;
+}
+
+.rz-esg-action-card__title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--esg-navy);
+}
+
+.rz-esg-action-card__summary {
+    font-size: .92rem;
+    color: var(--esg-muted);
+    line-height: 1.6;
+}
+
+.rz-esg-action-card__toggle {
+    margin-top: auto;
+    align-self: flex-start;
+}
+
+.rz-esg-action-card__toggle-icon {
+    font-size: 1.1rem;
+    transition: transform .25s ease;
+    display: inline-block;
+}
+
+.rz-esg-action-card__toggle[aria-expanded="true"] .rz-esg-action-card__toggle-icon {
+    transform: rotate(45deg);
+}
+
+.rz-esg-action-card__toggle[aria-expanded="true"] .rz-esg-action-card__toggle-label {
+    /* label is swapped by JS — no CSS change needed */
+}
+
+/* Expandable panel */
+.rz-esg-action-card__panel {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height .4s ease;
+}
+
+.rz-esg-action-card__panel:not([hidden]) {
+    max-height: 600px; /* generous upper bound */
+}
+
+/* Definition list inside card */
+.rz-esg-action-card__details {
+    border-top: 1px solid var(--esg-border);
+    padding-top: 16px;
+    display: grid;
+    gap: 12px;
+}
+
+.rz-esg-action-card__details dt {
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--esg-teal);
+    margin-bottom: 2px;
+}
+
+.rz-esg-action-card__details dd {
+    font-size: .9rem;
+    color: var(--esg-navy);
+    line-height: 1.6;
+    margin-bottom: 8px;
+}
+
+.rz-esg-action-card__close {
+    margin-top: 8px;
+    color: var(--esg-muted);
+    font-weight: 600;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   9. Section 5 — Metrics toggle (Sådan måler vi)
+───────────────────────────────────────────────────────────────────────────── */
+.rz-esg-metrics {
+    background: var(--esg-bg);
+    padding-block: 64px;
+    border-top: 1px solid var(--esg-border);
+    border-bottom: 1px solid var(--esg-border);
+}
+
+.rz-esg-metrics__toggle-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 0;
+}
+
+.rz-esg-metrics__toggle-arrow {
+    display: inline-block;
+    transition: transform .25s ease;
+}
+
+.rz-esg-metrics__toggle[aria-expanded="true"] .rz-esg-metrics__toggle-arrow {
+    transform: rotate(180deg);
+}
+
+.rz-esg-metrics__panel {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height .45s ease, padding .45s ease;
+}
+
+.rz-esg-metrics__panel:not([hidden]) {
+    max-height: 1000px;
+    padding-top: 32px;
+}
+
+.rz-esg-metrics__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+.rz-esg-metrics__item {
+    background: var(--esg-bg-soft);
+    border: 1px solid var(--esg-border);
+    border-radius: var(--esg-radius);
+    padding: 20px 24px;
+}
+
+.rz-esg-metrics__term {
+    font-weight: 700;
+    color: var(--esg-teal);
+    font-size: .95rem;
+    margin-bottom: 6px;
+}
+
+.rz-esg-metrics__def {
+    font-size: .9rem;
+    color: var(--esg-muted);
+    line-height: 1.65;
+    margin-left: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   10. Section 6 — Cases (Hverdagsnær ESG)
+───────────────────────────────────────────────────────────────────────────── */
+.rz-esg-cases {
+    background: var(--esg-bg-soft);
+    padding-block: 80px;
+}
+
+.rz-esg-cases__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+}
+
+.rz-esg-case-card {
+    background: var(--esg-bg);
+    border: 1px solid var(--esg-border);
+    border-radius: var(--esg-radius-lg);
+    box-shadow: var(--esg-shadow);
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: box-shadow .25s ease, transform .25s ease;
+}
+
+.rz-esg-case-card:hover {
+    box-shadow: var(--esg-shadow-hover);
+    transform: translateY(-2px);
+}
+
+.rz-esg-case-card__title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--esg-navy);
+    line-height: 1.3;
+}
+
+.rz-esg-case-card__intro {
+    font-size: .95rem;
+    color: var(--esg-teal);
+    font-style: italic;
+}
+
+.rz-esg-case-card__body {
+    font-size: .92rem;
+    color: var(--esg-muted);
+    line-height: 1.7;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   11. Section 7 — FAQ Accordion
+───────────────────────────────────────────────────────────────────────────── */
+.rz-esg-faq {
+    background: var(--esg-bg);
+    padding-block: 80px;
+}
+
+.rz-esg-faq__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid var(--esg-border);
+    border-radius: var(--esg-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--esg-shadow);
+}
+
+.rz-esg-faq__item {
+    border-bottom: 1px solid var(--esg-border);
+}
+
+.rz-esg-faq__item:last-child {
+    border-bottom: none;
+}
+
+.rz-esg-faq__question {
+    display: block;
+}
+
+.rz-esg-faq__question-btn {
+    width: 100%;
+    background: var(--esg-bg);
+    border: none;
+    padding: 20px 24px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    font-family: var(--esg-font);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--esg-navy);
+    cursor: pointer;
+    transition: background .2s ease;
+}
+
+.rz-esg-faq__question-btn:hover,
+.rz-esg-faq__question-btn[aria-expanded="true"] {
+    background: var(--esg-teal-light);
+}
+
+.rz-esg-faq__question-btn:focus-visible {
+    outline: 3px solid var(--esg-teal);
+    outline-offset: -3px;
+}
+
+.rz-esg-faq__arrow {
+    flex-shrink: 0;
+    font-size: .9rem;
+    color: var(--esg-teal);
+    transition: transform .25s ease;
+    display: inline-block;
+}
+
+.rz-esg-faq__question-btn[aria-expanded="true"] .rz-esg-faq__arrow {
+    transform: rotate(180deg);
+}
+
+.rz-esg-faq__answer {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height .35s ease, padding .35s ease;
+}
+
+.rz-esg-faq__answer:not([hidden]) {
+    max-height: 400px;
+}
+
+.rz-esg-faq__answer p {
+    padding: 0 24px 20px;
+    font-size: .93rem;
+    color: var(--esg-muted);
+    line-height: 1.7;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   12. Section 8 — CTA Banner
+───────────────────────────────────────────────────────────────────────────── */
+.rz-esg-cta {
+    background: var(--esg-teal);
+    padding-block: 80px;
+}
+
+.rz-esg-cta__inner {
+    text-align: center;
+    max-width: 680px;
+    margin-inline: auto;
+}
+
+.rz-esg-cta__heading {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 16px;
+}
+
+.rz-esg-cta__body {
+    font-size: 1.05rem;
+    color: rgba(255,255,255,.85);
+    line-height: 1.7;
+    margin-bottom: 36px;
+}
+
+.rz-esg-cta__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   13. Animations & counter keyframes
+───────────────────────────────────────────────────────────────────────────── */
+
+/* Counter "pulse" on completion */
+@keyframes rz-esg-counter-pop {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.06); }
+    100% { transform: scale(1); }
+}
+
+.rz-esg-counter--done {
+    animation: rz-esg-counter-pop .3s ease;
+}
+
+/* Fade-in-up (used via .rz-esg-animate / .rz-esg-visible) */
+@keyframes rz-esg-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   14. Responsive breakpoints
+───────────────────────────────────────────────────────────────────────────── */
+
+/* 640px — small tablets / large phones */
+@media (min-width: 640px) {
+    .rz-esg-hero {
+        padding-block: 80px;
+    }
+
+    .rz-esg-hero__chips {
+        flex-wrap: nowrap;
+    }
+
+    .rz-esg-cases__grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .rz-esg-metrics__grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .rz-esg-actions__grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* 768px — tablets */
+@media (min-width: 768px) {
+    .rz-esg-hero__inner {
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: space-between;
+    }
+
+    .rz-esg-hero__content {
+        flex: 1;
+        max-width: 520px;
+    }
+
+    .rz-esg-hero__kpi {
+        flex-shrink: 0;
+        width: 240px;
+    }
+
+    .rz-esg-tracks__grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* 1024px — desktop */
+@media (min-width: 1024px) {
+    .rz-esg-hero,
+    .rz-esg-tracks,
+    .rz-esg-roadmap,
+    .rz-esg-actions,
+    .rz-esg-cases,
+    .rz-esg-faq,
+    .rz-esg-cta,
+    .rz-esg-metrics {
+        padding-block: 96px;
+    }
+
+    .rz-esg-tracks__grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .rz-esg-actions__grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Horizontal roadmap on desktop */
+    .rz-esg-roadmap__track {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 0;
+    }
+
+    /* Switch connecting line to horizontal */
+    .rz-esg-roadmap__track::before {
+        left: 0;
+        right: 0;
+        top: 20px;    /* center on dot (dot height/2) */
+        bottom: auto;
+        width: auto;
+        height: 2px;
+    }
+
+    .rz-esg-milestone {
+        flex: 1;
+        flex-direction: column;
+        align-items: center;
+        padding: 0 16px;
+        padding-bottom: 0;
+        gap: 16px;
+    }
+
+    .rz-esg-milestone__content {
+        text-align: center;
+        width: 100%;
+    }
+
+    .rz-esg-milestone__meta {
+        justify-content: center;
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   15. Reduced motion overrides
+   MUST come last to override all transition/animation declarations.
+───────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .rz-esg *,
+    .rz-esg *::before,
+    .rz-esg *::after {
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
+    }
+
+    /* Make scroll-reveal elements immediately visible */
+    .rz-esg-animate {
+        opacity: 1;
+        transform: none;
+    }
+}
