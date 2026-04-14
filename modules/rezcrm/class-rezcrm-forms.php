@@ -73,8 +73,8 @@ class RZPZ_CRM_Forms {
         // Admin: formularer
         register_rest_route( $ns, 'crm/forms',            [ 'methods' => 'GET',    'callback' => [ __CLASS__, 'api_forms_list' ],   'permission_callback' => $cap ] );
         register_rest_route( $ns, 'crm/forms',            [ 'methods' => 'POST',   'callback' => [ __CLASS__, 'api_forms_save' ],   'permission_callback' => $cap ] );
-        register_rest_route( $ns, 'crm/forms/(?P<id>\d+)','methods' => 'GET',      'callback' => [ __CLASS__, 'api_form_get' ],     'permission_callback' => $cap ] );
-        register_rest_route( $ns, 'crm/forms/(?P<id>\d+)','methods' => 'PUT',      'callback' => [ __CLASS__, 'api_form_update' ],  'permission_callback' => $cap ] );
+        register_rest_route( $ns, 'crm/forms/(?P<id>\d+)', [ 'methods' => 'GET',    'callback' => [ __CLASS__, 'api_form_get' ],     'permission_callback' => $cap ] );
+        register_rest_route( $ns, 'crm/forms/(?P<id>\d+)', [ 'methods' => 'PUT',    'callback' => [ __CLASS__, 'api_form_update' ],  'permission_callback' => $cap ] );
         register_rest_route( $ns, 'crm/forms/(?P<id>\d+)/fields', [ 'methods' => 'GET',  'callback' => [ __CLASS__, 'api_fields_get' ],  'permission_callback' => $cap ] );
         register_rest_route( $ns, 'crm/forms/(?P<id>\d+)/fields', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'api_fields_save' ], 'permission_callback' => $cap ] );
         register_rest_route( $ns, 'crm/forms/(?P<id>\d+)/stats',  [ 'methods' => 'GET',  'callback' => [ __CLASS__, 'api_form_stats' ],  'permission_callback' => $cap ] );
