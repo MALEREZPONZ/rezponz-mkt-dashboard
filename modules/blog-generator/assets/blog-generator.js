@@ -1,5 +1,5 @@
 /* =========================================================
-   Rezponz Blog Generator — blog-generator.js  v3.2.0
+   Rezponz Blog Generator — blog-generator.js  v3.3.0
    ========================================================= */
 (function () {
   'use strict';
@@ -533,9 +533,11 @@
     });
 
     // Også topics fra allTopics (lokal state) for evt. nytilføjede
+    // scheduled_for kan være ISO-string (fra toISOString()) eller MySQL datetime ("Y-m-d H:i:s")
     allTopics.forEach(t => {
       if (!t.scheduled_for) return;
-      const d = new Date(t.scheduled_for.replace('T', ' ').replace('Z', ''));
+      const sf = t.scheduled_for.includes('T') ? t.scheduled_for : t.scheduled_for.replace(' ', 'T');
+      const d  = new Date(sf);
       if (d.getFullYear() === calYear && d.getMonth() === calMonth) {
         const day = d.getDate();
         if (!dayMap[day]) dayMap[day] = [];

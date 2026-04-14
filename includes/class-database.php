@@ -173,6 +173,17 @@ class RZPA_Database {
             KEY idx_sitemap (sitemap_id)
         ) $c;" );
 
+        dbDelta( "CREATE TABLE {$wpdb->prefix}rzpa_blog_visits (
+            id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            post_id    BIGINT UNSIGNED NOT NULL,
+            duration   SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            exit_type  VARCHAR(10) NOT NULL DEFAULT 'unknown',
+            visited_at DATETIME NOT NULL,
+            PRIMARY KEY (id),
+            KEY idx_post_id (post_id),
+            KEY idx_visited_at (visited_at)
+        ) $c;" );
+
         update_option( 'rzpa_db_version', RZPA_DB_VER );
     }
 
@@ -293,6 +304,10 @@ class RZPA_Database {
 
         if ( empty( $posts ) ) return [];
 
+        // Blog visit stats
+        $post_ids  = wp_list_pluck( $posts, 'ID' );
+        $visit_map = self::get_blog_visit_stats( $post_ids, $days );
+
         // GSC sidedata
         $pages_t    = $wpdb->prefix . 'rzpa_seo_pages';
         $pages_rows = $wpdb->get_results( $wpdb->prepare(
@@ -329,6 +344,8 @@ class RZPA_Database {
             $url      = get_permalink( $post );
             $norm_url = self::normalize_url_for_match( $url );
             $gsc      = $pages_map[ $norm_url ] ?? null;
+
+            $visit_stats = $visit_map[ $post->ID ] ?? null;
 
             $position    = $gsc ? round( (float) $gsc['avg_position'], 1 ) : null;
             $clicks      = $gsc ? (int) $gsc['total_clicks'] : 0;
@@ -397,6 +414,10 @@ class RZPA_Database {
                 'fixed_types'         => array_keys( $fixed_data ),
                 'indexing_requested'  => $indexing_requested,
                 'indexing_confirmed'  => $indexing_confirmed,
+                'visits'              => $visit_stats ? $visit_stats['visits']                         : 0,
+                'avg_duration'        => $visit_stats ? round( $visit_stats['avg_duration'] )          : null,
+                'pct_internal'        => $visit_stats ? round( $visit_stats['pct_internal'], 1 )        : null,
+                'pct_external'        => $visit_stats ? round( $visit_stats['pct_external'], 1 )        : null,
             ];
         }
 
@@ -1074,5 +1095,82 @@ class RZPA_Database {
             }
         }
         return $count;
+    }
+
+    // ── Blog visit tracking ──────────────────────────────────────────────────
+
+    /**
+     * Record a single blog post visit.
+     * Rate-limited by transient (IP+UA hash) — no PII stored.
+     */
+    public static function record_blog_visit( int $post_id, int $duration, string $exit_type ): bool {
+        global $wpdb;
+
+        // Validate exit_type
+        if ( ! in_array( $exit_type, [ 'internal', 'external', 'unknown' ], true ) ) {
+            $exit_type = 'unknown';
+        }
+
+        // Cap duration between 1s and 3600s
+        $duration = max( 1, min( 3600, $duration ) );
+
+        // Rate limit: one record per visitor per post per 30 min (based on hashed IP+UA, no PII stored)
+        $rate_key = 'rzpa_bv_' . substr( md5( $_SERVER['REMOTE_ADDR'] . ( $_SERVER['HTTP_USER_AGENT'] ?? '' ) . $post_id ), 0, 16 );
+        if ( get_transient( $rate_key ) ) return false;
+        set_transient( $rate_key, 1, 30 * MINUTE_IN_SECONDS );
+
+        $inserted = $wpdb->insert(
+            $wpdb->prefix . 'rzpa_blog_visits',
+            [
+                'post_id'    => $post_id,
+                'duration'   => $duration,
+                'exit_type'  => $exit_type,
+                'visited_at' => gmdate( 'Y-m-d H:i:s' ),
+            ],
+            [ '%d', '%d', '%s', '%s' ]
+        );
+
+        return $inserted !== false;
+    }
+
+    /**
+     * Get aggregated visit stats for an array of post IDs within the last $days days.
+     * Returns [ post_id => [ 'visits' => int, 'avg_duration' => float, 'pct_internal' => float, 'pct_external' => float ] ]
+     */
+    public static function get_blog_visit_stats( array $post_ids, int $days = 30 ): array {
+        global $wpdb;
+        if ( empty( $post_ids ) ) return [];
+
+        $t            = $wpdb->prefix . 'rzpa_blog_visits';
+        $placeholders = implode( ',', array_fill( 0, count( $post_ids ), '%d' ) );
+        $args         = array_merge( [ $days ], $post_ids );
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT
+                    post_id,
+                    COUNT(*)                                                   AS visits,
+                    AVG(duration)                                              AS avg_duration,
+                    SUM(exit_type = 'internal') / COUNT(*) * 100              AS pct_internal,
+                    SUM(exit_type = 'external') / COUNT(*) * 100              AS pct_external
+                 FROM {$t}
+                 WHERE visited_at >= DATE_SUB(NOW(), INTERVAL %d DAY)
+                   AND post_id IN ({$placeholders})
+                 GROUP BY post_id",
+                $args
+            ),
+            ARRAY_A
+        ) ?: [];
+
+        $map = [];
+        foreach ( $rows as $r ) {
+            $map[ (int) $r['post_id'] ] = [
+                'visits'       => (int) $r['visits'],
+                'avg_duration' => (float) $r['avg_duration'],
+                'pct_internal' => (float) $r['pct_internal'],
+                'pct_external' => (float) $r['pct_external'],
+            ];
+        }
+        return $map;
     }
 }

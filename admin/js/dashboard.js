@@ -4083,6 +4083,12 @@ const RZPA_App = (() => {
         if (pri === 'medium')   return '🟡';
         return '🟢';
       };
+      const fmtDuration = s => {
+        if (!s) return '–';
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return m > 0 ? `${m}:${String(sec).padStart(2,'0')} min` : `${sec}s`;
+      };
 
       let html = `
         <div class="rzpa-blog-table-wrap">
@@ -4095,6 +4101,9 @@ const RZPA_App = (() => {
                 <th class="num">Visninger</th>
                 <th class="num">CTR</th>
                 <th>AI</th>
+                <th class="num" title="Antal sidebesøg tracket direkte på bloggen (første besøg pr. 30 min)">Besøg</th>
+                <th class="num" title="Gennemsnitlig tid besøgende bruger på siden">Gns. tid</th>
+                <th class="num" title="Andel der klikker videre til en anden side på rezponz.dk">Videre →</th>
                 <th>Anbefaling</th>
               </tr>
             </thead>
@@ -4130,6 +4139,9 @@ const RZPA_App = (() => {
                 <td class="num">${post.impressions > 0 ? post.impressions.toLocaleString('da-DK') : '–'}</td>
                 <td class="num">${post.ctr > 0 ? post.ctr.toFixed(1) + '%' : '–'}</td>
                 <td>${aiLabel}</td>
+                <td class="num" style="color:${post.visits > 0 ? '#fff' : '#444'}">${post.visits > 0 ? post.visits.toLocaleString('da-DK') : '–'}</td>
+                <td class="num" style="color:${post.avg_duration ? '#ccc' : '#444'}">${fmtDuration(post.avg_duration)}</td>
+                <td class="num">${post.pct_internal !== null && post.visits > 0 ? `<span style="color:${post.pct_internal >= 40 ? '#4ade80' : post.pct_internal >= 20 ? '#CCFF00' : '#888'};font-weight:600">${post.pct_internal.toFixed(0)}%</span>` : '–'}</td>
                 <td class="rzpa-blog-rec-cell">
                   <span class="rzpa-blog-rec-dot">${priDot(post.priority)}</span>
                   <span class="rzpa-blog-rec-label">${post.rec_label}</span>
@@ -4145,7 +4157,7 @@ const RZPA_App = (() => {
                 </td>
               </tr>
               <tr class="rzpa-blog-expand-row" id="expand-${post.post_id}" style="display:none">
-                <td colspan="7">
+                <td colspan="10">
                   <div class="rzpa-blog-expand">
                     <div class="rzpa-blog-expand-icon">💡</div>
                     <div>

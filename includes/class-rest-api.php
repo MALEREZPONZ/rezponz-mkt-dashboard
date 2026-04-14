@@ -321,6 +321,11 @@ class RZPA_REST_API {
             'callback'            => [ __CLASS__, 'blog_check_index_status' ],
             'permission_callback' => $cap,
         ] );
+        register_rest_route( self::NS, '/blog/visit', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'blog_record_visit' ],
+            'permission_callback' => '__return_true', // public endpoint — rate limited in handler
+        ] );
         register_rest_route( self::NS, '/ai/fix-action', [
             'methods'             => 'POST',
             'callback'            => [ __CLASS__, 'ai_fix_action' ],
@@ -382,6 +387,25 @@ class RZPA_REST_API {
         $days = (int) ( $r->get_param( 'days' ) ?? 30 );
         $days = in_array( $days, [ 7, 30, 90 ], true ) ? $days : 30;
         return self::ok( RZPA_Database::get_blog_insights( $days ) );
+    }
+
+    // ── POST /blog/visit ──────────────────────────────────────────────────────
+    public static function blog_record_visit( WP_REST_Request $r ): WP_REST_Response {
+        $post_id   = (int) $r->get_param( 'post_id' );
+        $duration  = (int) $r->get_param( 'duration' );
+        $exit_type = sanitize_key( (string) ( $r->get_param( 'exit_type' ) ?? 'unknown' ) );
+
+        if ( $post_id <= 0 ) {
+            return new WP_REST_Response( [ 'ok' => false ], 400 );
+        }
+
+        // Only track actual published posts
+        if ( get_post_status( $post_id ) !== 'publish' ) {
+            return new WP_REST_Response( [ 'ok' => false ], 400 );
+        }
+
+        $recorded = RZPA_Database::record_blog_visit( $post_id, $duration, $exit_type );
+        return new WP_REST_Response( [ 'ok' => $recorded ], 200 );
     }
 
     /**

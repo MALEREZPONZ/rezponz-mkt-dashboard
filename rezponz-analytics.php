@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      3.3.0
+ * Version:      3.4.4
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,11 +14,11 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '3.3.0' );
+define( 'RZPA_VERSION',     '3.4.4' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
-define( 'RZPA_DB_VER',      '5' );
+define( 'RZPA_DB_VER',      '6' );
 
 // Composer / vendor autoloader (DomPDF m.fl.)
 if ( file_exists( RZPA_DIR . 'vendor/autoload.php' ) ) {
@@ -41,6 +41,15 @@ require_once RZPA_DIR . 'includes/class-admin.php';
 // ── Rekruttering Module ──────────────────────────────────────────────────────
 require_once RZPA_DIR . 'modules/rekruttering/class-rekruttering.php';
 // NOTE: init() called inside plugins_loaded below to ensure correct hook order
+
+// ── RezCRM Module ────────────────────────────────────────────────────────────
+require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm-db.php';
+require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm-forms-db.php';
+require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm.php';
+require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm-forms.php';
+require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm-auth.php';
+require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm-users.php';
+require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm-admin.php';
 
 // ── Crew Module ─────────────────────────────────────────────────────────────
 require_once RZPA_DIR . 'modules/crew/class-crew-db.php';
@@ -106,10 +115,19 @@ register_activation_hook( __FILE__, function () {
     RZLQ_Dept::install();
     RZPA_SEO_DB::install();
     RZPA_Blog_Gen_DB::install();
+    RZPZ_CRM_DB::install();
+    RZPZ_CRM_Forms_DB::install();
+    RZPZ_CRM_Auth::install_audit_table();
+    RZPZ_CRM_Auth::register_role();
     // Registrér sitemap rewrite-regel og flush ved aktivering
     RZPA_Sitemap_Manager::flush_rules();
 } );
 register_deactivation_hook( __FILE__, [ 'RZPA_Scheduler', 'clear_crons' ] );
+register_deactivation_hook( __FILE__, [ 'RZPZ_CRM_Auth', 'remove_role' ] );
+register_deactivation_hook( __FILE__, function() {
+    wp_clear_scheduled_hook( 'rzpz_crm_dispatch_rejections' );
+    wp_clear_scheduled_hook( 'rzpz_crm_gdpr_cleanup' );
+} );
 
 // ── Blog Generator: gem indstilling via AJAX ─────────────────────────────────
 add_action( 'wp_ajax_rzpa_save_blog_gen_setting', function () {
@@ -131,16 +149,22 @@ add_action( 'wp_head', function () {
     if ( ! is_singular() ) return;
     $post_id = get_the_ID();
 
-    // FAQ JSON-LD (FAQPage schema)
+    // FAQ JSON-LD (FAQPage schema) — decode+re-encode to guarantee valid JSON output
     $faq_schema = get_post_meta( $post_id, '_rzpa_faq_schema', true );
     if ( $faq_schema ) {
-        echo "\n" . $faq_schema . "\n";
+        $decoded = json_decode( $faq_schema, true );
+        if ( $decoded ) {
+            echo "\n" . wp_json_encode( $decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) . "\n";
+        }
     }
 
     // Article JSON-LD (BlogPosting schema)
     $article_schema = get_post_meta( $post_id, '_rzpa_article_schema', true );
     if ( $article_schema ) {
-        echo "\n" . $article_schema . "\n";
+        $decoded = json_decode( $article_schema, true );
+        if ( $decoded ) {
+            echo "\n" . wp_json_encode( $decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) . "\n";
+        }
     }
 
     // GEO meta-tags — kun på AI-genererede blogindlæg (lokal SEO + AI-synlighed Nordjylland)
@@ -210,6 +234,18 @@ add_action( 'plugins_loaded', function () {
     RZPA_Rekruttering::init();
     RZPA_Sitemap_Manager::init();
 
+    // RezCRM module
+    if ( get_option( RZPZ_CRM_DB::DB_VERSION_KEY ) !== RZPZ_CRM_DB::DB_VERSION ) {
+        RZPZ_CRM_DB::install();
+    }
+    if ( get_option( RZPZ_CRM_Forms_DB::DB_VERSION_KEY ) !== RZPZ_CRM_Forms_DB::DB_VERSION ) {
+        RZPZ_CRM_Forms_DB::install();
+    }
+    RZPZ_RezCRM::init();
+    RZPZ_CRM_Forms::init();
+    RZPZ_CRM_Auth::init();
+    RZPZ_CRM_Users::init();
+
     // Crew module – auto-install tables if missing or outdated
     if ( get_option( RZPZ_Crew_DB::DB_VERSION_KEY ) !== RZPZ_Crew_DB::DB_VERSION ) {
         RZPZ_Crew_DB::install();
@@ -278,4 +314,20 @@ add_action( 'plugins_loaded', function () {
     if ( $owner && $repo ) {
         ( new RZPA_Updater( RZPA_PLUGIN_FILE, $owner, $repo, $token ) )->init();
     }
+} );
+
+// Enqueue blog visitor tracking on single blog posts (frontend)
+add_action( 'wp_enqueue_scripts', function () {
+    if ( ! is_single() || get_post_type() !== 'post' ) return;
+    wp_enqueue_script(
+        'rzpa-blog-tracker',
+        RZPA_URL . 'assets/js/rzpa-blog-tracker.js',
+        [],
+        RZPA_VERSION,
+        true
+    );
+    wp_localize_script( 'rzpa-blog-tracker', 'RZPA_TRACKER', [
+        'postId' => get_the_ID(),
+        'apiUrl' => rest_url( 'rzpa/v1/blog/visit' ),
+    ] );
 } );

@@ -16,7 +16,7 @@ class RZPA_Blog_Gen_Admin {
 
         wp_enqueue_script(
             'rzpa-blog-generator',
-            plugin_dir_url( dirname( __DIR__ ) . '/rezponz-analytics.php' ) . 'modules/blog-generator/assets/blog-generator.js',
+            RZPA_URL . 'modules/blog-generator/assets/blog-generator.js',
             [ 'jquery' ],
             RZPA_VERSION,
             true

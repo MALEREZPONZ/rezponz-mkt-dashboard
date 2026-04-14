@@ -17,7 +17,20 @@ class RZPA_Rekruttering {
     public static function add_menu() {
         $cap = 'manage_options';
         add_submenu_page( 'rzpa-dashboard', '', '👥 HR & Crew', $cap, 'rzpa-section-crew', [ __CLASS__, 'page_rekruttering' ] );
-        add_submenu_page( 'rzpa-dashboard', 'Rekruttering – Rezponz', 'Rekruttering', $cap, 'rzpa-rekruttering', [ __CLASS__, 'page_rekruttering' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Rekruttering – Rezponz',   'Rekruttering',         $cap, 'rzpa-rekruttering',   [ __CLASS__, 'page_rekruttering' ] );
+        add_submenu_page( 'rzpa-dashboard', 'RezCRM – Rezponz',         '🎯 RezCRM',            $cap, 'rzpa-rezcrm',         [ 'RZPZ_CRM_Admin', 'render_page' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Ansøgningsformularer – Rezponz', '📋 Formularer',  $cap, 'rzpa-rezcrm-forms',   [ __CLASS__, 'page_forms' ] );
+        add_submenu_page( 'rzpa-dashboard', 'RezCRM Brugere – Rezponz', '🔐 Brugere & Sikkerhed', $cap, 'rzpa-rezcrm-users', [ __CLASS__, 'page_users' ] );
+    }
+
+    public static function page_forms() {
+        if ( class_exists( 'RZPZ_CRM_Forms_DB' ) ) {
+            require_once RZPA_DIR . 'modules/rezcrm/views/admin-rezcrm-forms.php';
+        }
+    }
+
+    public static function page_users() {
+        require_once RZPA_DIR . 'modules/rezcrm/views/admin-rezcrm-users.php';
     }
 
     public static function page_rekruttering() {

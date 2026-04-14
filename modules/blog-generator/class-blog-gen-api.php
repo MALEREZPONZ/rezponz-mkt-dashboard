@@ -444,15 +444,23 @@ PROMPT;
         if ( $topic->image_id ) set_post_thumbnail( $post_id, (int) $topic->image_id );
 
         // ── Elementor Single Post Template ────────────────────────────────────
-        // Sæt det Elementor-template der er konfigureret i Indstillinger
+        // Elementor Theme Builder bruger '_elementor_conditions' på TEMPLATE-posten
+        // til at afgøre hvilke posts det skal rendere. Vi tilføjer en betingelse:
+        // "inkluder singulær post med ID $post_id" → korrekt Elementor API.
         $elementor_template_id = (int) ( $opts['blog_gen_elementor_template_id'] ?? 0 );
         if ( $elementor_template_id ) {
-            // Fortæl Elementor at denne post bruger et specifikt template
-            update_post_meta( $post_id, '_elementor_template_id',   $elementor_template_id );
-            // Kræver at Elementor Theme Builder er aktiv med "Single Post"-type
-            update_post_meta( $post_id, '_elementor_template_type', 'single-post' );
+            $conditions = get_post_meta( $elementor_template_id, '_elementor_conditions', true );
+            if ( ! is_array( $conditions ) ) $conditions = [];
+            $condition = 'include/singular/post/' . $post_id;
+            if ( ! in_array( $condition, $conditions, true ) ) {
+                $conditions[] = $condition;
+                update_post_meta( $elementor_template_id, '_elementor_conditions', $conditions );
+                // Ryd Elementors betingelses-cache så ændringen træder i kraft med det samme
+                delete_option( 'elementor_conditions_cache' );
+                delete_transient( 'elementor_conditions_cache' );
+            }
         }
-        // Sørg for at Elementor editor-status er "published" så template renderes
+        // Aktivér Elementor's renderer for dette post (kræves for at content renderes korrekt)
         update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
 
         // ── Yoast SEO ─────────────────────────────────────────────────────────
@@ -485,30 +493,22 @@ PROMPT;
      * På Curanet shared hosting er loopback typisk blokeret.
      */
     private static function trigger_cron_safe(): void {
-        // Forsøg asynkron HTTP-trigger via WP standard mekanisme
+        // Forhindre dobbelt-trigger hvis cron allerede kører
         $doing_cron_transient = get_transient( 'doing_cron' );
         if ( $doing_cron_transient && ( floatval( $doing_cron_transient ) + WP_CRON_LOCK_TIMEOUT ) > microtime( true ) ) {
-            return; // Cron kører allerede
+            return; // Cron kører allerede — skip
         }
 
-        // Test om loopback virker (cached i 1 time)
-        $loopback_ok = get_transient( 'rzpa_cron_loopback_ok' );
-        if ( $loopback_ok === false ) {
-            $test = wp_remote_get( site_url( '/?rzpa_cron_test=1' ), [ 'timeout' => 3, 'blocking' => true, 'sslverify' => false ] );
-            $loopback_ok = ( ! is_wp_error( $test ) && wp_remote_retrieve_response_code( $test ) < 500 ) ? 'yes' : 'no';
-            set_transient( 'rzpa_cron_loopback_ok', $loopback_ok, HOUR_IN_SECONDS );
-        }
-
-        if ( $loopback_ok === 'yes' ) {
-            // Standard WP cron-ping
-            @wp_remote_post( site_url( '/wp-cron.php?doing_wp_cron' ), [
-                'timeout'   => 0.01,
-                'blocking'  => false,
-                'sslverify' => false,
-            ] );
-        }
-        // Hvis loopback er blokeret, kører WP Cron ved næste side-load (standard WP-adfærd)
-        // For at forcere direkte kørsel: brug system-cron (anbefalet på Curanet)
+        // Fire-and-forget ping til wp-cron.php (timeout=0.01s = non-blocking).
+        // Virker på alle hosting-platforme med loopback; fejler lydløst hvis blokeret.
+        // Den tidligere loopback-test (/?rzpa_cron_test=1) returnerede altid HTTP 200
+        // fra WordPress og var derfor ubrugelig — fjernet.
+        @wp_remote_post( site_url( '/wp-cron.php?doing_wp_cron' ), [
+            'timeout'   => 0.01,
+            'blocking'  => false,
+            'sslverify' => false,
+            'cookies'   => [],
+        ] );
     }
 
     // ── Build article prompt ──────────────────────────────────────────────────

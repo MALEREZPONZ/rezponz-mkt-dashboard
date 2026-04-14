@@ -1,0 +1,283 @@
+/* RezCRM Auth — Login page styles */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+body.rzcrm-login-body{
+    min-height:100vh;
+    background:#0a0a0a;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:system-ui,-apple-system,'Segoe UI',sans-serif;
+    color:#e5e5e5;
+    padding:24px 16px;
+}
+
+/* Subtle grid bg */
+body.rzcrm-login-body::before{
+    content:'';
+    position:fixed;inset:0;
+    background-image:
+        linear-gradient(rgba(204,255,0,.03) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(204,255,0,.03) 1px,transparent 1px);
+    background-size:40px 40px;
+    pointer-events:none;
+}
+
+/* Embedded in WP theme (shortcode) */
+.rzcrm-login-wrap{
+    font-family:system-ui,-apple-system,'Segoe UI',sans-serif;
+    color:#e5e5e5;
+}
+
+/* Wrap */
+.rzcrm-login-wrap{
+    width:100%;
+    max-width:420px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:20px;
+    position:relative;
+    z-index:1;
+}
+
+/* Card */
+.rzcrm-login-card{
+    width:100%;
+    background:#141414;
+    border:1px solid #2a2a2a;
+    border-radius:16px;
+    padding:40px 36px 36px;
+    box-shadow:0 24px 64px rgba(0,0,0,.6);
+}
+
+/* Logo */
+.rzcrm-login-logo{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:28px;
+}
+.rzcrm-logo-icon{
+    font-size:28px;
+    color:#CCFF00;
+    line-height:1;
+}
+.rzcrm-logo-text{
+    font-size:22px;
+    font-weight:300;
+    color:#e5e5e5;
+    letter-spacing:-.5px;
+}
+.rzcrm-logo-text strong{
+    font-weight:700;
+    color:#CCFF00;
+}
+
+/* Steps */
+.rzcrm-login-step h2{
+    font-size:20px;
+    font-weight:600;
+    color:#fff;
+    margin-bottom:6px;
+}
+.rzcrm-login-sub{
+    font-size:13px;
+    color:#666;
+    margin-bottom:24px;
+    line-height:1.5;
+}
+
+/* Fields */
+.rzcrm-field{
+    margin-bottom:16px;
+}
+.rzcrm-field label{
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    color:#888;
+    margin-bottom:7px;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+}
+.rzcrm-field input{
+    width:100%;
+    background:#0e0e0e;
+    border:1px solid #2e2e2e;
+    border-radius:8px;
+    padding:11px 14px;
+    font-size:15px;
+    color:#e5e5e5;
+    outline:none;
+    transition:.2s;
+}
+.rzcrm-field input::placeholder{ color:#3a3a3a; }
+.rzcrm-field input:focus{
+    border-color:#CCFF00;
+    box-shadow:0 0 0 3px rgba(204,255,0,.08);
+}
+
+/* OTP field */
+.rzcrm-otp-wrap input{
+    font-size:28px;
+    font-weight:700;
+    letter-spacing:.25em;
+    text-align:center;
+    padding:14px;
+}
+
+/* Buttons */
+.rzcrm-btn-primary{
+    width:100%;
+    margin-top:8px;
+    padding:13px;
+    background:#CCFF00;
+    color:#0a0a0a;
+    border:none;
+    border-radius:8px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    transition:.15s;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+}
+.rzcrm-btn-primary:hover{ background:#d9ff33; }
+.rzcrm-btn-primary:disabled{ opacity:.4; cursor:not-allowed; }
+
+.rzcrm-btn-ghost{
+    width:100%;
+    margin-top:8px;
+    padding:10px;
+    background:transparent;
+    color:#555;
+    border:1px solid #2a2a2a;
+    border-radius:8px;
+    font-size:14px;
+    cursor:pointer;
+    transition:.15s;
+}
+.rzcrm-btn-ghost:hover{ border-color:#444; color:#888; }
+
+/* Spinner */
+.rzcrm-btn-spinner{
+    display:inline-block;
+    animation:rzcrm-spin .6s linear infinite;
+}
+@keyframes rzcrm-spin{ to{ transform:rotate(360deg); } }
+
+/* Error */
+.rzcrm-error{
+    margin-top:14px;
+    padding:10px 14px;
+    background:rgba(255,60,60,.08);
+    border:1px solid rgba(255,60,60,.2);
+    border-radius:8px;
+    font-size:13px;
+    color:#ff6b6b;
+    line-height:1.5;
+}
+
+/* Setup steps */
+.rzcrm-setup-steps{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-bottom:20px;
+}
+.rzcrm-setup-step{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    font-size:13px;
+    color:#888;
+}
+.rzcrm-setup-num{
+    width:24px;height:24px;
+    background:rgba(204,255,0,.1);
+    border:1px solid rgba(204,255,0,.25);
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;
+    color:#CCFF00;
+    flex-shrink:0;
+}
+
+/* QR box */
+.rzcrm-qr-box{
+    background:#0e0e0e;
+    border:1px solid #2a2a2a;
+    border-radius:12px;
+    padding:20px;
+    text-align:center;
+    margin-bottom:20px;
+}
+.rzcrm-qr-loading{
+    color:#555;
+    font-size:13px;
+    padding:20px 0;
+}
+#rzcrm-qr-img{
+    width:180px;height:180px;
+    border-radius:8px;
+    display:block;
+    margin:0 auto 14px;
+}
+.rzcrm-secret-wrap{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:8px;
+}
+.rzcrm-secret-label{
+    font-size:11px;
+    color:#555;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+}
+#rzcrm-secret-code{
+    font-family:'Courier New',monospace;
+    font-size:13px;
+    color:#CCFF00;
+    background:rgba(204,255,0,.06);
+    padding:3px 8px;
+    border-radius:4px;
+    letter-spacing:.1em;
+}
+.rzcrm-copy-btn{
+    font-size:11px;
+    padding:3px 8px;
+    background:transparent;
+    border:1px solid #333;
+    border-radius:4px;
+    color:#666;
+    cursor:pointer;
+    transition:.15s;
+}
+.rzcrm-copy-btn:hover{ border-color:#CCFF00; color:#CCFF00; }
+
+/* Footer */
+.rzcrm-login-footer{
+    font-size:12px;
+    color:#333;
+    text-align:center;
+}
+.rzcrm-login-footer a{
+    color:#555;
+    text-decoration:none;
+}
+.rzcrm-login-footer a:hover{ color:#888; }
+
+/* Slide transitions */
+.rzcrm-login-step{
+    animation:rzcrm-fadein .2s ease;
+}
+@keyframes rzcrm-fadein{
+    from{ opacity:0; transform:translateY(8px); }
+    to{ opacity:1; transform:translateY(0); }
+}

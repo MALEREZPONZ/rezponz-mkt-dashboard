@@ -323,8 +323,8 @@ class RZPA_Admin {
             ];
         }
 
-        // Blog Indsigt
-        if ( strpos( $hook, 'rzpa-blog' ) !== false ) {
+        // Blog Indsigt — brug præcis match for at undgå falsk match med rzpa-blog-generator
+        if ( strpos( $hook, 'rzpa-blog' ) !== false && strpos( $hook, 'rzpa-blog-generator' ) === false ) {
             $opts       = get_option( 'rzpa_settings', [] );
             $seo_ok     = ! empty( $opts['google_client_id'] ) && ! empty( $opts['google_refresh_token'] );
             return [
