@@ -356,7 +356,7 @@ class RZPZ_CRM_Auth {
             wp_send_json_error( [ 'message' => $msg ], 401 );
         }
 
-        if ( ! $user->has_cap( self::CAP ) ) {
+        if ( ! $user->has_cap( self::CAP ) && ! $user->has_cap( 'manage_options' ) ) {
             self::log_audit( $user->ID, $username, 'login_no_access', 'Bruger har ikke CRM-adgang' );
             wp_send_json_error( [ 'message' => 'Du har ikke adgang til RezCRM.' ], 403 );
         }
@@ -370,6 +370,14 @@ class RZPZ_CRM_Auth {
         }
 
         self::clear_attempts( 'ip_' . $ip );
+
+        // Admins (manage_options) springer MFA over — de logger ind via wp-admin normalt
+        if ( $user->has_cap( 'manage_options' ) && ! $user->has_cap( self::CAP ) ) {
+            wp_set_auth_cookie( $user->ID, false );
+            self::set_mfa_session( $user->ID );
+            self::log_audit( $user->ID, $username, 'login_success', 'Admin login — ingen MFA krævet' );
+            wp_send_json_success( [ 'step' => 'done', 'redirect' => admin_url( 'admin.php?page=rzpa-rezcrm' ) ] );
+        }
 
         $mfa_enabled = get_user_meta( $user->ID, self::MFA_ENABLED_KEY, true );
         $token       = bin2hex( random_bytes( 24 ) );

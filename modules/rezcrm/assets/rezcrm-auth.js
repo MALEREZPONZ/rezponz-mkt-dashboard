@@ -81,7 +81,10 @@
             const r = await post('rzcrm_login_step1', { username, password });
             if (r.success) {
                 mfaToken = r.data.token || '';
-                if (r.data.step === 'setup') {
+                if (r.data.step === 'done') {
+                    // Admin user — redirect immediately
+                    window.location.href = r.data.redirect || redirect;
+                } else if (r.data.step === 'setup') {
                     // First-time: load QR and show setup
                     showStep('#rzcrm-step-setup');
                     loadQrCode();
