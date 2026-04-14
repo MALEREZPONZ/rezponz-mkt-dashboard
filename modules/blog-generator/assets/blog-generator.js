@@ -103,7 +103,7 @@
 
     tbody.innerHTML = queued.map(t => {
       const imgThumb = t.image_url
-        ? `<img src="${t.image_url}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`
+        ? `<img src="${escAttr(t.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`
         : `<span style="font-size:18px;opacity:.4">🖼</span>`;
 
       const actions = t.status === 'generating'
@@ -240,9 +240,32 @@
   }
 
   // ── Polling ───────────────────────────────────────────────────────────────────
+  const POLL_INTERVAL_MS = 4000;
+  const POLL_MAX         = 75;  // 75 × 4s = 5 min max
+  const pollCounts       = {};
+
   function startPolling(id) {
     if (pollTimers[id]) return;
+    pollCounts[id] = 0;
+
     pollTimers[id] = setInterval(async () => {
+      pollCounts[id] = (pollCounts[id] || 0) + 1;
+
+      // Max timeout: stop polling og vis venlig fejl
+      if (pollCounts[id] > POLL_MAX) {
+        clearInterval(pollTimers[id]);
+        delete pollTimers[id];
+        delete pollCounts[id];
+        const t = allTopics.find(x => x.id === id);
+        if (t && t.status === 'generating') {
+          t.status    = 'failed';
+          t.error_msg = 'Timeout: generering tog for lang tid. Tjek at WP Cron kører korrekt og prøv igen.';
+          renderTopics();
+          toast('⏱ Timeout efter 5 min — er WP Cron aktivt på serveren?', 'err');
+        }
+        return;
+      }
+
       try {
         const data = await api('topics/' + id + '/status');
         const t    = allTopics.find(x => x.id === id);
@@ -250,6 +273,7 @@
         if (data.status !== 'generating') {
           clearInterval(pollTimers[id]);
           delete pollTimers[id];
+          delete pollCounts[id];
 
           if (t) {
             t.status     = data.status;
@@ -268,7 +292,7 @@
             toast('❌ Generering fejlede: ' + (data.error_msg || 'Ukendt fejl'), 'err');
         }
       } catch(e) { /* silence poll errors */ }
-    }, 4000);
+    }, POLL_INTERVAL_MS);
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────────
@@ -598,6 +622,14 @@
     const bv = el('bg-brand-voice');
     if (!bv.value) bv.value = localStorage.getItem('rzpa_brand_voice') || '';
 
+    // Hent gemte værdier fra localized data (sættes ved siden af nonce i PHP)
+    if (RZPA_BG.settings) {
+      if (el('bg-elementor-template-id') && RZPA_BG.settings.blog_gen_elementor_template_id)
+        el('bg-elementor-template-id').value = RZPA_BG.settings.blog_gen_elementor_template_id;
+      if (el('bg-default-author-id') && RZPA_BG.settings.blog_gen_default_author)
+        el('bg-default-author-id').value = RZPA_BG.settings.blog_gen_default_author;
+    }
+
     await loadMedia();
     renderPickerGrid('bg-settings-media-grid', null);
   }
@@ -624,17 +656,26 @@
   });
 
   el('bg-save-settings').addEventListener('click', async () => {
+    const settings = [
+      { key: 'blog_gen_category',              value: el('bg-default-cat').value },
+      { key: 'blog_gen_elementor_template_id', value: el('bg-elementor-template-id')?.value || '' },
+      { key: 'blog_gen_default_author',        value: el('bg-default-author-id')?.value || '' },
+    ];
+
     try {
-      await fetch(ajaxurl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          action:   'rzpa_save_blog_gen_setting',
-          key:      'blog_gen_category',
-          value:    el('bg-default-cat').value,
-          _wpnonce: NONCE,
-        }),
-      });
+      // Gem alle settings i parallelle AJAX-kald
+      await Promise.all(settings.map(s =>
+        fetch(ajaxurl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            action:   'rzpa_save_blog_gen_setting',
+            key:      s.key,
+            value:    s.value,
+            _wpnonce: NONCE,
+          }),
+        })
+      ));
       toast('✓ Indstillinger gemt');
     } catch(e) {
       toast('Fejl: ' + e.message, 'err');

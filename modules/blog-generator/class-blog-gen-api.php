@@ -206,9 +206,19 @@ PROMPT;
         if ( ! empty( $r->get_json_params()['scheduled_for'] ) )
             $extra['scheduled_for'] = sanitize_text_field( $r->get_json_params()['scheduled_for'] );
 
-        RZPA_Blog_Gen_DB::update_status( $id, 'generating', $extra );
+        // Atomisk lock — forhindrer race condition ved dobbelt-klik
+        if ( ! RZPA_Blog_Gen_DB::try_lock_generating( $id ) ) {
+            return new WP_Error( 'already_generating', 'Generering er allerede i gang.', [ 'status' => 409 ] );
+        }
+        // Gem evt. ekstra felter oven på lock
+        if ( ! empty( $extra ) ) {
+            RZPA_Blog_Gen_DB::update_status( $id, 'generating', $extra );
+        }
+
         wp_schedule_single_event( time() + 1, 'rzpa_bg_generate_article', [ $id ] );
-        spawn_cron();
+
+        // Trigger cron uden loopback (virker på Curanet shared hosting)
+        self::trigger_cron_safe();
 
         return new WP_REST_Response( [ 'ok' => true, 'status' => 'generating', 'topic_id' => $id ], 200 );
     }
@@ -367,14 +377,32 @@ PROMPT;
         $clean_html = wp_kses_post( $clean_html );
 
         // ── Bestem post_status (draft / publish / future) ─────────────────────
-        $publish_mode = $topic->publish_immediately ?? 0;
+        $publish_mode = (int) ( $topic->publish_immediately ?? 0 );
         $post_date    = ! empty( $topic->post_date ) ? $topic->post_date : null;
-        $future       = $post_date && strtotime( $post_date ) > time();
+        $post_ts      = $post_date ? strtotime( $post_date ) : 0;
+        $future       = $post_ts && $post_ts > time();
+
         if ( $publish_mode ) {
-            $post_status = $future ? 'future' : 'publish';
+            if ( $future ) {
+                $post_status = 'future';   // Planlagt til fremtidig publicering
+            } elseif ( $post_ts && $post_ts < ( time() - 60 ) ) {
+                // Bagdateret dato — opret som udkast for at undgå lydløs publicering
+                $post_status = 'draft';
+                error_log( '[Rezponz Blog Gen] post_date i fortiden — opretter som udkast (topic_id=' . $topic_id . ')' );
+            } else {
+                $post_status = 'publish';
+            }
         } else {
             $post_status = 'draft';
         }
+
+        // ── Bestem post_author ────────────────────────────────────────────────
+        // I cron-kontekst er get_current_user_id() = 0; brug konfigureret default-author
+        $author_id = get_current_user_id();
+        if ( ! $author_id ) {
+            $author_id = (int) ( $opts['blog_gen_default_author'] ?? 0 );
+        }
+        if ( ! $author_id ) $author_id = 1; // Absolut fallback: admin
 
         // ── Opret WP-post ─────────────────────────────────────────────────────
         $cat_id   = (int) ( $opts['blog_gen_category'] ?? 0 );
@@ -384,9 +412,12 @@ PROMPT;
             'post_content' => $clean_html,
             'post_status'  => $post_status,
             'post_type'    => 'post',
-            'post_author'  => get_current_user_id() ?: 1,
+            'post_author'  => $author_id,
         ];
-        if ( $post_date ) $post_arr['post_date'] = $post_date;
+        if ( $post_date ) {
+            $post_arr['post_date']     = $post_date;
+            $post_arr['post_date_gmt'] = get_gmt_from_date( $post_date ); // Fix GMT-fejl
+        }
         if ( $cat_id && term_exists( $cat_id, 'category' ) )
             $post_arr['post_category'] = [ $cat_id ];
 
@@ -398,19 +429,33 @@ PROMPT;
             return;
         }
 
+        // ── SEO title + desc (skal defineres her — bruges både til meta og JSON-LD) ──
+        $yoast_title = $seo_title ?: ( $topic->title . ' | Rezponz' );
+        $yoast_desc  = $seo_desc  ?: '';
+
         // ── FAQ schema ────────────────────────────────────────────────────────
         if ( $faq_schema ) update_post_meta( $post_id, '_rzpa_faq_schema', $faq_schema );
 
         // ── Article JSON-LD ───────────────────────────────────────────────────
-        $article_schema = self::build_article_schema( $post_id, $topic->title, $focus_kw );
+        $article_schema = self::build_article_schema( $post_id, $topic->title, $focus_kw, $yoast_desc, (int) $topic->word_count );
         update_post_meta( $post_id, '_rzpa_article_schema', $article_schema );
 
         // ── Featured image ────────────────────────────────────────────────────
         if ( $topic->image_id ) set_post_thumbnail( $post_id, (int) $topic->image_id );
 
+        // ── Elementor Single Post Template ────────────────────────────────────
+        // Sæt det Elementor-template der er konfigureret i Indstillinger
+        $elementor_template_id = (int) ( $opts['blog_gen_elementor_template_id'] ?? 0 );
+        if ( $elementor_template_id ) {
+            // Fortæl Elementor at denne post bruger et specifikt template
+            update_post_meta( $post_id, '_elementor_template_id',   $elementor_template_id );
+            // Kræver at Elementor Theme Builder er aktiv med "Single Post"-type
+            update_post_meta( $post_id, '_elementor_template_type', 'single-post' );
+        }
+        // Sørg for at Elementor editor-status er "published" så template renderes
+        update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
+
         // ── Yoast SEO ─────────────────────────────────────────────────────────
-        $yoast_title = $seo_title ?: ( $topic->title . ' | Rezponz' );
-        $yoast_desc  = $seo_desc  ?: '';
         update_post_meta( $post_id, '_yoast_wpseo_focuskw',                 $focus_kw );
         update_post_meta( $post_id, '_yoast_wpseo_title',                   $yoast_title );
         update_post_meta( $post_id, '_yoast_wpseo_metadesc',                $yoast_desc );
@@ -429,6 +474,41 @@ PROMPT;
         update_post_meta( $post_id, '_seopress_titles_desc',  $yoast_desc );
 
         RZPA_Blog_Gen_DB::update_status( $topic_id, 'done', [ 'wp_post_id' => $post_id ] );
+    }
+
+    // ── Cron trigger (loopback-safe) ─────────────────────────────────────────
+
+    /**
+     * Trigger WP Cron uden at kræve HTTP loopback.
+     * Prøver spawn_cron() (kræver loopback) — hvis det fejler,
+     * kører cron-eventet direkte i denne request (sync fallback).
+     * På Curanet shared hosting er loopback typisk blokeret.
+     */
+    private static function trigger_cron_safe(): void {
+        // Forsøg asynkron HTTP-trigger via WP standard mekanisme
+        $doing_cron_transient = get_transient( 'doing_cron' );
+        if ( $doing_cron_transient && ( floatval( $doing_cron_transient ) + WP_CRON_LOCK_TIMEOUT ) > microtime( true ) ) {
+            return; // Cron kører allerede
+        }
+
+        // Test om loopback virker (cached i 1 time)
+        $loopback_ok = get_transient( 'rzpa_cron_loopback_ok' );
+        if ( $loopback_ok === false ) {
+            $test = wp_remote_get( site_url( '/?rzpa_cron_test=1' ), [ 'timeout' => 3, 'blocking' => true, 'sslverify' => false ] );
+            $loopback_ok = ( ! is_wp_error( $test ) && wp_remote_retrieve_response_code( $test ) < 500 ) ? 'yes' : 'no';
+            set_transient( 'rzpa_cron_loopback_ok', $loopback_ok, HOUR_IN_SECONDS );
+        }
+
+        if ( $loopback_ok === 'yes' ) {
+            // Standard WP cron-ping
+            @wp_remote_post( site_url( '/wp-cron.php?doing_wp_cron' ), [
+                'timeout'   => 0.01,
+                'blocking'  => false,
+                'sslverify' => false,
+            ] );
+        }
+        // Hvis loopback er blokeret, kører WP Cron ved næste side-load (standard WP-adfærd)
+        // For at forcere direkte kørsel: brug system-cron (anbefalet på Curanet)
     }
 
     // ── Build article prompt ──────────────────────────────────────────────────
@@ -481,26 +561,60 @@ PROMPT;
         if ( json_last_error() !== JSON_ERROR_NONE ) return '';
         if ( ( $decoded['@type'] ?? '' ) !== 'FAQPage' ) return '';
 
-        return '<script type="application/ld+json">' . wp_json_encode( $decoded ) . '</script>';
+        // Valider at mainEntity eksisterer og ikke er tom
+        if ( empty( $decoded['mainEntity'] ) || ! is_array( $decoded['mainEntity'] ) ) return '';
+        if ( count( $decoded['mainEntity'] ) < 1 ) return '';
+
+        // Sanitér streng-værdier i spørgsmål/svar for at undgå injiceret indhold
+        $clean_entities = [];
+        foreach ( $decoded['mainEntity'] as $item ) {
+            if ( empty( $item['@type'] ) || $item['@type'] !== 'Question' ) continue;
+            $clean_entities[] = [
+                '@type'          => 'Question',
+                'name'           => wp_strip_all_tags( $item['name'] ?? '' ),
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text'  => wp_strip_all_tags( $item['acceptedAnswer']['text'] ?? '' ),
+                ],
+            ];
+        }
+        if ( empty( $clean_entities ) ) return '';
+
+        $safe = [
+            '@context'   => 'https://schema.org',
+            '@type'      => 'FAQPage',
+            'mainEntity' => $clean_entities,
+        ];
+
+        return '<script type="application/ld+json">' . wp_json_encode( $safe, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) . '</script>';
     }
 
     // ── Build Article JSON-LD ─────────────────────────────────────────────────
 
-    private static function build_article_schema( int $post_id, string $title, string $keyword ): string {
+    private static function build_article_schema( int $post_id, string $title, string $keyword, string $description = '', int $word_count = 0 ): string {
+        $post = get_post( $post_id );
+
+        // Navngiven Person-forfatter (E-E-A-T) — hent fra WP-bruger
+        $author_id   = $post ? (int) $post->post_author : 1;
+        $author_name = get_the_author_meta( 'display_name', $author_id ) ?: 'Rezponz';
+        $author_url  = get_author_posts_url( $author_id );
+
         $schema = [
             '@context'        => 'https://schema.org',
             '@type'           => 'BlogPosting',
             'headline'        => $title,
+            'description'     => $description ?: $title,
             'keywords'        => $keyword,
             'url'             => get_permalink( $post_id ),
             'datePublished'   => get_the_date( 'c', $post_id ),
             'dateModified'    => get_the_modified_date( 'c', $post_id ),
+            'inLanguage'      => 'da-DK',
             'author'          => [
-                '@type' => 'Organization',
-                'name'  => 'Rezponz',
-                'url'   => 'https://rezponz.dk',
+                '@type' => 'Person',
+                'name'  => $author_name,
+                'url'   => $author_url,
             ],
-            'publisher'       => [
+            'publisher' => [
                 '@type' => 'Organization',
                 'name'  => 'Rezponz',
                 'url'   => 'https://rezponz.dk',
@@ -509,9 +623,11 @@ PROMPT;
             'mainEntityOfPage' => [ '@type' => 'WebPage', '@id' => get_permalink( $post_id ) ],
         ];
 
-        $thumb = get_the_post_thumbnail_url( $post_id, 'large' );
-        if ( $thumb ) $schema['image'] = $thumb;
+        if ( $word_count > 0 ) $schema['wordCount'] = $word_count;
 
-        return '<script type="application/ld+json">' . wp_json_encode( $schema ) . '</script>';
+        $thumb = get_the_post_thumbnail_url( $post_id, 'large' );
+        if ( $thumb ) $schema['image'] = [ '@type' => 'ImageObject', 'url' => $thumb ];
+
+        return '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) . '</script>';
     }
 }

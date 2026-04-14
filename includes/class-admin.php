@@ -107,8 +107,9 @@ class RZPA_Admin {
         add_submenu_page( 'rzpa-dashboard', '', '📊 Analyse & Ads', $cap, 'rzpa-section-ads', [ __CLASS__, 'page_dashboard' ] );
         add_submenu_page( 'rzpa-dashboard', 'SEO – Rezponz',              'SEO',              $cap, 'rzpa-seo',        [ __CLASS__, 'page_seo' ] );
         add_submenu_page( 'rzpa-dashboard', 'AI-synlighed – Rezponz',     'AI-synlighed',     $cap, 'rzpa-ai',         [ __CLASS__, 'page_ai' ] );
-        add_submenu_page( 'rzpa-dashboard', 'Blog Indsigt – Rezponz',     'Blog Indsigt',     $cap, 'rzpa-blog',       [ __CLASS__, 'page_blog' ] );
-        add_submenu_page( 'rzpa-dashboard', 'Meta Ads – Rezponz',         'Meta Ads',         $cap, 'rzpa-meta',       [ __CLASS__, 'page_meta' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Blog Indsigt – Rezponz',     'Blog Indsigt',     $cap, 'rzpa-blog',            [ __CLASS__, 'page_blog' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Blog Generator – Rezponz',  '✍️ Blog Generator', $cap, 'rzpa-blog-generator',  [ 'RZPA_Blog_Gen_Admin', 'render_page' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Meta Ads – Rezponz',         'Meta Ads',         $cap, 'rzpa-meta',            [ __CLASS__, 'page_meta' ] );
         add_submenu_page( 'rzpa-dashboard', 'Google Ads – Rezponz',       'Google Ads',       $cap, 'rzpa-google-ads', [ __CLASS__, 'page_google_ads' ] );
         add_submenu_page( 'rzpa-dashboard', 'Snapchat Ads – Rezponz',     'Snapchat Ads',     $cap, 'rzpa-snapchat',   [ __CLASS__, 'page_snap' ] );
         add_submenu_page( 'rzpa-dashboard', 'TikTok Ads – Rezponz',       'TikTok Ads',       $cap, 'rzpa-tiktok',     [ __CLASS__, 'page_tiktok' ] );

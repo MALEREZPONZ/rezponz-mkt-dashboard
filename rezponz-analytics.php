@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      3.2.0
+ * Version:      3.3.0
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '3.2.0' );
+define( 'RZPA_VERSION',     '3.3.0' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -117,7 +117,8 @@ add_action( 'wp_ajax_rzpa_save_blog_gen_setting', function () {
     if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden', 403 );
     $key   = sanitize_key( $_POST['key'] ?? '' );
     $value = wp_unslash( $_POST['value'] ?? '' );
-    $allowed = [ 'blog_gen_brand_voice', 'blog_gen_category', 'blog_gen_default_type', 'blog_gen_default_words' ];
+    $allowed = [ 'blog_gen_brand_voice', 'blog_gen_category', 'blog_gen_default_type', 'blog_gen_default_words',
+                 'blog_gen_elementor_template_id', 'blog_gen_default_author' ];
     if ( ! in_array( $key, $allowed, true ) ) wp_die( 'Invalid key', 400 );
     $opts         = get_option( 'rzpa_settings', [] );
     $opts[ $key ] = sanitize_textarea_field( $value );
@@ -142,11 +143,13 @@ add_action( 'wp_head', function () {
         echo "\n" . $article_schema . "\n";
     }
 
-    // GEO meta-tags (forbedrer AI-synlighed og lokal SEO for Nordjylland)
-    echo '<meta name="geo.region"   content="DK-81">' . "\n";   // DK-81 = Nordjylland
-    echo '<meta name="geo.placename" content="Aalborg, Danmark">' . "\n";
-    echo '<meta name="geo.position" content="57.0488;9.9217">' . "\n";
-    echo '<meta name="ICBM"         content="57.0488, 9.9217">' . "\n";
+    // GEO meta-tags — kun på AI-genererede blogindlæg (lokal SEO + AI-synlighed Nordjylland)
+    if ( get_post_meta( $post_id, '_rzpa_article_schema', true ) ) {
+        echo '<meta name="geo.region"    content="DK-81">' . "\n";   // DK-81 = Nordjylland
+        echo '<meta name="geo.placename" content="Aalborg, Danmark">' . "\n";
+        echo '<meta name="geo.position"  content="57.0488;9.9217">' . "\n";
+        echo '<meta name="ICBM"          content="57.0488, 9.9217">' . "\n";
+    }
 } );
 
 // Forhindre caching af sider med Profil-Quiz shortcode

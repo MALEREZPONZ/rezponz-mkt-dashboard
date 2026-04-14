@@ -136,7 +136,7 @@ class RZPA_Blog_Gen_DB {
         global $wpdb;
         $t     = $wpdb->prefix . 'rzpa_blog_topics';
         $start = $year_month . '-01 00:00:00';
-        $end   = date( 'Y-m-t 23:59:59', strtotime( $year_month . '-01' ) );
+        $end   = gmdate( 'Y-m-t 23:59:59', strtotime( $year_month . '-01' ) );
         return $wpdb->get_results( $wpdb->prepare(
             "SELECT id, title, pillar, status, scheduled_for, wp_post_id
              FROM {$t}
@@ -207,11 +207,27 @@ class RZPA_Blog_Gen_DB {
     }
 
     public static function update_status( int $id, string $status, array $extra = [] ): bool {
+        if ( ! in_array( $status, self::STATUSES, true ) ) return false;
+
         global $wpdb;
         $t = $wpdb->prefix . 'rzpa_blog_topics';
 
         $data = array_merge( [ 'status' => $status ], $extra );
         return (bool) $wpdb->update( $t, $data, [ 'id' => $id ] );
+    }
+
+    /**
+     * Atomisk lock: sæt status til 'generating' KUN hvis nuværende status er 'queued'.
+     * Returnerer true hvis ændringen lykkedes (dvs. ingen race condition).
+     */
+    public static function try_lock_generating( int $id ): bool {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpa_blog_topics';
+        $rows = $wpdb->query( $wpdb->prepare(
+            "UPDATE {$t} SET status = 'generating', updated_at = NOW() WHERE id = %d AND status = 'queued' LIMIT 1",
+            $id
+        ) );
+        return $rows === 1;
     }
 
     public static function delete_topic( int $id ): bool {

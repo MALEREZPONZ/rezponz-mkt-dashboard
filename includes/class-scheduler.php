@@ -83,14 +83,13 @@ class RZPA_Scheduler {
         $due = RZPA_Blog_Gen_DB::get_due_scheduled();
         foreach ( $due as $topic ) {
             $id = (int) $topic->id;
+            // Atomisk lock — kun dispatch hvis vi vinder racen (ingen duplikat-posts)
+            if ( ! RZPA_Blog_Gen_DB::try_lock_generating( $id ) ) continue;
             RZPA_Blog_Gen_DB::update_status( $id, 'generating', [
                 'error_msg'   => null,
                 'retry_count' => 0,
             ] );
             wp_schedule_single_event( time() + 2, 'rzpa_bg_generate_article', [ $id ] );
-        }
-        if ( ! empty( $due ) ) {
-            spawn_cron();
         }
     }
 

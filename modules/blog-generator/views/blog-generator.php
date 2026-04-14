@@ -307,6 +307,26 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter:invert(
         </select>
       </div>
 
+      <div style="margin-bottom:16px">
+        <div class="bg-label">Elementor Single Post Template ID</div>
+        <input type="number" id="bg-elementor-template-id" placeholder="fx 1234 — find ID i Elementor → Templates"
+          style="width:100%;background:#222;border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-size:13px">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">
+          Alle AI-genererede blogindlæg får automatisk dette Elementor Single-template tilknyttet.
+          Find template-ID i Elementor → Templates → Single Post → ret URL (post_id=<strong>XXXX</strong>).
+          Lad stå tom for at bruge WordPress' standard single.php.
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <div class="bg-label">Standard forfatter (bruger-ID)</div>
+        <input type="number" id="bg-default-author-id" placeholder="fx 1 — bruges i WP Cron hvor ingen bruger er logget ind"
+          style="width:100%;background:#222;border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-size:13px">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">
+          Artikler genereres asynkront (WP Cron). Skriv bruger-ID på den forfatter der skal krediteres (standard: 1 = admin).
+        </div>
+      </div>
+
       <button class="bg-btn bg-btn-primary" id="bg-save-settings">Gem indstillinger</button>
     </div>
 
