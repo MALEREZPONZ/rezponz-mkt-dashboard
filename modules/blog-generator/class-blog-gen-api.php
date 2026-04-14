@@ -71,13 +71,28 @@ Rezponz er et dansk kundeservicebureau baseret i Aalborg — grundlagt på fæll
 - Blog: https://rezponz.dk/rezponz-blog-insights
 - Outsourcing-info: https://rezponz.dk/kundeservice-outsourcing
 
-━━━ OUTPUT-FORMAT ━━━
-Start ALTID med en JSON-blok på første linje (ingen tekst før):
+━━━ OUTPUT-FORMAT (KRITISK — følg præcist) ━━━
+LINJE 1: Kun denne JSON (ingen tekst før, ingen forklaring):
 {"seo_title":"<SEO-titel max 60 tegn>","seo_desc":"<Meta description 120-155 tegn med søgeord>","focus_kw":"<primært søgeord>"}
 
-Derefter KUN HTML: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <a href="...">
-INGEN <html>, <head>, <body>, INGEN markdown, INGEN kodeblokke
-FAQ JSON-LD schema til sidst: <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[...]}</script>
+LINJE 2+: KUN ren HTML. Ingen undtagelser.
+Tilladte tags: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <a href="...">
+ABSOLUT FORBUDT:
+- Aldrig ** asterisker til fed tekst (brug <strong>)
+- Aldrig # eller ## til overskrifter (brug <h2>/<h3>)
+- Aldrig ```kodeblokke``` eller backticks af nogen art
+- Aldrig [tekst](url) markdown-links (brug <a href="url">tekst</a>)
+- Aldrig rå JSON i teksten
+
+FAQ-SEKTION FORMAT (obligatorisk hvis FAQ er aktiveret):
+<h2>Ofte stillede spørgsmål</h2>
+<h3>Spørgsmål her?</h3>
+<p>Svar her.</p>
+<h3>Næste spørgsmål?</h3>
+<p>Svar her.</p>
+
+SIDST I OUTPUT: FAQ JSON-LD (ingen kodeblok, direkte HTML):
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"...","acceptedAnswer":{"@type":"Answer","text":"..."}}]}</script>
 PROMPT;
 
     // ── Bootstrap ─────────────────────────────────────────────────────────────
@@ -373,12 +388,20 @@ PROMPT;
                 $seo_desc  = sanitize_text_field( $meta['seo_desc']  ?? '' );
                 $focus_kw  = sanitize_text_field( $meta['focus_kw']  ?? $focus_kw );
                 $html      = substr( $raw, strlen( $jm[0] ) );
+
+                // Trim meta description til 155 tegn for Google SERP
+                if ( mb_strlen( $seo_desc ) > 155 ) {
+                    $seo_desc = mb_substr( $seo_desc, 0, 152 ) . '…';
+                }
             }
         }
 
-        // ── Udtræk FAQ JSON-LD ────────────────────────────────────────────────
+        // ── Udtræk FAQ JSON-LD (fra <script> ELLER markdown ```json block) ─────
         $faq_schema = self::extract_faq_schema( $html );
+        // Fjern <script> blokke fra post-content
         $clean_html = preg_replace( '/<script\b[^>]*>.*?<\/script>/is', '', $html );
+        // Konvertér resterende markdown → HTML + strip code fences
+        $clean_html = self::markdown_to_html( $clean_html );
         $clean_html = wp_kses_post( $clean_html );
 
         // ── Bestem post_status (draft / publish / future) ─────────────────────
@@ -413,7 +436,7 @@ PROMPT;
         $cat_id   = (int) ( $opts['blog_gen_category'] ?? 0 );
         $post_arr = [
             'post_title'   => wp_strip_all_tags( $topic->title ),
-            'post_name'    => sanitize_title( $focus_kw ?: $topic->title ),
+            'post_name'    => sanitize_title( $topic->title ),
             'post_content' => $clean_html,
             'post_status'  => $post_status,
             'post_type'    => 'post',
@@ -436,7 +459,15 @@ PROMPT;
 
         // ── SEO title + desc (skal defineres her — bruges både til meta og JSON-LD) ──
         $yoast_title = $seo_title ?: ( $topic->title . ' | Rezponz' );
-        $yoast_desc  = $seo_desc  ?: '';
+        // Fallback meta description: første 155 tegn af clean content
+        if ( ! $seo_desc && $clean_html ) {
+            $plain       = wp_strip_all_tags( $clean_html );
+            $plain       = preg_replace( '/\s+/', ' ', trim( $plain ) );
+            $seo_desc    = mb_strlen( $plain ) > 155
+                ? mb_substr( $plain, 0, 152 ) . '…'
+                : $plain;
+        }
+        $yoast_desc  = $seo_desc;
 
         // ── FAQ schema ────────────────────────────────────────────────────────
         if ( $faq_schema ) update_post_meta( $post_id, '_rzpa_faq_schema', $faq_schema );
@@ -446,7 +477,18 @@ PROMPT;
         update_post_meta( $post_id, '_rzpa_article_schema', $article_schema );
 
         // ── Featured image ────────────────────────────────────────────────────
-        if ( $topic->image_id ) set_post_thumbnail( $post_id, (int) $topic->image_id );
+        if ( $topic->image_id ) {
+            $img_id = (int) $topic->image_id;
+            // Primær metode: WP standard
+            set_post_thumbnail( $post_id, $img_id );
+            // Direkte fallback (sikrer at _thumbnail_id altid er sat)
+            update_post_meta( $post_id, '_thumbnail_id', $img_id );
+            // Yoast OG image
+            update_post_meta( $post_id, '_yoast_wpseo_opengraph-image',    wp_get_attachment_url( $img_id ) );
+            update_post_meta( $post_id, '_yoast_wpseo_opengraph-image-id', $img_id );
+            update_post_meta( $post_id, '_yoast_wpseo_twitter-image',      wp_get_attachment_url( $img_id ) );
+            update_post_meta( $post_id, '_yoast_wpseo_twitter-image-id',   $img_id );
+        }
 
         // ── Elementor Single Post Template ────────────────────────────────────
         // Elementor Theme Builder bruger '_elementor_conditions' på TEMPLATE-posten
@@ -553,16 +595,82 @@ VIGTIGT:
 - Skriv mindst 2 citerbare ekspert-sætninger der kan bruges som direkte citat af AI-assistenter
 - Lyd som et ægte Rezponz-teammedlem der taler til en kollega eller potentiel medarbejder
 - Start output med JSON-meta-linjen som beskrevet i OUTPUT-FORMAT ovenfor
+- FAQ: skriv ALTID med <h3>spørgsmål</h3><p>svar</p> — ALDRIG markdown **bold**
+- Brug KUN ren HTML — ingen ** asterisker, ingen # hashtags, ingen ``` backticks
+- Interne links: brug <a href="https://rezponz.dk/jobs">ankertekst</a> — ALDRIG [tekst](url)
 PROMPT;
+    }
+
+    // ── Markdown → HTML cleanup ────────────────────────────────────────────────
+    // AI returnerer indimellem markdown selvom vi beder om ren HTML.
+    // Denne metode konverterer de mest almindelige mønstre.
+
+    private static function markdown_to_html( string $text ): string {
+        // 1. Udtræk FAQ JSON-LD fra markdown ```json ... ``` blokke (flyttes til <script>)
+        //    — selve ekstraktionen sker i extract_faq_schema() ovenfor; her fjerner vi bare blokken
+        $text = preg_replace( '/```(?:json)?\s*\{\s*"@context"\s*:.*?\}\s*```/is', '', $text );
+
+        // 2. Strip alle resterende ``` kodeblokke (fx fejlagtigt indlejrede JSON)
+        $text = preg_replace( '/```[a-z]*\n?/i', '', $text );
+        $text = str_replace( '```', '', $text );
+
+        // 3. Markdown-overskrifter → HTML (kun hvis siden indeholder markdown-headings)
+        $text = preg_replace( '/^#### (.+)$/m', '<h4>$1</h4>', $text );
+        $text = preg_replace( '/^### (.+)$/m',  '<h3>$1</h3>', $text );
+        $text = preg_replace( '/^## (.+)$/m',   '<h2>$1</h2>', $text );
+        $text = preg_replace( '/^# (.+)$/m',    '<h2>$1</h2>', $text ); // h1 → h2 (WP-standard)
+
+        // 4. **fed** → <strong>fed</strong>  (ikke DOTALL — krydser ikke HTML-tags)
+        $text = preg_replace( '/\*\*(?![\s*])(.+?)(?<![\s*])\*\*/', '<strong>$1</strong>', $text );
+
+        // 5. *kursiv* → <em>kursiv</em>  (ikke DOTALL)
+        $text = preg_replace( '/\*(?![\s*])(.+?)(?<![\s*])\*/', '<em>$1</em>', $text );
+
+        // 6. Markdown links [tekst](url) → <a href="url">tekst</a>
+        $text = preg_replace( '/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/', '<a href="$2">$1</a>', $text );
+
+        // 7. Markdown lister (- tekst) → <ul><li> hvis de ikke allerede er i et HTML-tag
+        $text = preg_replace_callback(
+            '/(?:^|\n)((?:[ \t]*[-*+] .+\n?)+)/m',
+            function ( $m ) {
+                $items = preg_replace( '/^[ \t]*[-*+] (.+)$/m', '<li>$1</li>', trim( $m[1] ) );
+                return "\n<ul>$items</ul>\n";
+            },
+            $text
+        );
+
+        // 8. Ryd op: fjern overflødige tomme linjer der kan skabe <br> spam
+        $text = preg_replace( '/\n{3,}/', "\n\n", $text );
+
+        return trim( $text );
     }
 
     // ── Extract & validate FAQ schema ─────────────────────────────────────────
 
     private static function extract_faq_schema( string $html ): string {
-        if ( ! preg_match( '/<script[^>]+type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is', $html, $m ) )
-            return '';
+        // Primær: søg i ALLE <script type="application/ld+json"> blokke — find FAQPage specifikt
+        // (preg_match finder kun første blok, som kan være Article-schema)
+        $json_str = '';
+        if ( preg_match_all( '/<script[^>]+type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is', $html, $all_m ) ) {
+            foreach ( $all_m[1] as $candidate ) {
+                $candidate = trim( $candidate );
+                if ( strpos( $candidate, 'FAQPage' ) !== false ) {
+                    $json_str = $candidate;
+                    break;
+                }
+            }
+        }
 
-        $decoded = json_decode( trim( $m[1] ), true );
+        // Fallback: AI returnerede JSON-LD i en markdown ```json ``` blok
+        if ( ! $json_str ) {
+            if ( preg_match( '/```(?:json)?\s*(\{[\s\S]*?"@type"\s*:\s*"FAQPage"[\s\S]*?\})\s*```/is', $html, $m2 ) ) {
+                $json_str = trim( $m2[1] );
+            }
+        }
+
+        if ( ! $json_str ) return '';
+
+        $decoded = json_decode( $json_str, true );
         if ( json_last_error() !== JSON_ERROR_NONE ) return '';
         if ( ( $decoded['@type'] ?? '' ) !== 'FAQPage' ) return '';
 

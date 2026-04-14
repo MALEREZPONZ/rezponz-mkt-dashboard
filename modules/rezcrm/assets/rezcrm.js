@@ -127,7 +127,7 @@
       filter.value = was;
     }
     if (appSel) {
-      appSel.innerHTML = '<option value="">Vælg stilling…</option>' + opts;
+      appSel.innerHTML = '<option value="">— Ingen specifik stilling —</option>' + opts;
     }
   }
 
@@ -295,7 +295,7 @@
 
   function openModal(id) {
     el(id).style.display = 'flex';
-    el('crm-backdrop').style.display = '';
+    el('crm-backdrop').style.display = 'block';
   }
   function closeModal(id) {
     el(id).style.display = 'none';
@@ -332,8 +332,8 @@
       position_id:  +el('app-position').value,
       source:       el('app-source').value,
     };
-    if (!payload.first_name || !payload.email || !payload.position_id) {
-      toast('Udfyld fornavn, email og stilling', 'err'); return;
+    if (!payload.first_name || !payload.email) {
+      toast('Udfyld fornavn og email', 'err'); return;
     }
     try {
       el('crm-app-save-btn').textContent = '⏳ Gemmer…';
@@ -418,7 +418,7 @@
     tplSel.innerHTML = '<option value="">— Vælg skabelon eller skriv manuelt —</option>' +
       allTemplates.map(t => `<option value="${t.id}">${escHtml(t.name)} (${t.type})</option>`).join('');
     tplSel.onchange = () => {
-      const tpl = allTemplates.find(t => t.id === +tplSel.value);
+      const tpl = allTemplates.find(t => t.id == tplSel.value);
       if (tpl) {
         el('crm-comm-subject').value = tpl.subject || '';
         el('crm-comm-body').value    = tpl.body    || '';
@@ -662,10 +662,10 @@
   }
 
   function loadTemplateIntoEditor(id) {
-    const tpl = allTemplates.find(t => t.id === id);
+    const tpl = allTemplates.find(t => t.id == id); // loose == : DB returns string IDs
     if (!tpl) return;
     editingTplId = id;
-    el('crm-tpl-form-title').textContent = 'Rediger skabelon';
+    el('crm-tpl-form-title').textContent = '✏️ ' + (tpl.name || 'Rediger skabelon');
     el('tpl-name').value    = tpl.name    || '';
     el('tpl-type').value    = tpl.type    || 'email';
     el('tpl-trigger').value = tpl.trigger || 'manual';
@@ -689,10 +689,14 @@
     const btn = el('crm-tpl-save-btn');
     btn.textContent = '⏳ Gemmer…';
     try {
-      await api('templates', { method: 'POST', body: JSON.stringify(payload) });
+      const method = editingTplId ? 'PUT' : 'POST';
+      const endpoint = editingTplId ? 'templates/' + editingTplId : 'templates';
+      const res = await api(endpoint, { method, body: JSON.stringify(payload) });
+      const savedId = res?.id || editingTplId;
       toast('Skabelon gemt ✓');
       await loadTemplates();
       renderTemplatesList();
+      if (savedId) loadTemplateIntoEditor(savedId); // keep selection after save
     } catch(e) {
       toast('Fejl: ' + e.message, 'err');
     } finally {

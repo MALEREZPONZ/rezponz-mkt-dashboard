@@ -78,7 +78,8 @@ class RZPZ_CRM_Forms {
         register_rest_route( $ns, 'crm/forms/(?P<id>\d+)/fields', [ 'methods' => 'GET',  'callback' => [ __CLASS__, 'api_fields_get' ],  'permission_callback' => $cap ] );
         register_rest_route( $ns, 'crm/forms/(?P<id>\d+)/fields', [ 'methods' => 'POST', 'callback' => [ __CLASS__, 'api_fields_save' ], 'permission_callback' => $cap ] );
         register_rest_route( $ns, 'crm/forms/(?P<id>\d+)/stats',  [ 'methods' => 'GET',  'callback' => [ __CLASS__, 'api_form_stats' ],  'permission_callback' => $cap ] );
-        register_rest_route( $ns, 'crm/forms/(?P<id>\d+)', [ 'methods' => 'DELETE', 'callback' => [ __CLASS__, 'api_form_delete' ], 'permission_callback' => $cap ] );
+        register_rest_route( $ns, 'crm/forms/(?P<id>\d+)',            [ 'methods' => 'DELETE', 'callback' => [ __CLASS__, 'api_form_delete' ],    'permission_callback' => $cap ] );
+        register_rest_route( $ns, 'crm/forms/(?P<id>\d+)/duplicate', [ 'methods' => 'POST',   'callback' => [ __CLASS__, 'api_form_duplicate' ], 'permission_callback' => $cap ] );
 
         // Frontend: start session + submit form (offentlig, rate-limited ved IP)
         register_rest_route( $ns, 'crm/form-session',     [ 'methods' => 'POST',   'callback' => [ __CLASS__, 'api_start_session' ],  'permission_callback' => '__return_true' ] );
@@ -114,6 +115,17 @@ class RZPZ_CRM_Forms {
     public static function api_form_delete( WP_REST_Request $req ): WP_REST_Response {
         RZPZ_CRM_Forms_DB::delete_form( (int) $req->get_param( 'id' ) );
         return new WP_REST_Response( [ 'ok' => true ], 200 );
+    }
+
+    public static function api_form_duplicate( WP_REST_Request $req ): WP_REST_Response {
+        $id      = (int) $req->get_param( 'id' );
+        $form    = RZPZ_CRM_Forms_DB::get_form( $id );
+        if ( ! $form ) return new WP_REST_Response( [ 'message' => 'Formular ikke fundet' ], 404 );
+
+        $new_id = RZPZ_CRM_Forms_DB::duplicate_form( $id, $form );
+        if ( ! $new_id ) return new WP_REST_Response( [ 'message' => 'Duplikering fejlede' ], 500 );
+
+        return new WP_REST_Response( [ 'ok' => true, 'id' => $new_id ], 201 );
     }
 
     public static function api_fields_get( WP_REST_Request $req ): WP_REST_Response {

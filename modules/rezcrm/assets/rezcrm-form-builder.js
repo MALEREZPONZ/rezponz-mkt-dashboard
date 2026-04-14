@@ -54,6 +54,12 @@
 
       const statsBtn = e.target.closest('.fb-stats-btn');
       if (statsBtn) openStats(+statsBtn.dataset.id);
+
+      const dupBtn = e.target.closest('.fb-duplicate-btn');
+      if (dupBtn) duplicateForm(+dupBtn.dataset.id, dupBtn.dataset.title);
+
+      const delBtn = e.target.closest('.fb-delete-btn');
+      if (delBtn) deleteForm(+delBtn.dataset.id, delBtn.dataset.title);
     });
 
     el('fb-back-btn')?.addEventListener('click', () => {
@@ -358,7 +364,7 @@
     if (el('fb-form-position')) el('fb-form-position').value = form.position_id || '';
 
     el('fb-settings-modal').style.display = 'flex';
-    el('crm-backdrop').style.display      = '';
+    el('crm-backdrop').style.display      = 'block';
   }
 
   async function saveSettings() {
@@ -394,7 +400,7 @@
   // ── Stats modal ──────────────────────────────────────────────────────────────
   async function openStats(formId) {
     el('fb-stats-modal').style.display = 'flex';
-    el('crm-backdrop').style.display   = '';
+    el('crm-backdrop').style.display   = 'block';
     el('fb-stats-body').innerHTML      = '<p style="color:var(--crm-muted)">Indlæser…</p>';
 
     try {
@@ -426,6 +432,44 @@
         </table>`;
     } catch(e) {
       el('fb-stats-body').innerHTML = '<p style="color:#ff5555">Fejl: ' + e.message + '</p>';
+    }
+  }
+
+  // ── Duplicate form ───────────────────────────────────────────────────────────
+  async function duplicateForm(formId, title) {
+    if (!confirm('Dupliker formularen "' + title + '"?\nDen nye kopi oprettes som inaktiv kladde.')) return;
+    try {
+      const res = await api('crm/forms/' + formId + '/duplicate', { method: 'POST' });
+      toast('Formular duplikeret ✓ — genindlæser…');
+      setTimeout(() => location.reload(), 1200);
+    } catch(e) {
+      toast('Fejl: ' + e.message, 'err');
+    }
+  }
+
+  // ── Delete form ──────────────────────────────────────────────────────────────
+  async function deleteForm(formId, title) {
+    if (!confirm('Slet formularen "' + title + '" permanent?\n\nDette sletter også alle felter og session-data. Kan ikke fortrydes.')) return;
+    try {
+      await api('crm/forms/' + formId, { method: 'DELETE' });
+      toast('Formular slettet');
+      // Remove card from DOM immediately
+      const card = document.querySelector('.fb-form-card[data-form-id="' + formId + '"]');
+      if (card) {
+        card.style.transition = 'opacity .3s, transform .3s';
+        card.style.opacity    = '0';
+        card.style.transform  = 'scale(.95)';
+        setTimeout(() => { card.remove(); updateEmptyState(); }, 350);
+      }
+    } catch(e) {
+      toast('Fejl: ' + e.message, 'err');
+    }
+  }
+
+  function updateEmptyState() {
+    const grid = el('fb-forms-grid');
+    if (grid && grid.querySelectorAll('.fb-form-card').length === 0) {
+      grid.innerHTML = '<div style="text-align:center;padding:60px;color:#888"><p style="font-size:18px">Ingen formularer endnu</p><p>Klik "+ Ny formular" for at oprette din første ansøgningsformular</p></div>';
     }
   }
 

@@ -402,6 +402,47 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
       </p>
     </div>
 
+    <!-- ══ SMS via GatewayAPI ════════════════════════════════════════════ -->
+    <div class="rzpa-card rzpa-settings-section" id="sms-gateway">
+      <h2>💬 SMS (GatewayAPI)</h2>
+      <p style="font-size:13px;color:#888;margin-bottom:16px;line-height:1.7">
+        Bruges til at sende SMS-skabeloner fra RezCRM — fx automatiske bekræftelser og invitationer til samtale.<br>
+        <strong style="color:#ccc">Kræver:</strong> En gratis eller betalt konto på
+        <a href="https://gatewayapi.com" target="_blank" style="color:var(--neon)">gatewayapi.com</a>
+        — de har et gratis startkreditter, og efterfølgende er SMS til Danmark ca. <strong style="color:#ccc">0,04–0,06 kr./stk.</strong><br>
+        Ingen abonnementspris — du betaler kun per besked.
+      </p>
+      <div style="background:rgba(204,255,0,.04);border:1px solid rgba(204,255,0,.12);border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:12px;color:#888;line-height:1.7">
+        <strong style="color:#ccc">Opsætning:</strong>
+        1. Opret konto på gatewayapi.com &nbsp;→&nbsp;
+        2. Gå til <em>API Keys</em> &nbsp;→&nbsp;
+        3. Opret ny API-nøgle af typen <em>Token</em> &nbsp;→&nbsp;
+        4. Indsæt nøglen herunder og gem
+      </div>
+      <div class="rzpa-settings-grid">
+        <div class="rzpa-field">
+          <label>GatewayAPI Token</label>
+          <input type="password" name="gatewayapi_token"
+                 value="<?php echo esc_attr( $opts['gatewayapi_token'] ?? '' ); ?>"
+                 placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                 autocomplete="new-password" />
+          <?php if ( ! empty( $opts['gatewayapi_token'] ) ) : ?>
+            <small style="color:#4ade80;font-size:11px">✅ Token gemt — SMS er aktiveret</small>
+          <?php else : ?>
+            <small style="color:#666;font-size:11px">Ingen token endnu — SMS-afsendelse er deaktiveret</small>
+          <?php endif; ?>
+        </div>
+        <div class="rzpa-field">
+          <label>Afsender-navn (maks. 11 tegn)</label>
+          <input type="text" name="sms_sender"
+                 value="<?php echo esc_attr( $opts['sms_sender'] ?? 'Rezponz' ); ?>"
+                 placeholder="Rezponz"
+                 maxlength="11" />
+          <small style="color:#666;font-size:11px">Vises som afsender på modtagerens telefon</small>
+        </div>
+      </div>
+    </div>
+
       <!-- ══ Google Ads ════════════════════════════════════════════════════ -->
       <div class="rzpa-card rzpa-settings-section" id="google-ads">
         <h2>🟦 Google Ads</h2>

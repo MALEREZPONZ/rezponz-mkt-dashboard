@@ -64,6 +64,20 @@
 /* Søjle-tags */
 .bg-pillar { font-size:11px; padding:2px 7px; border-radius:20px; background:rgba(255,255,255,.07); color:#bbb; }
 
+/* Planlagt-pills i kø */
+.bg-sched-pill {
+  display:inline-flex; align-items:center; gap:4px; font-size:11px;
+  color:var(--neon); background:rgba(204,255,0,.08); border:1px solid rgba(204,255,0,.2);
+  padding:3px 8px; border-radius:20px; cursor:pointer; white-space:nowrap; transition:.15s;
+}
+.bg-sched-pill:hover { background:rgba(204,255,0,.16); border-color:rgba(204,255,0,.45); }
+.bg-sched-empty {
+  display:inline-flex; align-items:center; gap:4px; font-size:11px;
+  color:#555; border:1px dashed rgba(255,255,255,.15); padding:3px 8px;
+  border-radius:20px; cursor:pointer; transition:.15s; white-space:nowrap;
+}
+.bg-sched-empty:hover { color:var(--neon); border-color:rgba(204,255,0,.3); background:rgba(204,255,0,.04); }
+
 /* Billede-picker */
 .bg-image-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; max-height:240px; overflow-y:auto; margin-top:8px; }
 .bg-image-item { cursor:pointer; border-radius:6px; overflow:hidden; border:2px solid transparent; transition:.15s; aspect-ratio:1; }
@@ -94,15 +108,34 @@
 .bg-cal-nav h2 { font-size:16px; font-weight:700; color:#fff; margin:0; min-width:160px; text-align:center; }
 .bg-cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
 .bg-cal-day-name { text-align:center; font-size:11px; color:var(--muted); font-weight:600; padding:6px 0; text-transform:uppercase; letter-spacing:.05em; }
-.bg-cal-cell { min-height:88px; background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:8px; padding:6px; font-size:11px; }
-.bg-cal-cell.today { border-color:rgba(204,255,0,.3); background:rgba(204,255,0,.04); }
-.bg-cal-cell.other-month { opacity:.35; }
-.bg-cal-num { font-size:12px; font-weight:600; color:var(--muted); margin-bottom:4px; }
-.bg-cal-event { background:rgba(204,255,0,.12); color:var(--neon); border-radius:4px; padding:2px 5px; margin-bottom:2px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:11px; border-left:2px solid var(--neon); }
+.bg-cal-cell { min-height:88px; background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:8px; padding:6px; font-size:11px; position:relative; cursor:pointer; transition:border-color .15s, background .15s; }
+.bg-cal-cell:hover:not(.other-month) { border-color:rgba(204,255,0,.25); background:rgba(204,255,0,.03); }
+.bg-cal-cell.today { border-color:rgba(204,255,0,.35); background:rgba(204,255,0,.04); }
+.bg-cal-cell.other-month { opacity:.3; cursor:default; pointer-events:none; }
+.bg-cal-cell.bg-cal-open { border-color:rgba(204,255,0,.6); background:rgba(204,255,0,.06); }
+.bg-cal-num { font-size:12px; font-weight:600; color:var(--muted); margin-bottom:4px; display:flex; align-items:center; justify-content:space-between; }
+.bg-cal-add-btn { opacity:0; font-size:14px; color:rgba(204,255,0,.6); line-height:1; transition:.15s; }
+.bg-cal-cell:hover .bg-cal-add-btn { opacity:1; }
+.bg-cal-event { background:rgba(204,255,0,.12); color:var(--neon); border-radius:4px; padding:2px 5px 2px 5px; margin-bottom:2px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:11px; border-left:2px solid var(--neon); display:flex; align-items:center; gap:3px; }
+.bg-cal-event:hover { background:rgba(204,255,0,.18); }
 .bg-cal-event.done { background:rgba(74,222,128,.1); color:#4ade80; border-left-color:#4ade80; }
+.bg-cal-event.done:hover { background:rgba(74,222,128,.18); }
 .bg-cal-event.failed { background:rgba(255,85,85,.1); color:#ff5555; border-left-color:#ff5555; }
 .bg-cal-event.generating { background:rgba(204,255,0,.2); animation:bg-pulse 1.5s ease-in-out infinite; }
+.bg-cal-event-title { flex:1; overflow:hidden; text-overflow:ellipsis; }
+.bg-cal-event-rm { opacity:0; font-size:12px; padding:0 2px; flex-shrink:0; transition:opacity .15s; }
+.bg-cal-event:hover .bg-cal-event-rm { opacity:.7; }
+.bg-cal-event-rm:hover { opacity:1 !important; color:#ff5555 !important; }
 @keyframes bg-pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+@keyframes bg-spin  { to { transform: rotate(360deg); } }
+.bg-legend-spin { display:inline-block; width:9px; height:9px; border:1.5px solid rgba(204,255,0,.3); border-top-color:rgba(204,255,0,.8); border-radius:50%; animation:bg-spin 1s linear infinite; vertical-align:middle; margin-right:1px; }
+/* Dropdown topic row */
+.bg-cal-dd-item { padding:8px 14px; font-size:12px; color:#ccc; cursor:pointer; display:flex; align-items:center; gap:8px; transition:background .1s; border-bottom:1px solid rgba(255,255,255,.04); }
+.bg-cal-dd-item:last-child { border-bottom:none; }
+.bg-cal-dd-item:hover { background:rgba(204,255,0,.07); color:#fff; }
+.bg-cal-dd-item-dot { width:7px; height:7px; border-radius:50%; background:var(--neon); flex-shrink:0; }
+.bg-cal-dd-item-title { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bg-cal-dd-item-kw { font-size:10px; color:#555; white-space:nowrap; }
 
 /* Toggles */
 .bg-toggles { display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
@@ -361,8 +394,22 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter:invert(
       <span><span style="color:var(--neon)">▌</span> Planlagt / Kø</span>
       <span><span style="color:#4ade80">▌</span> Publiceret</span>
       <span><span style="color:#ff5555">▌</span> Fejlet</span>
-      <span><span style="color:var(--neon);opacity:.6">▌ ◌</span> Genererer</span>
+      <span><span style="color:var(--neon)">▌</span> <span class="bg-legend-spin"></span> Genererer</span>
+      <span style="margin-left:auto;color:#555">Klik på en dag for at planlægge et emne</span>
     </div>
+  </div>
+</div>
+
+<!-- Kalender-dropdown: vælg emne til en dag -->
+<div id="bg-cal-dropdown" style="display:none;position:fixed;z-index:99999;min-width:260px;max-width:340px;background:#1a1a1a;border:1px solid rgba(204,255,0,.25);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.6);padding:0;overflow:hidden">
+  <div style="padding:10px 14px 8px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between">
+    <span id="bg-cal-dd-title" style="font-size:13px;font-weight:700;color:#fff"></span>
+    <button id="bg-cal-dd-close" style="background:none;border:none;color:#555;font-size:16px;cursor:pointer;padding:0 2px;line-height:1">✕</button>
+  </div>
+  <div id="bg-cal-dd-list" style="max-height:280px;overflow-y:auto;padding:6px 0"></div>
+  <div id="bg-cal-dd-empty" style="display:none;padding:16px 14px;font-size:12px;color:#555;text-align:center">
+    Ingen uplanlagte emner i køen.<br>
+    <button class="bg-btn bg-btn-ghost bg-btn-sm" id="bg-cal-dd-goto-queue" style="margin-top:8px">Gå til kø →</button>
   </div>
 </div>
 

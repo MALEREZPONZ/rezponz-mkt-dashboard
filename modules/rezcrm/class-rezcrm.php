@@ -97,6 +97,7 @@ class RZPZ_RezCRM {
             // Templates
             [ 'GET',    'crm/templates',                       'api_templates_list' ],
             [ 'POST',   'crm/templates',                       'api_templates_save' ],
+            [ 'PUT',    'crm/templates/(?P<id>\d+)',           'api_templates_update' ],
             [ 'DELETE', 'crm/templates/(?P<id>\d+)',           'api_templates_delete' ],
 
             // Stats
@@ -279,6 +280,14 @@ class RZPZ_RezCRM {
         return new WP_REST_Response( [ 'id' => $id ], 200 );
     }
 
+    public static function api_templates_update( WP_REST_Request $req ): WP_REST_Response {
+        $data       = $req->get_json_params();
+        $data['id'] = (int) $req->get_param( 'id' ); // ensure URL id takes precedence
+        $id         = RZPZ_CRM_DB::upsert_template( $data );
+        if ( ! $id ) return new WP_REST_Response( [ 'message' => 'Ugyldig data' ], 400 );
+        return new WP_REST_Response( [ 'id' => $id ], 200 );
+    }
+
     public static function api_templates_delete( WP_REST_Request $req ): WP_REST_Response {
         global $wpdb;
         $wpdb->delete( $wpdb->prefix . 'rzpz_crm_templates', [ 'id' => (int) $req->get_param( 'id' ) ] );
@@ -380,13 +389,16 @@ class RZPZ_RezCRM {
             $phone = '+45' . ltrim( $phone, '0' );
         }
 
+        $sender = sanitize_text_field( $opts['sms_sender'] ?? 'Rezponz' );
+        $sender = substr( preg_replace( '/[^A-Za-z0-9 ]/', '', $sender ), 0, 11 ) ?: 'Rezponz';
+
         $res = wp_remote_post( 'https://gatewayapi.com/rest/mtsms', [
             'headers' => [
                 'Authorization' => 'Token ' . $token,
                 'Content-Type'  => 'application/json',
             ],
             'body'    => wp_json_encode( [
-                'sender'     => 'Rezponz',
+                'sender'     => $sender,
                 'message'    => $message,
                 'recipients' => [ [ 'msisdn' => ltrim( $phone, '+' ) ] ],
             ] ),

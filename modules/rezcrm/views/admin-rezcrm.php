@@ -122,7 +122,7 @@ if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
               <input type="tel" id="app-phone" class="crm-input" placeholder="+45 12 34 56 78">
             </div>
             <div class="crm-field">
-              <label>Stilling *</label>
+              <label>Stilling</label>
               <select id="app-position" class="crm-select"></select>
             </div>
             <div class="crm-field">
@@ -270,7 +270,10 @@ if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
         <div class="crm-templates-layout">
           <div class="crm-templates-list" id="crm-templates-list"></div>
           <div class="crm-template-editor" id="crm-template-editor">
-            <h3 id="crm-tpl-form-title">Ny skabelon</h3>
+            <div style="margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.08)">
+              <h3 id="crm-tpl-form-title" style="margin:0;font-size:15px;font-weight:700;color:#fff">Ny skabelon</h3>
+              <p style="margin:4px 0 0;font-size:12px;color:#555">Udfyld felterne til højre og gem</p>
+            </div>
             <div class="crm-field">
               <label>Navn</label>
               <input type="text" id="tpl-name" class="crm-input" placeholder="fx Bekræftelse">

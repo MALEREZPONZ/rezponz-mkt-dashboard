@@ -117,8 +117,8 @@
         : '';
 
       const scheduledLabel = t.scheduled_for
-        ? `<span style="font-size:11px;color:var(--neon)">⏰ ${fmtDate(t.scheduled_for)}</span>`
-        : `<span style="font-size:11px;color:var(--muted)">–</span>`;
+        ? `<span class="bg-sched-pill" data-id="${t.id}" title="Klik for at ændre">⏰ ${fmtDate(t.scheduled_for)}</span>`
+        : `<span class="bg-sched-empty" data-id="${t.id}" title="Klik for at planlægge">+ Planlæg</span>`;
 
       return `<tr data-id="${t.id}">
         <td><button class="bg-btn bg-btn-danger bg-btn-sm bg-del-btn" data-id="${t.id}" title="Slet">✕</button></td>
@@ -149,6 +149,11 @@
     // Slet-knapper
     tbody.querySelectorAll('.bg-del-btn').forEach(btn => {
       btn.addEventListener('click', () => deleteTopic(+btn.dataset.id));
+    });
+
+    // Planlagt dato — klik for at sætte/ændre
+    tbody.querySelectorAll('.bg-sched-pill, .bg-sched-empty').forEach(pill => {
+      pill.addEventListener('click', () => openInlineDatePicker(pill, +pill.dataset.id));
     });
 
     // Billede-picker i tabel (PATCH topic — kun opdater image, ikke generer)
@@ -564,21 +569,27 @@
     // Dage i måneden
     for (let d = 1; d <= daysInMonth; d++) {
       const isToday = isThisMonth && d === today.getDate();
-      const eventsHtml = (dayMap[d] || []).map(t =>
-        `<div class="bg-cal-event ${t.status || ''}" title="${escAttr(t.title)}" data-id="${t.id}">${escHtml(t.title.substring(0, 30))}${t.title.length > 30 ? '…' : ''}</div>`
-      ).join('');
+      const dateStr = `${calYear}-${String(calMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const eventsHtml = (dayMap[d] || []).map(t => {
+        const canRm = (t.status === 'queued' || t.status === 'failed');
+        return `<div class="bg-cal-event ${t.status || ''}" data-id="${t.id}" title="${escAttr(t.title)}">
+          <span class="bg-cal-event-title">${escHtml(t.title.substring(0, 28))}${t.title.length > 28 ? '…' : ''}</span>
+          ${canRm ? `<span class="bg-cal-event-rm" data-rm="${t.id}" title="Fjern fra kalender">✕</span>` : ''}
+        </div>`;
+      }).join('');
 
       grid.insertAdjacentHTML('beforeend',
-        `<div class="bg-cal-cell${isToday ? ' today' : ''}">
-          <div class="bg-cal-num">${d}</div>
+        `<div class="bg-cal-cell${isToday ? ' today' : ''}" data-date="${dateStr}">
+          <div class="bg-cal-num"><span>${d}</span><span class="bg-cal-add-btn" title="Planlæg emne her">＋</span></div>
           ${eventsHtml}
         </div>`
       );
     }
 
-    // Click på event → skift til kø-tab og scroll til emnet
+    // Click på event-titel → skift til kø-tab og scroll
     qsa('.bg-cal-event', grid).forEach(ev => {
-      ev.addEventListener('click', () => {
+      ev.querySelector('.bg-cal-event-title')?.addEventListener('click', e => {
+        e.stopPropagation();
         const id = +ev.dataset.id;
         const queueTab = qs('[data-tab="queue"]');
         if (queueTab) queueTab.click();
@@ -588,7 +599,133 @@
         }, 100);
       });
     });
+
+    // Click på ✕ → fjern planlagt dato (unschedule)
+    qsa('.bg-cal-event-rm', grid).forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        const id = +btn.dataset.rm;
+        try {
+          await api('topics/' + id, {
+            method: 'PATCH',
+            body: JSON.stringify({ scheduled_for: null }),
+          });
+          const t = allTopics.find(x => x.id == id);
+          if (t) t.scheduled_for = null;
+          toast('Emne fjernet fra kalender');
+          renderCalendar();
+        } catch(e) {
+          toast('Fejl: ' + e.message, 'err');
+        }
+      });
+    });
+
+    // Click på dag-celle → åbn dropdown til at planlægge
+    qsa('.bg-cal-cell', grid).forEach(cell => {
+      cell.addEventListener('click', e => {
+        if (e.target.closest('.bg-cal-event')) return; // ignorér event-klik
+        openCalDropdown(cell, cell.dataset.date);
+      });
+    });
   }
+
+  // ── Kalender-dropdown ──────────────────────────────────────────────────────
+  let calDropdownDate = null;
+
+  function openCalDropdown(cell, dateStr) {
+    if (!dateStr) return;
+    calDropdownDate = dateStr;
+
+    // Markér åben celle
+    qsa('.bg-cal-open').forEach(c => c.classList.remove('bg-cal-open'));
+    cell.classList.add('bg-cal-open');
+
+    // Formater dato til visning
+    const [yr, mo, dy] = dateStr.split('-');
+    const MONTH_DA = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+    el('bg-cal-dd-title').textContent = `Planlæg til ${parseInt(dy)}. ${MONTH_DA[parseInt(mo)-1]} ${yr}`;
+
+    // Filtrer: kun køet emner UDEN dato
+    const available = allTopics.filter(t =>
+      (t.status === 'queued' || t.status === 'failed') && !t.scheduled_for
+    );
+
+    const list = el('bg-cal-dd-list');
+    const empty = el('bg-cal-dd-empty');
+
+    if (available.length === 0) {
+      list.style.display = 'none';
+      empty.style.display = '';
+    } else {
+      empty.style.display = 'none';
+      list.style.display = '';
+      list.innerHTML = available.map(t => `
+        <div class="bg-cal-dd-item" data-schedule-id="${t.id}">
+          <span class="bg-cal-dd-item-dot"></span>
+          <span class="bg-cal-dd-item-title">${escHtml(t.title)}</span>
+          <span class="bg-cal-dd-item-kw">${escHtml(t.keywords || '')}</span>
+        </div>`).join('');
+
+      list.querySelectorAll('.bg-cal-dd-item').forEach(row => {
+        row.addEventListener('click', () => scheduleTopicToDate(+row.dataset.scheduleId, calDropdownDate));
+      });
+    }
+
+    // Positionér dropdown ved cellen
+    const rect = cell.getBoundingClientRect();
+    const dd   = el('bg-cal-dropdown');
+    dd.style.display = '';
+
+    // Bestem side: højre hvis der er plads, ellers venstre
+    const ddW  = 300;
+    const winW = window.innerWidth;
+    let left = rect.right + 6;
+    if (left + ddW > winW - 12) left = rect.left - ddW - 6;
+    if (left < 8) left = 8;
+
+    // position:fixed → koordinater relativt til viewport (ingen scrollY)
+    let top = rect.bottom + 4;
+    const winH = window.innerHeight;
+    if (top + 300 > winH) top = Math.max(4, rect.top - 300 - 4);
+
+    dd.style.left = left + 'px';
+    dd.style.top  = top  + 'px';
+  }
+
+  function closeCalDropdown() {
+    el('bg-cal-dropdown').style.display = 'none';
+    qsa('.bg-cal-open').forEach(c => c.classList.remove('bg-cal-open'));
+    calDropdownDate = null;
+  }
+
+  async function scheduleTopicToDate(topicId, dateStr) {
+    const scheduledFor = dateStr + ' 09:00:00'; // standard: 09:00
+    try {
+      await api('topics/' + topicId, {
+        method: 'PATCH',
+        body: JSON.stringify({ scheduled_for: scheduledFor }),
+      });
+      const t = allTopics.find(x => x.id == topicId);
+      if (t) t.scheduled_for = scheduledFor;
+      closeCalDropdown();
+      toast('✓ Emne planlagt');
+      renderCalendar();
+    } catch(e) {
+      toast('Fejl: ' + e.message, 'err');
+    }
+  }
+
+  // Luk dropdown ved klik udenfor
+  document.addEventListener('click', e => {
+    const dd = el('bg-cal-dropdown');
+    if (!dd || dd.style.display === 'none') return;
+    if (!dd.contains(e.target) && !e.target.closest('.bg-cal-cell')) closeCalDropdown();
+  });
+  el('bg-cal-dd-close')?.addEventListener('click', closeCalDropdown);
+  el('bg-cal-dd-goto-queue')?.addEventListener('click', () => {
+    closeCalDropdown();
+    qs('[data-tab="queue"]')?.click();
+  });
 
   el('bg-cal-prev').addEventListener('click', () => {
     calMonth--;
@@ -684,6 +821,97 @@
       toast('Fejl: ' + e.message, 'err');
     }
   });
+
+  // ── Inline date picker for queue PLANLAGT column ────────────────────────────
+
+  function openInlineDatePicker(pill, topicId) {
+    // Fjern evt. eksisterende picker
+    const existing = document.getElementById('bg-inline-dp');
+    if (existing) {
+      existing.remove();
+      document.removeEventListener('click', outsideDpClick);
+      if (existing._topicId === topicId) return; // toggle lukker
+    }
+
+    const topic = allTopics.find(t => t.id == topicId);
+    const rect  = pill.getBoundingClientRect();
+
+    const dp = document.createElement('div');
+    dp.id = 'bg-inline-dp';
+    dp._topicId = topicId;
+    dp.style.cssText = [
+      'position:fixed', 'z-index:99999',
+      'background:#1a1a1a', 'border:1px solid rgba(204,255,0,.3)',
+      'border-radius:10px', 'padding:12px 14px',
+      'box-shadow:0 8px 32px rgba(0,0,0,.6)', 'min-width:230px',
+    ].join(';');
+
+    let left = rect.left;
+    if (left + 245 > window.innerWidth) left = window.innerWidth - 250;
+    dp.style.top  = (rect.bottom + 6) + 'px';
+    dp.style.left = Math.max(8, left) + 'px';
+
+    let defaultVal = '';
+    if (topic?.scheduled_for) {
+      const d = new Date(topic.scheduled_for.replace(' ', 'T'));
+      defaultVal = d.toISOString().slice(0, 16);
+    }
+
+    dp.innerHTML = `
+      <div style="font-size:11px;color:#666;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Planlæg publicering</div>
+      <input type="datetime-local" id="bg-dp-input" value="${defaultVal}"
+        style="background:#111;border:1px solid rgba(255,255,255,.15);border-radius:8px;
+               color:#e5e5e5;padding:7px 10px;font-size:13px;width:100%;box-sizing:border-box;
+               outline:none;font-family:inherit;color-scheme:dark">
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button id="bg-dp-save" style="flex:1;background:#CCFF00;color:#111;border:none;border-radius:6px;
+          padding:7px 0;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✓ Gem dato</button>
+        ${topic?.scheduled_for
+          ? `<button id="bg-dp-clear" style="background:transparent;color:#ff5555;border:1px solid rgba(255,85,85,.3);
+              border-radius:6px;padding:7px 10px;font-size:12px;cursor:pointer;font-family:inherit">✕</button>`
+          : ''}
+      </div>`;
+
+    document.body.appendChild(dp);
+
+    dp.querySelector('#bg-dp-save').addEventListener('click', async () => {
+      const val = dp.querySelector('#bg-dp-input').value;
+      if (!val) { toast('Vælg en dato', 'err'); return; }
+      await applySchedule(topicId, val.replace('T', ' ') + ':00');
+      dp.remove();
+      document.removeEventListener('click', outsideDpClick);
+    });
+    dp.querySelector('#bg-dp-clear')?.addEventListener('click', async () => {
+      await applySchedule(topicId, null);
+      dp.remove();
+      document.removeEventListener('click', outsideDpClick);
+    });
+
+    setTimeout(() => document.addEventListener('click', outsideDpClick), 60);
+  }
+
+  function outsideDpClick(e) {
+    const dp = document.getElementById('bg-inline-dp');
+    if (dp && !dp.contains(e.target) && !e.target.closest('.bg-sched-pill, .bg-sched-empty')) {
+      dp.remove();
+      document.removeEventListener('click', outsideDpClick);
+    }
+  }
+
+  async function applySchedule(topicId, scheduledFor) {
+    try {
+      await api('topics/' + topicId, {
+        method: 'PATCH',
+        body: JSON.stringify({ scheduled_for: scheduledFor }),
+      });
+      const t = allTopics.find(x => x.id == topicId);
+      if (t) t.scheduled_for = scheduledFor;
+      toast(scheduledFor ? '✓ Dato planlagt' : 'Dato fjernet');
+      renderTopics();
+    } catch(e) {
+      toast('Fejl: ' + e.message, 'err');
+    }
+  }
 
   // ── XSS helpers ───────────────────────────────────────────────────────────────
   function escHtml(s) {

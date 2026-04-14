@@ -74,9 +74,13 @@ wp_localize_script( 'rzpz-crm-fb', 'RZPZ_FB', [
             </div>
 
             <div class="fb-form-actions">
-              <button class="rzpa-btn rzpa-btn-sm fb-edit-btn" data-id="<?php echo (int) $form->id; ?>">✏️ Rediger felter</button>
+              <button class="rzpa-btn rzpa-btn-sm fb-edit-btn" data-id="<?php echo (int) $form->id; ?>">✏️ Rediger</button>
               <button class="rzpa-btn rzpa-btn-sm fb-settings-btn" data-id="<?php echo (int) $form->id; ?>">⚙️ Indstillinger</button>
               <button class="rzpa-btn rzpa-btn-sm fb-stats-btn" data-id="<?php echo (int) $form->id; ?>">📊 Stats</button>
+            </div>
+            <div class="fb-form-actions fb-form-actions-danger">
+              <button class="rzpa-btn rzpa-btn-sm fb-duplicate-btn" data-id="<?php echo (int) $form->id; ?>" data-title="<?php echo esc_attr( $form->title ); ?>">⧉ Dupliker</button>
+              <button class="rzpa-btn rzpa-btn-sm fb-delete-btn" data-id="<?php echo (int) $form->id; ?>" data-title="<?php echo esc_attr( $form->title ); ?>">🗑 Slet</button>
             </div>
           </div>
         <?php endforeach; ?>

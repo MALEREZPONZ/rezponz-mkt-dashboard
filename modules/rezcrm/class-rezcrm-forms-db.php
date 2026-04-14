@@ -241,9 +241,66 @@ class RZPZ_CRM_Forms_DB {
 
     public static function delete_form( int $id ): void {
         global $wpdb;
-        $wpdb->delete( $wpdb->prefix . 'rzpz_crm_forms',       [ 'form_id' => $id ] );
         $wpdb->delete( $wpdb->prefix . 'rzpz_crm_form_fields',  [ 'form_id' => $id ] );
+        $wpdb->delete( $wpdb->prefix . 'rzpz_crm_form_sessions', [ 'form_id' => $id ] );
         $wpdb->delete( $wpdb->prefix . 'rzpz_crm_forms',        [ 'id'      => $id ] );
+    }
+
+    public static function duplicate_form( int $id, object $form ): int|false {
+        global $wpdb;
+        $tf = $wpdb->prefix . 'rzpz_crm_forms';
+        $tff = $wpdb->prefix . 'rzpz_crm_form_fields';
+
+        // Generate unique slug (max 20 iterations to prevent infinite loop)
+        $base_slug = rtrim( $form->slug, '-' );
+        $new_slug  = $base_slug . '-kopi';
+        $i = 2;
+        while ( $i <= 20 && $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$tf} WHERE slug = %s", $new_slug ) ) ) {
+            $new_slug = $base_slug . '-kopi-' . $i++;
+        }
+        // Final fallback: append timestamp if still taken
+        if ( $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$tf} WHERE slug = %s", $new_slug ) ) ) {
+            $new_slug = $base_slug . '-kopi-' . time();
+        }
+
+        $ok = $wpdb->insert( $tf, [
+            'title'          => $form->title . ' (kopi)',
+            'slug'           => $new_slug,
+            'is_active'      => 0,   // start as draft
+            'show_progress'  => $form->show_progress,
+            'multi_step'     => $form->multi_step,
+            'intro_text'     => $form->intro_text,
+            'success_message'=> $form->success_message,
+            'redirect_url'   => $form->redirect_url,
+            'notify_email'   => $form->notify_email,
+            'position_id'    => $form->position_id,
+        ] );
+        if ( ! $ok ) return false;
+
+        $new_id = $wpdb->insert_id;
+
+        // Copy all fields
+        $fields = $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM {$tff} WHERE form_id = %d ORDER BY sort_order ASC", $id
+        ) );
+        foreach ( $fields as $f ) {
+            $wpdb->insert( $tff, [
+                'form_id'    => $new_id,
+                'sort_order' => $f->sort_order,
+                'section_name'=> $f->section_name,
+                'field_type' => $f->field_type,
+                'field_key'  => $f->field_key,
+                'label'      => $f->label,
+                'placeholder'=> $f->placeholder,
+                'help_text'  => $f->help_text,
+                'options'    => $f->options,
+                'required'   => $f->required,
+                'core_map'   => $f->core_map,
+                'conditions' => $f->conditions,
+            ] );
+        }
+
+        return $new_id;
     }
 
     // ── Fields CRUD ──────────────────────────────────────────────────────────
