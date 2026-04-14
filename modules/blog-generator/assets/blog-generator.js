@@ -207,8 +207,12 @@
 
   // ── Generate ──────────────────────────────────────────────────────────────────
   async function generateTopic(id) {
-    const topic = allTopics.find(t => t.id === id);
-    if (!topic) return;
+    // Use loose equality (==) — REST API returns IDs as strings, btn.dataset as numbers
+    const topic = allTopics.find(t => t.id == id);
+    if (!topic) {
+      toast('Fejl: Emne ikke fundet — prøv at genindlæse siden', 'err');
+      return;
+    }
     // Start generation immediately — image can be added afterwards
     await _doGenerate(id, topic.image_id || null);
   }
@@ -219,13 +223,14 @@
         method: 'POST',
         body:   JSON.stringify({ image_id: imageId }),
       });
-      const t = allTopics.find(x => x.id === id);
+      const t = allTopics.find(x => x.id == id);
       if (t) t.status = 'generating';
       renderTopics();
       toast('⏳ Generering startet — checker status…');
       startPolling(id);
     } catch(e) {
-      toast('Fejl: ' + e.message, 'err');
+      // Surface clear error — common case: missing OpenAI key
+      toast('❌ ' + (e.message || 'Ukendt fejl'), 'err');
     }
   }
 
@@ -258,7 +263,7 @@
 
       try {
         const data = await api('topics/' + id + '/status');
-        const t    = allTopics.find(x => x.id === id);
+        const t    = allTopics.find(x => x.id == id);
 
         if (data.status !== 'generating') {
           clearInterval(pollTimers[id]);
@@ -291,7 +296,7 @@
     try {
       await api('topics/' + id, { method: 'DELETE' });
       if (pollTimers[id]) { clearInterval(pollTimers[id]); delete pollTimers[id]; }
-      allTopics = allTopics.filter(t => t.id !== id);
+      allTopics = allTopics.filter(t => t.id != id);
       renderTopics();
       renderDone();
       toast('Emne slettet');

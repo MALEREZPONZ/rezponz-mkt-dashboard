@@ -117,9 +117,14 @@ PROMPT;
     public static function topics_list(): WP_REST_Response {
         $topics = RZPA_Blog_Gen_DB::get_topics();
         foreach ( $topics as $t ) {
-            $t->post_url  = $t->wp_post_id ? get_permalink( (int) $t->wp_post_id ) : null;
-            $t->post_edit = $t->wp_post_id ? get_edit_post_link( (int) $t->wp_post_id, 'raw' ) : null;
-            $t->image_url = $t->image_id   ? wp_get_attachment_image_url( (int) $t->image_id, 'thumbnail' ) : null;
+            // Cast numeric fields to int/float so JS receives proper JSON types (not strings)
+            $t->id         = (int) $t->id;
+            $t->wp_post_id = $t->wp_post_id ? (int) $t->wp_post_id : null;
+            $t->image_id   = $t->image_id   ? (int) $t->image_id   : null;
+            $t->word_count = (int) $t->word_count;
+            $t->post_url   = $t->wp_post_id ? get_permalink( $t->wp_post_id ) : null;
+            $t->post_edit  = $t->wp_post_id ? get_edit_post_link( $t->wp_post_id, 'raw' ) : null;
+            $t->image_url  = $t->image_id   ? wp_get_attachment_image_url( $t->image_id, 'thumbnail' ) : null;
         }
         return new WP_REST_Response( $topics, 200 );
     }
