@@ -4,11 +4,11 @@ window.RZPZ_CRM = window.RZPZ_CRM || {};
 window.RZPZ_CRM.apiBase = <?php echo wp_json_encode( rest_url( 'rzpa/v1/' ) ); ?>;
 window.RZPZ_CRM.nonce   = <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>;
 </script>
-<div class="rzpa-page" id="rzcrm-users-page">
+<div class="wrap rzpa-wrap" id="rzcrm-users-page">
 
     <div class="rzpa-page-header">
         <div>
-            <h1>Brugere & Sikkerhed</h1>
+            <h1 class="rzpa-page-title">Brugere & Sikkerhed</h1>
             <p class="rzpa-page-sub">Administrér RezCRM-brugere og overvåg adgang</p>
         </div>
         <div class="rzpa-header-actions">
@@ -17,13 +17,13 @@ window.RZPZ_CRM.nonce   = <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' 
     </div>
 
     <!-- Tabs -->
-    <div class="rzpa-tabs" style="margin-bottom:24px">
-        <button class="rzpa-tab rzpa-tab-active" data-tab="users">👥 Brugere</button>
-        <button class="rzpa-tab" data-tab="audit">🔍 Audit Log</button>
+    <div class="rzcrm-tab-nav">
+        <button class="rzcrm-tab-btn rzcrm-tab-active" data-tab="users">👥 Brugere</button>
+        <button class="rzcrm-tab-btn" data-tab="audit">🔍 Audit Log</button>
     </div>
 
     <!-- Users tab -->
-    <div id="tab-users" class="rzpa-tab-content">
+    <div id="tab-users" class="rzcrm-tab-content">
         <div class="rzcrm-users-table-wrap rzpa-card">
             <table class="rzcrm-users-table" id="crm-users-table">
                 <thead>
@@ -44,7 +44,7 @@ window.RZPZ_CRM.nonce   = <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' 
     </div>
 
     <!-- Audit log tab -->
-    <div id="tab-audit" class="rzpa-tab-content" hidden>
+    <div id="tab-audit" class="rzcrm-tab-content" style="display:none">
         <div class="rzpa-card">
             <div class="rzcrm-audit-filters" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
                 <select id="audit-user-filter" style="background:#0e0e0e;color:#e5e5e5;border:1px solid #2a2a2a;border-radius:6px;padding:6px 10px;font-size:13px">
@@ -166,81 +166,162 @@ window.RZPZ_CRM.nonce   = <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' 
 </div>
 
 <style>
-.rzcrm-users-table{width:100%;border-collapse:collapse;font-size:13px}
-.rzcrm-users-table th{
-    padding:10px 14px;
-    text-align:left;
-    font-size:11px;
-    font-weight:600;
-    color:#555;
-    text-transform:uppercase;
-    letter-spacing:.05em;
-    border-bottom:1px solid #222;
+/* ── Tab navigation ──────────────────────────────────── */
+.rzcrm-tab-nav {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
 }
-.rzcrm-users-table td{
-    padding:12px 14px;
-    border-bottom:1px solid #1a1a1a;
-    vertical-align:middle;
+.rzcrm-tab-btn {
+    padding: 10px 22px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #666;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    transition: color .15s, border-color .15s;
+    margin-bottom: -1px;
+    letter-spacing: .01em;
 }
-.rzcrm-users-table tr:last-child td{border-bottom:none}
-.rzcrm-users-table tr:hover td{background:rgba(255,255,255,.02)}
-.rzcrm-loading{color:#444;text-align:center;padding:24px!important}
+.rzcrm-tab-btn:hover { color: #ccc; }
+.rzcrm-tab-btn.rzcrm-tab-active { color: #CCFF00; border-bottom-color: #CCFF00; }
 
-.rzcrm-user-info{display:flex;align-items:center;gap:10px}
-.rzcrm-avatar{
-    width:34px;height:34px;border-radius:50%;
-    background:#1a1a1a;border:1px solid #2a2a2a;
-    display:flex;align-items:center;justify-content:center;
-    font-size:14px;font-weight:700;color:#CCFF00;
-    flex-shrink:0;
-}
-.rzcrm-user-login{font-weight:600;color:#e5e5e5;font-size:13px}
-.rzcrm-user-email{font-size:11px;color:#555;margin-top:2px}
+/* ── Header ──────────────────────────────────────────── */
+.rzpa-header-actions { display: flex; align-items: center; gap: 8px; }
 
-.rzcrm-badge{
-    display:inline-flex;align-items:center;gap:4px;
-    font-size:11px;padding:3px 8px;border-radius:20px;
-    font-weight:600;
+/* ── Users table ─────────────────────────────────────── */
+.rzcrm-users-table-wrap { padding: 0 !important; overflow: hidden; }
+.rzcrm-users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rzcrm-users-table th {
+    padding: 12px 20px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    background: rgba(255,255,255,.02);
 }
-.rzcrm-badge-admin{background:rgba(204,255,0,.1);color:#CCFF00;border:1px solid rgba(204,255,0,.2)}
-.rzcrm-badge-user{background:rgba(100,100,200,.1);color:#8888ff;border:1px solid rgba(100,100,200,.2)}
-.rzcrm-badge-active{background:rgba(60,200,60,.1);color:#4cd964;border:1px solid rgba(60,200,60,.2)}
-.rzcrm-badge-inactive{background:rgba(255,60,60,.1);color:#ff6b6b;border:1px solid rgba(255,60,60,.2)}
-.rzcrm-badge-mfa-on{background:rgba(0,200,150,.1);color:#00c896;border:1px solid rgba(0,200,150,.2)}
-.rzcrm-badge-mfa-off{background:rgba(255,150,0,.1);color:#ff9500;border:1px solid rgba(255,150,0,.2)}
+.rzcrm-users-table td {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+    vertical-align: middle;
+}
+.rzcrm-users-table tr:last-child td { border-bottom: none; }
+.rzcrm-users-table tbody tr:hover td { background: rgba(255,255,255,.02); }
+.rzcrm-loading { color: #444; text-align: center; padding: 36px !important; font-size: 13px; }
 
-.rzcrm-actions-cell{display:flex;gap:6px;justify-content:flex-end}
-.rzcrm-action-btn{
-    font-size:11px;padding:4px 10px;
-    border-radius:4px;border:1px solid #2a2a2a;
-    background:transparent;color:#888;cursor:pointer;transition:.15s;
-    white-space:nowrap;
+/* ── User cell ───────────────────────────────────────── */
+.rzcrm-user-info { display: flex; align-items: center; gap: 12px; }
+.rzcrm-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(204,255,0,.08); border: 1px solid rgba(204,255,0,.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #CCFF00;
+    flex-shrink: 0; letter-spacing: .02em;
 }
-.rzcrm-action-btn:hover{border-color:#555;color:#ccc}
-.rzcrm-action-btn.danger:hover{border-color:rgba(255,60,60,.4);color:#ff6b6b}
-.rzcrm-action-btn.warn:hover{border-color:rgba(255,150,0,.4);color:#ff9500}
+.rzcrm-user-login { font-weight: 600; color: #e5e5e5; font-size: 13px; line-height: 1.3; }
+.rzcrm-user-email { font-size: 11px; color: #555; margin-top: 2px; }
 
-.rzcrm-form-row{margin-bottom:14px}
-.rzcrm-form-row label{display:block;font-size:12px;font-weight:600;color:#888;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
-.rzcrm-form-row input,.rzcrm-form-row select{
-    width:100%;background:#0e0e0e;border:1px solid #2e2e2e;
-    border-radius:6px;padding:9px 12px;font-size:14px;color:#e5e5e5;outline:none;transition:.2s;
+/* ── Badges ──────────────────────────────────────────── */
+.rzcrm-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; padding: 3px 9px; border-radius: 999px;
+    font-weight: 700; letter-spacing: .03em;
 }
-.rzcrm-form-row input:focus{border-color:#CCFF00;box-shadow:0 0 0 3px rgba(204,255,0,.08)}
-.rzcrm-form-error{
-    padding:10px 14px;background:rgba(255,60,60,.08);border:1px solid rgba(255,60,60,.2);
-    border-radius:8px;font-size:13px;color:#ff6b6b;margin-top:12px;
+.rzcrm-badge-admin   { background: rgba(204,255,0,.08);  color: #CCFF00; border: 1px solid rgba(204,255,0,.2); }
+.rzcrm-badge-user    { background: rgba(130,130,255,.08); color: #9090ff; border: 1px solid rgba(130,130,255,.2); }
+.rzcrm-badge-active  { background: rgba(60,200,60,.08);  color: #4cd964; border: 1px solid rgba(60,200,60,.2); }
+.rzcrm-badge-inactive{ background: rgba(255,60,60,.08);  color: #ff6b6b; border: 1px solid rgba(255,60,60,.2); }
+.rzcrm-badge-mfa-on  { background: rgba(0,200,150,.08);  color: #00c896; border: 1px solid rgba(0,200,150,.2); }
+.rzcrm-badge-mfa-off { background: rgba(255,150,0,.08);  color: #ff9500; border: 1px solid rgba(255,150,0,.2); }
+
+/* ── Row actions ─────────────────────────────────────── */
+.rzcrm-actions-cell { display: flex; gap: 6px; justify-content: flex-end; }
+.rzcrm-action-btn {
+    font-size: 11px; padding: 5px 12px;
+    border-radius: 999px; border: 1px solid rgba(255,255,255,.1);
+    background: transparent; color: #666; cursor: pointer; transition: .15s;
+    white-space: nowrap; font-family: inherit; font-weight: 600;
+}
+.rzcrm-action-btn:hover        { border-color: rgba(255,255,255,.25); color: #ccc; }
+.rzcrm-action-btn.danger:hover { border-color: rgba(255,80,80,.4); color: #ff6b6b; }
+.rzcrm-action-btn.warn:hover   { border-color: rgba(255,150,0,.4); color: #ff9500; }
+
+/* ── Modal shell ─────────────────────────────────────── */
+.rzpa-modal {
+    background: #141414;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 20px;
+    box-shadow: 0 32px 80px rgba(0,0,0,.8);
+    overflow: hidden;
+}
+.rzpa-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px 18px;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.rzpa-modal-header h3 {
+    margin: 0; font-size: 16px; font-weight: 700; color: #fff;
+}
+.rzpa-modal-body   { padding: 22px 24px; }
+.rzpa-modal-footer {
+    display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+    padding: 16px 24px;
+    border-top: 1px solid rgba(255,255,255,.07);
+    background: rgba(255,255,255,.02);
+}
+.rzpa-modal-close {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+    color: #888; font-size: 16px; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: .15s;
+}
+.rzpa-modal-close:hover { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.25); }
+
+/* ── Modal form rows ─────────────────────────────────── */
+.rzcrm-form-row { margin-bottom: 16px; }
+.rzcrm-form-row label {
+    display: block; font-size: 11px; font-weight: 700; color: #555;
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: .06em;
+}
+.rzcrm-form-row input, .rzcrm-form-row select {
+    width: 100%; background: #0e0e0e; border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px; padding: 10px 14px; font-size: 14px; color: #e5e5e5;
+    outline: none; transition: border-color .15s, box-shadow .15s; font-family: inherit;
+    box-sizing: border-box;
+}
+.rzcrm-form-row input:focus {
+    border-color: #CCFF00;
+    box-shadow: 0 0 0 3px rgba(204,255,0,.08);
+}
+.rzcrm-form-error {
+    padding: 12px 16px; background: rgba(255,60,60,.06);
+    border: 1px solid rgba(255,60,60,.2); border-radius: 10px;
+    font-size: 13px; color: #ff6b6b; margin-top: 12px;
 }
 
-/* Audit log action badges */
-.audit-action{
-    font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600;
-    display:inline-block;
+/* ── Audit table / pagination ────────────────────────── */
+.rzcrm-audit-filters select {
+    background: #111; color: #e5e5e5;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 8px; padding: 7px 12px; font-size: 13px;
+    font-family: inherit; outline: none; cursor: pointer;
 }
-.audit-ok{background:rgba(60,200,60,.1);color:#4cd964}
-.audit-fail{background:rgba(255,60,60,.1);color:#ff6b6b}
-.audit-info{background:rgba(100,100,200,.1);color:#8888ff}
-.audit-warn{background:rgba(255,150,0,.1);color:#ff9500}
+.audit-action {
+    font-size: 10px; padding: 3px 9px; border-radius: 999px;
+    font-weight: 700; display: inline-block; letter-spacing: .03em;
+}
+.audit-ok   { background: rgba(60,200,60,.08);  color: #4cd964; }
+.audit-fail { background: rgba(255,60,60,.08);  color: #ff6b6b; }
+.audit-info { background: rgba(130,130,255,.08); color: #9090ff; }
+.audit-warn { background: rgba(255,150,0,.08);  color: #ff9500; }
 </style>
 
 <script>
@@ -259,13 +340,13 @@ async function api(path, opts = {}) {
 }
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
-document.querySelectorAll('.rzpa-tab').forEach(t => {
+document.querySelectorAll('.rzcrm-tab-btn').forEach(t => {
     t.addEventListener('click', () => {
-        document.querySelectorAll('.rzpa-tab').forEach(x => x.classList.remove('rzpa-tab-active'));
-        t.classList.add('rzpa-tab-active');
-        document.querySelectorAll('.rzpa-tab-content').forEach(c => c.hidden = true);
+        document.querySelectorAll('.rzcrm-tab-btn').forEach(x => x.classList.remove('rzcrm-tab-active'));
+        t.classList.add('rzcrm-tab-active');
+        document.querySelectorAll('.rzcrm-tab-content').forEach(c => c.style.display = 'none');
         const tab = document.getElementById('tab-' + t.dataset.tab);
-        if (tab) tab.hidden = false;
+        if (tab) tab.style.display = '';
         if (t.dataset.tab === 'audit') loadAudit();
     });
 });

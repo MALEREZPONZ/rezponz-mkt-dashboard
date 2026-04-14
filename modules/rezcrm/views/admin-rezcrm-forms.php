@@ -17,16 +17,17 @@ wp_localize_script( 'rzpz-crm-fb', 'RZPZ_FB', [
     'siteUrl'    => site_url(),
 ] );
 ?>
-<div class="wrap rzpz-fb-wrap" id="rzpz-fb-app">
+<div class="wrap rzpa-wrap rzpz-fb-wrap" id="rzpz-fb-app">
   <div id="fb-toast" class="crm-toast"></div>
 
   <!-- ── Header ────────────────────────────────────────────────────────────── -->
-  <div class="crm-header">
-    <div class="crm-header-left">
-      <h1>📋 Ansøgningsformularer</h1>
+  <div class="rzpa-page-header">
+    <div>
+      <h1 class="rzpa-page-title">Ansøgningsformularer</h1>
+      <p class="rzpa-page-sub">Opret og administrér ansøgningsformularer til dine stillinger</p>
     </div>
-    <div class="crm-header-right">
-      <button class="crm-btn crm-btn-primary" id="fb-new-form-btn">+ Ny formular</button>
+    <div class="rzpa-header-actions">
+      <button class="rzpa-btn rzpa-btn-primary" id="fb-new-form-btn">+ Ny formular</button>
     </div>
   </div>
 
@@ -73,9 +74,9 @@ wp_localize_script( 'rzpz-crm-fb', 'RZPZ_FB', [
             </div>
 
             <div class="fb-form-actions">
-              <button class="crm-btn crm-btn-ghost fb-edit-btn" data-id="<?php echo (int) $form->id; ?>">✏️ Rediger felter</button>
-              <button class="crm-btn crm-btn-ghost fb-settings-btn" data-id="<?php echo (int) $form->id; ?>">⚙️ Indstillinger</button>
-              <button class="crm-btn crm-btn-ghost fb-stats-btn" data-id="<?php echo (int) $form->id; ?>">📊 Stats</button>
+              <button class="rzpa-btn rzpa-btn-sm fb-edit-btn" data-id="<?php echo (int) $form->id; ?>">✏️ Rediger felter</button>
+              <button class="rzpa-btn rzpa-btn-sm fb-settings-btn" data-id="<?php echo (int) $form->id; ?>">⚙️ Indstillinger</button>
+              <button class="rzpa-btn rzpa-btn-sm fb-stats-btn" data-id="<?php echo (int) $form->id; ?>">📊 Stats</button>
             </div>
           </div>
         <?php endforeach; ?>
@@ -86,9 +87,9 @@ wp_localize_script( 'rzpz-crm-fb', 'RZPZ_FB', [
   <!-- ── Form Builder (field editor) ──────────────────────────────────────── -->
   <div id="fb-builder-view" style="display:none">
     <div class="fb-builder-header">
-      <button class="crm-btn crm-btn-ghost" id="fb-back-btn">← Tilbage til formularer</button>
+      <button class="rzpa-btn" id="fb-back-btn">← Tilbage</button>
       <h2 id="fb-builder-title">Rediger formular</h2>
-      <button class="crm-btn crm-btn-primary" id="fb-save-fields-btn">💾 Gem felter</button>
+      <button class="rzpa-btn rzpa-btn-primary" id="fb-save-fields-btn">💾 Gem felter</button>
     </div>
 
     <div class="fb-builder-layout">
@@ -191,8 +192,8 @@ wp_localize_script( 'rzpz-crm-fb', 'RZPZ_FB', [
         </div>
       </div>
       <div class="crm-modal-footer">
-        <button class="crm-btn crm-btn-ghost" data-close="fb-settings-modal">Annuller</button>
-        <button class="crm-btn crm-btn-primary" id="fb-save-settings-btn">Gem indstillinger</button>
+        <button class="rzpa-btn" data-close="fb-settings-modal">Annuller</button>
+        <button class="rzpa-btn rzpa-btn-primary" id="fb-save-settings-btn">Gem indstillinger</button>
       </div>
     </div>
   </div>
