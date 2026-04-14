@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class RZPA_Blog_Gen_DB {
 
-    const DB_VERSION     = '1';
+    const DB_VERSION     = '2';
     const DB_VERSION_KEY = 'rzpa_blog_gen_db_ver';
 
     /** Foruddefinerede søjler til content-køen */
@@ -59,23 +59,31 @@ class RZPA_Blog_Gen_DB {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
         dbDelta( "CREATE TABLE {$t} (
-            id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            title        VARCHAR(500)    NOT NULL,
-            keywords     TEXT,
-            pillar       VARCHAR(30)     NOT NULL DEFAULT 'custom',
-            article_type VARCHAR(20)     NOT NULL DEFAULT 'explainer',
-            target       VARCHAR(10)     NOT NULL DEFAULT 'unge',
-            word_count   SMALLINT UNSIGNED NOT NULL DEFAULT 1200,
-            status       VARCHAR(20)     NOT NULL DEFAULT 'queued',
-            wp_post_id   BIGINT UNSIGNED DEFAULT NULL,
-            image_id     BIGINT UNSIGNED DEFAULT NULL,
-            include_faq  TINYINT(1)      NOT NULL DEFAULT 1,
-            error_msg    TEXT            DEFAULT NULL,
-            created_at   DATETIME        DEFAULT CURRENT_TIMESTAMP,
-            updated_at   DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            id                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            title                VARCHAR(500)    NOT NULL,
+            keywords             TEXT,
+            pillar               VARCHAR(30)     NOT NULL DEFAULT 'custom',
+            article_type         VARCHAR(20)     NOT NULL DEFAULT 'explainer',
+            target               VARCHAR(10)     NOT NULL DEFAULT 'unge',
+            word_count           SMALLINT UNSIGNED NOT NULL DEFAULT 1200,
+            status               VARCHAR(20)     NOT NULL DEFAULT 'queued',
+            wp_post_id           BIGINT UNSIGNED DEFAULT NULL,
+            image_id             BIGINT UNSIGNED DEFAULT NULL,
+            include_faq          TINYINT(1)      NOT NULL DEFAULT 1,
+            include_toc          TINYINT(1)      NOT NULL DEFAULT 0,
+            include_tldr         TINYINT(1)      NOT NULL DEFAULT 0,
+            include_internal_links TINYINT(1)    NOT NULL DEFAULT 1,
+            publish_immediately  TINYINT(1)      NOT NULL DEFAULT 0,
+            post_date            DATETIME        DEFAULT NULL,
+            scheduled_for        DATETIME        DEFAULT NULL,
+            retry_count          TINYINT         NOT NULL DEFAULT 0,
+            error_msg            TEXT            DEFAULT NULL,
+            created_at           DATETIME        DEFAULT CURRENT_TIMESTAMP,
+            updated_at           DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             KEY idx_status (status),
-            KEY idx_pillar (pillar)
+            KEY idx_pillar (pillar),
+            KEY idx_scheduled (scheduled_for, status)
         ) {$c};" );
 
         update_option( self::DB_VERSION_KEY, self::DB_VERSION );
@@ -112,6 +120,43 @@ class RZPA_Blog_Gen_DB {
         return $wpdb->get_results( "SELECT * FROM {$t} ORDER BY status ASC, id ASC" ) ?: [];
     }
 
+    /** Topics planlagt til fremtidig generering (scheduled_for <= now, status = queued) */
+    public static function get_due_scheduled( ): array {
+        global $wpdb;
+        $t   = $wpdb->prefix . 'rzpa_blog_topics';
+        $now = current_time( 'mysql' );
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM {$t} WHERE status = 'queued' AND scheduled_for IS NOT NULL AND scheduled_for <= %s ORDER BY scheduled_for ASC LIMIT 5",
+            $now
+        ) ) ?: [];
+    }
+
+    /** Hent alle topics med scheduled_for i et givet måneds-interval (til kalender-visning) */
+    public static function get_calendar_topics( string $year_month ): array {
+        global $wpdb;
+        $t     = $wpdb->prefix . 'rzpa_blog_topics';
+        $start = $year_month . '-01 00:00:00';
+        $end   = date( 'Y-m-t 23:59:59', strtotime( $year_month . '-01' ) );
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT id, title, pillar, status, scheduled_for, wp_post_id
+             FROM {$t}
+             WHERE scheduled_for BETWEEN %s AND %s
+             ORDER BY scheduled_for ASC",
+            $start, $end
+        ) ) ?: [];
+    }
+
+    /** Nulstil stuck-generating topics (ældre end 30 min) */
+    public static function reset_stuck_generating(): void {
+        global $wpdb;
+        $t      = $wpdb->prefix . 'rzpa_blog_topics';
+        $cutoff = gmdate( 'Y-m-d H:i:s', time() - 30 * MINUTE_IN_SECONDS );
+        $wpdb->query( $wpdb->prepare(
+            "UPDATE {$t} SET status = 'queued', error_msg = 'Auto-reset: stuck i generating tilstand' WHERE status = 'generating' AND updated_at < %s",
+            $cutoff
+        ) );
+    }
+
     public static function get_topic( int $id ): ?object {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpa_blog_topics';
@@ -124,16 +169,35 @@ class RZPA_Blog_Gen_DB {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpa_blog_topics';
 
+        $scheduled_for = null;
+        if ( ! empty( $data['scheduled_for'] ) ) {
+            $ts = strtotime( $data['scheduled_for'] );
+            if ( $ts && $ts > time() ) {
+                $scheduled_for = gmdate( 'Y-m-d H:i:s', $ts );
+            }
+        }
+        $post_date = null;
+        if ( ! empty( $data['post_date'] ) ) {
+            $ts = strtotime( $data['post_date'] );
+            if ( $ts ) $post_date = gmdate( 'Y-m-d H:i:s', $ts );
+        }
+
         $row = [
-            'title'        => sanitize_text_field( $data['title'] ?? '' ),
-            'keywords'     => sanitize_text_field( $data['keywords'] ?? '' ),
-            'pillar'       => in_array( $data['pillar'] ?? '', array_keys( self::PILLARS ), true ) ? $data['pillar'] : 'custom',
-            'article_type' => in_array( $data['article_type'] ?? '', array_keys( self::ARTICLE_TYPES ), true ) ? $data['article_type'] : 'explainer',
-            'target'       => in_array( $data['target'] ?? '', array_keys( self::TARGETS ), true ) ? $data['target'] : 'unge',
-            'word_count'   => max( 600, min( 2500, (int) ( $data['word_count'] ?? 1200 ) ) ),
-            'status'       => 'queued',
-            'image_id'     => ! empty( $data['image_id'] ) ? (int) $data['image_id'] : null,
-            'include_faq'  => ! empty( $data['include_faq'] ) ? 1 : 0,
+            'title'                => sanitize_text_field( $data['title'] ?? '' ),
+            'keywords'             => sanitize_text_field( $data['keywords'] ?? '' ),
+            'pillar'               => in_array( $data['pillar'] ?? '', array_keys( self::PILLARS ), true ) ? $data['pillar'] : 'custom',
+            'article_type'         => in_array( $data['article_type'] ?? '', array_keys( self::ARTICLE_TYPES ), true ) ? $data['article_type'] : 'explainer',
+            'target'               => in_array( $data['target'] ?? '', array_keys( self::TARGETS ), true ) ? $data['target'] : 'unge',
+            'word_count'           => max( 600, min( 2500, (int) ( $data['word_count'] ?? 1200 ) ) ),
+            'status'               => $scheduled_for ? 'queued' : 'queued',
+            'image_id'             => ! empty( $data['image_id'] ) ? (int) $data['image_id'] : null,
+            'include_faq'          => ! empty( $data['include_faq'] ) ? 1 : 0,
+            'include_toc'          => ! empty( $data['include_toc'] ) ? 1 : 0,
+            'include_tldr'         => ! empty( $data['include_tldr'] ) ? 1 : 0,
+            'include_internal_links' => isset( $data['include_internal_links'] ) ? ( (int) $data['include_internal_links'] ? 1 : 0 ) : 1,
+            'publish_immediately'  => ! empty( $data['publish_immediately'] ) ? 1 : 0,
+            'post_date'            => $post_date,
+            'scheduled_for'        => $scheduled_for,
         ];
 
         if ( empty( $row['title'] ) ) return false;

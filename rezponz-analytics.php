@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      3.1.0
+ * Version:      3.2.0
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '3.1.0' );
+define( 'RZPA_VERSION',     '3.2.0' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -113,6 +113,7 @@ register_deactivation_hook( __FILE__, [ 'RZPA_Scheduler', 'clear_crons' ] );
 
 // ── Blog Generator: gem indstilling via AJAX ─────────────────────────────────
 add_action( 'wp_ajax_rzpa_save_blog_gen_setting', function () {
+    check_ajax_referer( 'wp_rest', '_wpnonce' );
     if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden', 403 );
     $key   = sanitize_key( $_POST['key'] ?? '' );
     $value = wp_unslash( $_POST['value'] ?? '' );
@@ -124,13 +125,28 @@ add_action( 'wp_ajax_rzpa_save_blog_gen_setting', function () {
     wp_send_json_success();
 } );
 
-// ── FAQ Schema markup output i <head> for posts med _rzpa_faq_schema ────────────
+// ── Structured data + GEO meta output i <head> ───────────────────────────────
 add_action( 'wp_head', function () {
     if ( ! is_singular() ) return;
-    $schema = get_post_meta( get_the_ID(), '_rzpa_faq_schema', true );
-    if ( $schema ) {
-        echo "\n" . $schema . "\n";
+    $post_id = get_the_ID();
+
+    // FAQ JSON-LD (FAQPage schema)
+    $faq_schema = get_post_meta( $post_id, '_rzpa_faq_schema', true );
+    if ( $faq_schema ) {
+        echo "\n" . $faq_schema . "\n";
     }
+
+    // Article JSON-LD (BlogPosting schema)
+    $article_schema = get_post_meta( $post_id, '_rzpa_article_schema', true );
+    if ( $article_schema ) {
+        echo "\n" . $article_schema . "\n";
+    }
+
+    // GEO meta-tags (forbedrer AI-synlighed og lokal SEO for Nordjylland)
+    echo '<meta name="geo.region"   content="DK-81">' . "\n";   // DK-81 = Nordjylland
+    echo '<meta name="geo.placename" content="Aalborg, Danmark">' . "\n";
+    echo '<meta name="geo.position" content="57.0488;9.9217">' . "\n";
+    echo '<meta name="ICBM"         content="57.0488, 9.9217">' . "\n";
 } );
 
 // Forhindre caching af sider med Profil-Quiz shortcode

@@ -88,6 +88,32 @@
 .bg-tab { padding:8px 18px; font-size:13px; font-weight:600; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; transition:.15s; }
 .bg-tab.active { color:var(--neon); border-bottom-color:var(--neon); }
 
+/* Kalender */
+.bg-calendar { user-select:none; }
+.bg-cal-nav { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.bg-cal-nav h2 { font-size:16px; font-weight:700; color:#fff; margin:0; min-width:160px; text-align:center; }
+.bg-cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+.bg-cal-day-name { text-align:center; font-size:11px; color:var(--muted); font-weight:600; padding:6px 0; text-transform:uppercase; letter-spacing:.05em; }
+.bg-cal-cell { min-height:88px; background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:8px; padding:6px; font-size:11px; }
+.bg-cal-cell.today { border-color:rgba(204,255,0,.3); background:rgba(204,255,0,.04); }
+.bg-cal-cell.other-month { opacity:.35; }
+.bg-cal-num { font-size:12px; font-weight:600; color:var(--muted); margin-bottom:4px; }
+.bg-cal-event { background:rgba(204,255,0,.12); color:var(--neon); border-radius:4px; padding:2px 5px; margin-bottom:2px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:11px; border-left:2px solid var(--neon); }
+.bg-cal-event.done { background:rgba(74,222,128,.1); color:#4ade80; border-left-color:#4ade80; }
+.bg-cal-event.failed { background:rgba(255,85,85,.1); color:#ff5555; border-left-color:#ff5555; }
+.bg-cal-event.generating { background:rgba(204,255,0,.2); animation:bg-pulse 1.5s ease-in-out infinite; }
+@keyframes bg-pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+/* Toggles */
+.bg-toggles { display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+.bg-toggle { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text); cursor:pointer; }
+.bg-toggle input[type=checkbox] { accent-color:var(--neon); width:14px; height:14px; }
+
+/* Datetime input */
+input[type="datetime-local"] { background:#222; border:1px solid var(--border); border-radius:8px; color:var(--text); padding:8px 12px; font-size:13px; outline:none; }
+input[type="datetime-local"]:focus { border-color:rgba(204,255,0,.4); }
+input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter:invert(.6); cursor:pointer; }
+
 /* Notifikation */
 .bg-toast { position:fixed; bottom:24px; right:24px; background:#1e1e1e; border:1px solid var(--border); border-radius:10px; padding:12px 18px; font-size:13px; color:var(--text); z-index:99999; box-shadow:0 4px 24px rgba(0,0,0,.5); opacity:0; transform:translateY(10px); transition:.2s; pointer-events:none; }
 .bg-toast.show { opacity:1; transform:translateY(0); }
@@ -114,6 +140,7 @@
 <div class="bg-tabs">
   <div class="bg-tab active" data-tab="queue">Kø <span id="bg-queue-count" style="color:var(--muted);font-weight:400"></span></div>
   <div class="bg-tab" data-tab="done">Publiceret <span id="bg-done-count" style="color:var(--muted);font-weight:400"></span></div>
+  <div class="bg-tab" data-tab="calendar">📅 Kalender</div>
   <div class="bg-tab" data-tab="settings">⚙️ Indstillinger</div>
 </div>
 
@@ -151,11 +178,32 @@
         <option value="1600">~1.600 ord (lang)</option>
         <option value="2000">~2.000 ord (dyb)</option>
       </select>
-      <label style="display:flex;align-items:center;gap:6px;color:var(--text);font-size:13px">
-        <input type="checkbox" id="bg-new-faq" checked> Inkluder FAQ
-      </label>
     </div>
-    <div style="display:flex;gap:8px;margin-top:4px">
+
+    <!-- Indholdsvalg + publicering -->
+    <div style="margin:8px 0 4px">
+      <div class="bg-label">Indhold &amp; funktioner</div>
+      <div class="bg-toggles">
+        <label class="bg-toggle"><input type="checkbox" id="bg-new-faq" checked> FAQ-sektion</label>
+        <label class="bg-toggle"><input type="checkbox" id="bg-new-toc"> Indholdsfortegnelse (TOC)</label>
+        <label class="bg-toggle"><input type="checkbox" id="bg-new-tldr"> TL;DR-boks</label>
+        <label class="bg-toggle"><input type="checkbox" id="bg-new-internal-links" checked> Interne links</label>
+      </div>
+    </div>
+
+    <div style="margin:8px 0 4px">
+      <div class="bg-label">Publiceringstilstand</div>
+      <div class="bg-toggles" style="margin-bottom:6px">
+        <label class="bg-toggle"><input type="checkbox" id="bg-new-publish-now"> Publiker direkte (ellers udkast)</label>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="bg-label" style="margin:0;white-space:nowrap">⏰ Planlagt dato/tid:</div>
+        <input type="datetime-local" id="bg-new-scheduled" title="Lad stå tomt for at generere nu">
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Planlagter du en dato, genereres artiklen automatisk på det tidspunkt.</div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:10px">
       <button class="bg-btn bg-btn-primary" id="bg-save-new">Tilføj til kø</button>
       <button class="bg-btn bg-btn-ghost" id="bg-cancel-add">Annuller</button>
     </div>
@@ -191,6 +239,7 @@
             <th>Type</th>
             <th>Målgruppe</th>
             <th>Billede</th>
+            <th>Planlagt</th>
             <th>Status</th>
             <th></th>
           </tr>
@@ -269,6 +318,31 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- === TAB: KALENDER === -->
+<div id="tab-calendar" style="display:none">
+  <div class="bg-card bg-calendar">
+    <div class="bg-cal-nav">
+      <button class="bg-btn bg-btn-ghost bg-btn-sm" id="bg-cal-prev">◀</button>
+      <h2 id="bg-cal-title">— —</h2>
+      <button class="bg-btn bg-btn-ghost bg-btn-sm" id="bg-cal-next">▶</button>
+      <button class="bg-btn bg-btn-ghost bg-btn-sm" id="bg-cal-today" style="margin-left:8px">I dag</button>
+    </div>
+    <div class="bg-cal-grid" id="bg-cal-grid">
+      <!-- ugedage headers -->
+      <?php foreach (['Man','Tir','Ons','Tor','Fre','Lør','Søn'] as $d): ?>
+        <div class="bg-cal-day-name"><?php echo $d; ?></div>
+      <?php endforeach; ?>
+      <!-- dage udfyldes af JS -->
+    </div>
+    <div style="margin-top:14px;font-size:12px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap">
+      <span><span style="color:var(--neon)">▌</span> Planlagt / Kø</span>
+      <span><span style="color:#4ade80">▌</span> Publiceret</span>
+      <span><span style="color:#ff5555">▌</span> Fejlet</span>
+      <span><span style="color:var(--neon);opacity:.6">▌ ◌</span> Genererer</span>
+    </div>
   </div>
 </div>
 

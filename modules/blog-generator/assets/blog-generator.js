@@ -1,26 +1,28 @@
 /* =========================================================
-   Rezponz Blog Generator — blog-generator.js
+   Rezponz Blog Generator — blog-generator.js  v3.2.0
    ========================================================= */
 (function () {
   'use strict';
 
-  const BASE   = RZPA_BG.apiBase;
-  const NONCE  = RZPA_BG.nonce;
+  const BASE  = RZPA_BG.apiBase;
+  const NONCE = RZPA_BG.nonce;
 
-  // ── State ───────────────────────────────────────────────────────────────────
-  let allTopics    = [];
-  let mediaImages  = [];
-  let pickerCb     = null;   // callback(imageId) ved billede-valg
-  let pickerSel    = null;   // aktuelt valgt image_id i picker
-  let pollTimers   = {};     // topic_id → interval
+  // ── State ────────────────────────────────────────────────────────────────────
+  let allTopics   = [];
+  let mediaImages = [];
+  let pickerCb    = null;   // callback(imageId) ved billede-valg
+  let pickerSel   = null;   // aktuelt valgt image_id i picker
+  let pollTimers  = {};     // topic_id → interval
+  let calYear     = new Date().getFullYear();
+  let calMonth    = new Date().getMonth();   // 0-indexed
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-  const el   = id => document.getElementById(id);
-  const qs   = (sel, ctx) => (ctx || document).querySelector(sel);
-  const qsa  = (sel, ctx) => [...(ctx || document).querySelectorAll(sel)];
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  const el  = id  => document.getElementById(id);
+  const qs  = (s, c) => (c || document).querySelector(s);
+  const qsa = (s, c) => [...(c || document).querySelectorAll(s)];
 
   async function api(path, opts = {}) {
-    const res = await fetch(BASE + path, {
+    const res  = await fetch(BASE + path, {
       headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': NONCE },
       ...opts,
     });
@@ -42,9 +44,15 @@
     return `<span class="bg-badge bg-badge-${status}">${labels[status] || status}</span>`;
   }
 
-  function pillarLabel(k) { return (RZPA_BG.pillars[k] || k); }
-  function typeLabel(k)   { return (RZPA_BG.types[k]   || k); }
-  function targetLabel(k) { return (RZPA_BG.targets[k] || k); }
+  function pillarLabel(k) { return RZPA_BG.pillars[k] || k; }
+  function typeLabel(k)   { return RZPA_BG.types[k]   || k; }
+  function targetLabel(k) { return RZPA_BG.targets[k] || k; }
+
+  function fmtDate(iso) {
+    if (!iso) return '–';
+    const d = new Date(iso.replace(' ', 'T'));
+    return isNaN(d) ? '–' : d.toLocaleDateString('da-DK', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+  }
 
   // ── Tabs ─────────────────────────────────────────────────────────────────────
   qsa('.bg-tab').forEach(tab => {
@@ -54,7 +62,8 @@
       const name = tab.dataset.tab;
       qsa('[id^="tab-"]').forEach(p => p.style.display = 'none');
       el('tab-' + name).style.display = 'block';
-      if (name === 'settings') loadSettings();
+      if (name === 'settings')  loadSettings();
+      if (name === 'calendar')  renderCalendar();
     });
   });
 
@@ -80,9 +89,11 @@
     if (!queued.length) {
       el('bg-topics-table').style.display = 'none';
       tbody.innerHTML = '';
-      el('bg-topics-wrap').insertAdjacentHTML('beforeend',
-        '<div class="bg-empty" id="bg-topics-empty">Køen er tom — tilføj et emne eller tryk "Overrask mig" 🎲</div>'
-      );
+      if (!el('bg-topics-empty')) {
+        el('bg-topics-wrap').insertAdjacentHTML('beforeend',
+          '<div class="bg-empty" id="bg-topics-empty">Køen er tom — tilføj et emne eller tryk "Overrask mig" 🎲</div>'
+        );
+      }
       return;
     }
 
@@ -102,8 +113,12 @@
           : `<button class="bg-btn bg-btn-primary bg-btn-sm bg-gen-btn" data-id="${t.id}">▶ Generer</button>`;
 
       const errNote = t.status === 'failed' && t.error_msg
-        ? `<div style="font-size:11px;color:#ff5555;margin-top:3px">${t.error_msg.substring(0,80)}</div>`
+        ? `<div style="font-size:11px;color:#ff5555;margin-top:3px">${escHtml(t.error_msg.substring(0, 80))}</div>`
         : '';
+
+      const scheduledLabel = t.scheduled_for
+        ? `<span style="font-size:11px;color:var(--neon)">⏰ ${fmtDate(t.scheduled_for)}</span>`
+        : `<span style="font-size:11px;color:var(--muted)">–</span>`;
 
       return `<tr data-id="${t.id}">
         <td><button class="bg-btn bg-btn-danger bg-btn-sm bg-del-btn" data-id="${t.id}" title="Slet">✕</button></td>
@@ -120,6 +135,7 @@
             ${imgThumb}
           </div>
         </td>
+        <td>${scheduledLabel}</td>
         <td>${statusBadge(t.status)}</td>
         <td>${actions}</td>
       </tr>`;
@@ -135,24 +151,26 @@
       btn.addEventListener('click', () => deleteTopic(+btn.dataset.id));
     });
 
-    // Billede-picker i tabel
+    // Billede-picker i tabel (PATCH topic — kun opdater image, ikke generer)
     tbody.querySelectorAll('.bg-image-pick-cell').forEach(cell => {
       cell.addEventListener('click', () => {
         openImagePicker(+cell.dataset.image || null, async (imgId) => {
           try {
-            await api('topics/' + cell.dataset.id + '/generate', {
-              method: 'POST',
-              body: JSON.stringify({ image_id: imgId }),
+            await api('topics/' + cell.dataset.id, {
+              method: 'PATCH',
+              body:   JSON.stringify({ image_id: imgId }),
             });
-          } catch(e) { /* handled by generateTopic */ }
-          // Opdater blot image i state og re-render
-          const t = allTopics.find(x => x.id == cell.dataset.id);
-          if (t) {
-            t.image_id  = imgId;
-            t.image_url = mediaImages.find(m => m.id === imgId)?.thumb || '';
+            const t = allTopics.find(x => x.id == cell.dataset.id);
+            if (t) {
+              t.image_id  = imgId;
+              t.image_url = mediaImages.find(m => m.id === imgId)?.thumb || '';
+            }
+            renderTopics();
+            toast('✓ Billede opdateret');
+          } catch(e) {
+            toast('Fejl: ' + e.message, 'err');
           }
-          renderTopics();
-        }, true /* pickerOnly — don't auto-generate */);
+        });
       });
     });
 
@@ -188,27 +206,28 @@
   }
 
   // ── Generate ──────────────────────────────────────────────────────────────────
-  async function generateTopic(id, imageId) {
+  async function generateTopic(id) {
     const topic = allTopics.find(t => t.id === id);
     if (!topic) return;
 
-    if (!imageId && !topic.image_id) {
-      // Ingen billede valgt — åbn picker
+    if (!topic.image_id) {
       openImagePicker(null, async (imgId) => {
-        topic.image_id  = imgId;
-        topic.image_url = imgId ? (mediaImages.find(m => m.id === imgId)?.thumb || '') : '';
+        if (imgId) {
+          topic.image_id  = imgId;
+          topic.image_url = mediaImages.find(m => m.id === imgId)?.thumb || '';
+        }
         await _doGenerate(id, imgId);
       });
       return;
     }
-    await _doGenerate(id, imageId || topic.image_id);
+    await _doGenerate(id, topic.image_id);
   }
 
   async function _doGenerate(id, imageId) {
     try {
       await api('topics/' + id + '/generate', {
         method: 'POST',
-        body: JSON.stringify({ image_id: imageId }),
+        body:   JSON.stringify({ image_id: imageId }),
       });
       const t = allTopics.find(x => x.id === id);
       if (t) t.status = 'generating';
@@ -243,11 +262,10 @@
           renderTopics();
           renderDone();
 
-          if (data.status === 'done') {
-            toast('✅ Blogindlæg klar! ' + (data.post_edit ? '' : ''), 'ok');
-          } else if (data.status === 'failed') {
+          if (data.status === 'done')
+            toast('✅ Blogindlæg klar!', 'ok');
+          else if (data.status === 'failed')
             toast('❌ Generering fejlede: ' + (data.error_msg || 'Ukendt fejl'), 'err');
-          }
         }
       } catch(e) { /* silence poll errors */ }
     }, 4000);
@@ -258,6 +276,7 @@
     if (!confirm('Slet dette emne fra køen?')) return;
     try {
       await api('topics/' + id, { method: 'DELETE' });
+      if (pollTimers[id]) { clearInterval(pollTimers[id]); delete pollTimers[id]; }
       allTopics = allTopics.filter(t => t.id !== id);
       renderTopics();
       renderDone();
@@ -269,8 +288,10 @@
 
   // ── Add form ──────────────────────────────────────────────────────────────────
   el('bg-add-btn').addEventListener('click', () => {
-    el('bg-add-form').style.display = el('bg-add-form').style.display === 'none' ? 'block' : 'none';
-    if (el('bg-add-form').style.display !== 'none') el('bg-new-title').focus();
+    const form = el('bg-add-form');
+    const show = form.style.display === 'none' || form.style.display === '';
+    form.style.display = show ? 'block' : 'none';
+    if (show) el('bg-new-title').focus();
   });
 
   el('bg-cancel-add').addEventListener('click', () => {
@@ -285,32 +306,46 @@
     btn.disabled    = true;
     btn.textContent = '⏳ Tilføjer…';
 
-    try {
-      const data = await api('topics', {
-        method: 'POST',
-        body: JSON.stringify({
-          title,
-          keywords:     el('bg-new-keywords').value.trim(),
-          pillar:       el('bg-new-pillar').value,
-          article_type: el('bg-new-type').value,
-          target:       el('bg-new-target').value,
-          word_count:   +el('bg-new-words').value,
-          include_faq:  el('bg-new-faq').checked ? 1 : 0,
-        }),
-      });
+    const scheduledRaw = el('bg-new-scheduled').value;
+    const scheduledFor = scheduledRaw ? new Date(scheduledRaw).toISOString() : null;
 
-      toast('✓ Emne tilføjet til køen');
-      el('bg-new-title').value    = '';
-      el('bg-new-keywords').value = '';
+    try {
+      const payload = {
+        title,
+        keywords:              el('bg-new-keywords').value.trim(),
+        pillar:                el('bg-new-pillar').value,
+        article_type:          el('bg-new-type').value,
+        target:                el('bg-new-target').value,
+        word_count:            +el('bg-new-words').value,
+        include_faq:           el('bg-new-faq').checked ? 1 : 0,
+        include_toc:           el('bg-new-toc').checked ? 1 : 0,
+        include_tldr:          el('bg-new-tldr').checked ? 1 : 0,
+        include_internal_links:el('bg-new-internal-links').checked ? 1 : 0,
+        publish_immediately:   el('bg-new-publish-now').checked ? 1 : 0,
+        scheduled_for:         scheduledFor,
+      };
+
+      const data = await api('topics', { method: 'POST', body: JSON.stringify(payload) });
+
+      toast('✓ Emne tilføjet til køen' + (scheduledFor ? ' — planlagt til ' + fmtDate(scheduledFor) : ''));
+      el('bg-new-title').value     = '';
+      el('bg-new-keywords').value  = '';
+      el('bg-new-scheduled').value = '';
       el('bg-add-form').style.display = 'none';
 
-      // Tilføj til lokal state og re-render
-      allTopics.push({ id: data.id, title, status: 'queued',
-        pillar: el('bg-new-pillar').value,
-        article_type: el('bg-new-type').value,
-        target: el('bg-new-target').value,
-        word_count: +el('bg-new-words').value,
-        image_id: null, image_url: null, error_msg: null });
+      allTopics.push({
+        id:            data.id,
+        title,
+        status:        'queued',
+        pillar:        el('bg-new-pillar').value,
+        article_type:  el('bg-new-type').value,
+        target:        el('bg-new-target').value,
+        word_count:    +el('bg-new-words').value,
+        scheduled_for: scheduledFor,
+        image_id:      null,
+        image_url:     null,
+        error_msg:     null,
+      });
       renderTopics();
     } catch(e) {
       toast('Fejl: ' + e.message, 'err');
@@ -322,18 +357,13 @@
 
   // ── Overrask mig ──────────────────────────────────────────────────────────────
   el('bg-surprise-btn').addEventListener('click', async () => {
-    const queued = allTopics.filter(t => t.status === 'queued');
-    if (!queued.length) {
-      toast('Ingen emner i kø — tilføj et emne først', 'err');
-      return;
-    }
+    const queued = allTopics.filter(t => t.status === 'queued' && !t.scheduled_for);
+    if (!queued.length) { toast('Ingen emner i kø — tilføj et emne først', 'err'); return; }
     const pick = queued[Math.floor(Math.random() * queued.length)];
     const btn  = el('bg-surprise-btn');
     btn.disabled    = true;
     btn.textContent = '⏳ Starter…';
-
     await generateTopic(pick.id);
-
     btn.disabled    = false;
     btn.textContent = '🎲 Overrask mig';
   });
@@ -348,7 +378,7 @@
     try {
       const suggestions = await api('suggest', {
         method: 'POST',
-        body: JSON.stringify({
+        body:   JSON.stringify({
           keyword: el('bg-suggest-kw').value.trim(),
           target:  el('bg-suggest-target').value,
           count:   6,
@@ -356,20 +386,26 @@
       });
 
       el('bg-suggest-results').innerHTML = suggestions.map(s =>
-        `<span class="bg-suggest-chip" data-title="${escAttr(s.title)}" data-pillar="${s.pillar || 'custom'}" data-type="${s.article_type || 'explainer'}">${escHtml(s.title)}</span>`
+        `<span class="bg-suggest-chip"
+          data-title="${escAttr(s.title)}"
+          data-pillar="${s.pillar || 'custom'}"
+          data-type="${s.article_type || 'explainer'}">
+          ${escHtml(s.title)}
+          ${s.difficulty   ? `<small style="opacity:.6"> · ⚡${s.difficulty}/10</small>` : ''}
+        </span>`
       ).join('');
 
       el('bg-suggest-results').querySelectorAll('.bg-suggest-chip').forEach(chip => {
         chip.addEventListener('click', () => {
-          el('bg-new-title').value = chip.dataset.title;
+          el('bg-new-title').value  = chip.dataset.title;
           el('bg-new-pillar').value = chip.dataset.pillar;
-          el('bg-new-type').value  = chip.dataset.type;
+          el('bg-new-type').value   = chip.dataset.type;
           el('bg-add-form').style.display = 'block';
           el('bg-new-title').focus();
         });
       });
     } catch(e) {
-      el('bg-suggest-results').innerHTML = `<span style="color:#ff5555;font-size:12px">${e.message}</span>`;
+      el('bg-suggest-results').innerHTML = `<span style="color:#ff5555;font-size:12px">${escHtml(e.message)}</span>`;
     } finally {
       btn.disabled    = false;
       btn.textContent = '✨ Foreslå emner';
@@ -379,11 +415,8 @@
   // ── Image Picker ──────────────────────────────────────────────────────────────
   async function loadMedia() {
     if (mediaImages.length) return;
-    try {
-      mediaImages = await api('media');
-    } catch(e) {
-      mediaImages = [];
-    }
+    try { mediaImages = await api('media'); }
+    catch(e) { mediaImages = []; }
   }
 
   function renderPickerGrid(containerId, selectedId) {
@@ -407,13 +440,11 @@
     });
   }
 
-  function openImagePicker(currentId, callback, pickerOnly = false) {
+  function openImagePicker(currentId, callback) {
     pickerCb  = callback;
     pickerSel = currentId || null;
-
     const wrap = el('bg-image-picker-wrap');
     wrap.style.display = 'flex';
-
     loadMedia().then(() => renderPickerGrid('bg-picker-grid', currentId));
   }
 
@@ -421,38 +452,132 @@
     el('bg-image-picker-wrap').style.display = 'none';
     pickerCb = null;
   });
-
   el('bg-image-picker-confirm').addEventListener('click', () => {
     el('bg-image-picker-wrap').style.display = 'none';
     if (pickerCb) pickerCb(pickerSel);
     pickerCb = null;
   });
-
   el('bg-image-picker-clear').addEventListener('click', () => {
     el('bg-image-picker-wrap').style.display = 'none';
     if (pickerCb) pickerCb(null);
     pickerCb = null;
   });
 
+  // ── Calendar ──────────────────────────────────────────────────────────────────
+  const MONTH_NAMES_DA = ['Januar','Februar','Marts','April','Maj','Juni',
+                          'Juli','August','September','Oktober','November','December'];
+
+  async function renderCalendar() {
+    const ym    = `${calYear}-${String(calMonth + 1).padStart(2, '0')}`;
+    el('bg-cal-title').textContent = `${MONTH_NAMES_DA[calMonth]} ${calYear}`;
+
+    let events = [];
+    try {
+      events = await api('calendar/' + ym);
+    } catch(e) {
+      events = [];
+    }
+
+    // Byg events-map: day → [topics]
+    const dayMap = {};
+    events.forEach(t => {
+      if (!t.scheduled_for) return;
+      const d = new Date(t.scheduled_for.replace(' ', 'T'));
+      const day = d.getDate();
+      if (!dayMap[day]) dayMap[day] = [];
+      dayMap[day].push(t);
+    });
+
+    // Også topics fra allTopics (lokal state) for evt. nytilføjede
+    allTopics.forEach(t => {
+      if (!t.scheduled_for) return;
+      const d = new Date(t.scheduled_for.replace('T', ' ').replace('Z', ''));
+      if (d.getFullYear() === calYear && d.getMonth() === calMonth) {
+        const day = d.getDate();
+        if (!dayMap[day]) dayMap[day] = [];
+        // undgå dubletter
+        if (!dayMap[day].find(x => x.id === t.id)) dayMap[day].push(t);
+      }
+    });
+
+    // Find 1. dag i måneden og antal dage
+    const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    // Konverter til mandag-baseret (0=Mon … 6=Sun)
+    const startOffset = (firstDay + 6) % 7;
+
+    const today = new Date();
+    const isThisMonth = today.getFullYear() === calYear && today.getMonth() === calMonth;
+
+    // Fjern alle eksisterende dage (behold day-name headers)
+    const grid = el('bg-cal-grid');
+    qsa('.bg-cal-cell', grid).forEach(c => c.remove());
+
+    // Tomme celler for offset
+    for (let i = 0; i < startOffset; i++) {
+      grid.insertAdjacentHTML('beforeend',
+        '<div class="bg-cal-cell other-month"><div class="bg-cal-num"></div></div>'
+      );
+    }
+
+    // Dage i måneden
+    for (let d = 1; d <= daysInMonth; d++) {
+      const isToday = isThisMonth && d === today.getDate();
+      const eventsHtml = (dayMap[d] || []).map(t =>
+        `<div class="bg-cal-event ${t.status || ''}" title="${escAttr(t.title)}" data-id="${t.id}">${escHtml(t.title.substring(0, 30))}${t.title.length > 30 ? '…' : ''}</div>`
+      ).join('');
+
+      grid.insertAdjacentHTML('beforeend',
+        `<div class="bg-cal-cell${isToday ? ' today' : ''}">
+          <div class="bg-cal-num">${d}</div>
+          ${eventsHtml}
+        </div>`
+      );
+    }
+
+    // Click på event → skift til kø-tab og scroll til emnet
+    qsa('.bg-cal-event', grid).forEach(ev => {
+      ev.addEventListener('click', () => {
+        const id = +ev.dataset.id;
+        const queueTab = qs('[data-tab="queue"]');
+        if (queueTab) queueTab.click();
+        setTimeout(() => {
+          const row = qs(`tr[data-id="${id}"]`);
+          if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      });
+    });
+  }
+
+  el('bg-cal-prev').addEventListener('click', () => {
+    calMonth--;
+    if (calMonth < 0) { calMonth = 11; calYear--; }
+    renderCalendar();
+  });
+  el('bg-cal-next').addEventListener('click', () => {
+    calMonth++;
+    if (calMonth > 11) { calMonth = 0; calYear++; }
+    renderCalendar();
+  });
+  el('bg-cal-today').addEventListener('click', () => {
+    calYear  = new Date().getFullYear();
+    calMonth = new Date().getMonth();
+    renderCalendar();
+  });
+
   // ── Settings tab ──────────────────────────────────────────────────────────────
   async function loadSettings() {
-    // Kategori-liste
     try {
-      const cats   = await api('categories');
-      const sel    = el('bg-default-cat');
-      const saved  = el('bg-default-cat').dataset.saved || '';
+      const cats  = await api('categories');
+      const sel   = el('bg-default-cat');
+      const saved = sel.dataset.saved || '';
       sel.innerHTML = '<option value="">— Ingen kategori —</option>' +
         cats.map(c => `<option value="${c.id}"${c.id == saved ? ' selected' : ''}>${escHtml(c.name)}</option>`).join('');
     } catch(e) {}
 
-    // Brand voice
     const bv = el('bg-brand-voice');
-    if (!bv.value) {
-      // Hent fra lokalt storage hvis gemt
-      bv.value = localStorage.getItem('rzpa_brand_voice') || '';
-    }
+    if (!bv.value) bv.value = localStorage.getItem('rzpa_brand_voice') || '';
 
-    // Media i settings
     await loadMedia();
     renderPickerGrid('bg-settings-media-grid', null);
   }
@@ -460,20 +585,19 @@
   el('bg-save-brand-voice').addEventListener('click', async () => {
     const voice = el('bg-brand-voice').value.trim();
     localStorage.setItem('rzpa_brand_voice', voice);
-
-    // Gem via WP options REST (kræver en lille PHP-endpoint — sender til rzpa_settings)
     try {
-      await fetch(ajaxurl, {
+      const res = await fetch(ajaxurl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          action: 'rzpa_save_blog_gen_setting',
-          key:    'blog_gen_brand_voice',
-          value:  voice,
-          nonce:  NONCE,
+          action:    'rzpa_save_blog_gen_setting',
+          key:       'blog_gen_brand_voice',
+          value:     voice,
+          _wpnonce:  NONCE,
         }),
       });
-      toast('✓ Brand voice gemt');
+      const data = await res.json();
+      toast(data.success ? '✓ Brand voice gemt' : '⚠ Gem fejlede', data.success ? 'ok' : 'err');
     } catch(e) {
       toast('✓ Gemt lokalt (serverfejl: ' + e.message + ')');
     }
@@ -485,10 +609,10 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          action: 'rzpa_save_blog_gen_setting',
-          key:    'blog_gen_category',
-          value:  el('bg-default-cat').value,
-          nonce:  NONCE,
+          action:   'rzpa_save_blog_gen_setting',
+          key:      'blog_gen_category',
+          value:    el('bg-default-cat').value,
+          _wpnonce: NONCE,
         }),
       });
       toast('✓ Indstillinger gemt');
@@ -502,7 +626,7 @@
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
   function escAttr(s) {
-    return String(s || '').replace(/"/g,'&quot;');
+    return String(s || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────────

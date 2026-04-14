@@ -5,14 +5,18 @@ class RZPA_Scheduler {
 
     public static function init() {
         add_filter( 'cron_schedules', [ __CLASS__, 'add_schedules' ] );
-        add_action( 'rzpa_daily_seo_sync',    [ __CLASS__, 'run_seo_sync' ] );
-        add_action( 'rzpa_sixhour_ads_sync',  [ __CLASS__, 'run_ads_sync' ] );
+        add_action( 'rzpa_daily_seo_sync',       [ __CLASS__, 'run_seo_sync' ] );
+        add_action( 'rzpa_sixhour_ads_sync',     [ __CLASS__, 'run_ads_sync' ] );
+        add_action( 'rzpa_blog_calendar_tick',   [ __CLASS__, 'run_blog_calendar' ] );
 
         if ( ! wp_next_scheduled( 'rzpa_daily_seo_sync' ) ) {
             wp_schedule_event( strtotime( 'today 06:00:00' ), 'daily', 'rzpa_daily_seo_sync' );
         }
         if ( ! wp_next_scheduled( 'rzpa_sixhour_ads_sync' ) ) {
             wp_schedule_event( time(), 'every_6_hours', 'rzpa_sixhour_ads_sync' );
+        }
+        if ( ! wp_next_scheduled( 'rzpa_blog_calendar_tick' ) ) {
+            wp_schedule_event( time(), 'hourly', 'rzpa_blog_calendar_tick' );
         }
     }
 
@@ -60,8 +64,39 @@ class RZPA_Scheduler {
         }
     }
 
+    /**
+     * Hourly Blog Calendar tick
+     *
+     * 1. Nulstil stuck-generating topics (ældre end 30 min)
+     * 2. Dispatch planlagte topics der er klar til generering
+     */
+    public static function run_blog_calendar(): void {
+        if ( ! class_exists( 'RZPA_Blog_Gen_DB' ) ) return;
+
+        $opts = get_option( 'rzpa_settings', [] );
+        if ( empty( $opts['openai_api_key'] ) ) return;
+
+        // 1. Ryd stuck-generating topics
+        RZPA_Blog_Gen_DB::reset_stuck_generating();
+
+        // 2. Hent planlagte topics der er klar (scheduled_for <= now)
+        $due = RZPA_Blog_Gen_DB::get_due_scheduled();
+        foreach ( $due as $topic ) {
+            $id = (int) $topic->id;
+            RZPA_Blog_Gen_DB::update_status( $id, 'generating', [
+                'error_msg'   => null,
+                'retry_count' => 0,
+            ] );
+            wp_schedule_single_event( time() + 2, 'rzpa_bg_generate_article', [ $id ] );
+        }
+        if ( ! empty( $due ) ) {
+            spawn_cron();
+        }
+    }
+
     public static function clear_crons() {
         wp_clear_scheduled_hook( 'rzpa_daily_seo_sync' );
         wp_clear_scheduled_hook( 'rzpa_sixhour_ads_sync' );
+        wp_clear_scheduled_hook( 'rzpa_blog_calendar_tick' );
     }
 }
