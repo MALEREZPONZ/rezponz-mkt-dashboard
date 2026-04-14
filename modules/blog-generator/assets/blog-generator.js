@@ -422,7 +422,14 @@
   function renderPickerGrid(containerId, selectedId) {
     const grid = el(containerId);
     if (!mediaImages.length) {
-      grid.innerHTML = '<p style="color:var(--muted);font-size:13px">Ingen billeder i mediebiblioteket.</p>';
+      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--muted);font-size:13px">
+        <div style="font-size:32px;margin-bottom:8px">📂</div>
+        <div>Ingen billeder i mediebiblioteket.</div>
+        <a href="${typeof ajaxurl !== 'undefined' ? ajaxurl.replace('admin-ajax.php','upload.php') : '/wp-admin/upload.php'}"
+           target="_blank" style="color:var(--neon);font-size:12px;margin-top:6px;display:inline-block">
+          → Upload billeder i mediebiblioteket
+        </a>
+      </div>`;
       return;
     }
     grid.innerHTML = mediaImages.map(m =>
@@ -445,22 +452,35 @@
     pickerSel = currentId || null;
     const wrap = el('bg-image-picker-wrap');
     wrap.style.display = 'flex';
+
+    // Vis loading-spinner mens billeder hentes
+    el('bg-picker-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px"><div class="bg-spinner" style="width:24px;height:24px;border-width:3px"></div></div>';
+
     loadMedia().then(() => renderPickerGrid('bg-picker-grid', currentId));
   }
 
-  el('bg-image-picker-close').addEventListener('click', () => {
+  function closeImagePicker() {
     el('bg-image-picker-wrap').style.display = 'none';
-    pickerCb = null;
-  });
+    pickerCb  = null;
+    pickerSel = null;
+  }
+
+  el('bg-image-picker-close').addEventListener('click', closeImagePicker);
+
   el('bg-image-picker-confirm').addEventListener('click', () => {
-    el('bg-image-picker-wrap').style.display = 'none';
-    if (pickerCb) pickerCb(pickerSel);
-    pickerCb = null;
+    const cb = pickerCb;
+    closeImagePicker();
+    if (cb) cb(pickerSel);
   });
   el('bg-image-picker-clear').addEventListener('click', () => {
-    el('bg-image-picker-wrap').style.display = 'none';
-    if (pickerCb) pickerCb(null);
-    pickerCb = null;
+    const cb = pickerCb;
+    closeImagePicker();
+    if (cb) cb(null);
+  });
+
+  // Luk ved klik på baggrunden (udenfor modal-boksen)
+  el('bg-image-picker-wrap').addEventListener('click', e => {
+    if (e.target === el('bg-image-picker-wrap')) closeImagePicker();
   });
 
   // ── Calendar ──────────────────────────────────────────────────────────────────

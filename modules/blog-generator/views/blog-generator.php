@@ -347,7 +347,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter:invert(
 </div>
 
 <!-- Billede-picker modal (inline i tabel-rækker) -->
-<div id="bg-image-picker-wrap" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center">
+<div id="bg-image-picker-wrap" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.8);align-items:center;justify-content:center">
   <div style="background:#1a1a1a;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:24px;width:580px;max-width:95vw;max-height:80vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h3 style="margin:0;color:#fff;font-size:16px">Vælg billede</h3>
