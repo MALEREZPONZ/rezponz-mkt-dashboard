@@ -39,10 +39,14 @@ class RZPZ_CRM_Auth {
         add_action( 'after_setup_theme', [ __CLASS__, 'hide_admin_bar' ] );
         add_action( 'admin_menu',        [ __CLASS__, 'restrict_admin_menu' ], 999 );
 
-        // AJAX handlers (login flow)
+        // AJAX handlers (login flow) — registrér for både logget-ind og ikke-logget-ind brugere
         add_action( 'wp_ajax_nopriv_rzcrm_login_step1', [ __CLASS__, 'ajax_login_step1' ] );
+        add_action( 'wp_ajax_rzcrm_login_step1',        [ __CLASS__, 'ajax_login_step1' ] );
         add_action( 'wp_ajax_nopriv_rzcrm_login_step2', [ __CLASS__, 'ajax_login_step2' ] );
+        add_action( 'wp_ajax_rzcrm_login_step2',        [ __CLASS__, 'ajax_login_step2' ] );
+        add_action( 'wp_ajax_nopriv_rzcrm_mfa_setup',   [ __CLASS__, 'ajax_mfa_setup'   ] );
         add_action( 'wp_ajax_rzcrm_mfa_setup',          [ __CLASS__, 'ajax_mfa_setup'   ] );
+        add_action( 'wp_ajax_nopriv_rzcrm_mfa_confirm', [ __CLASS__, 'ajax_mfa_confirm' ] );
         add_action( 'wp_ajax_rzcrm_mfa_confirm',        [ __CLASS__, 'ajax_mfa_confirm' ] );
         add_action( 'wp_ajax_rzcrm_logout',             [ __CLASS__, 'ajax_logout'      ] );
 
