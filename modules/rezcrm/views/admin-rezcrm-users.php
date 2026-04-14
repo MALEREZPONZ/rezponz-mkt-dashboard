@@ -86,7 +86,7 @@
 </div>
 
 <!-- Create/Edit User Modal -->
-<div class="rzpa-modal-overlay" id="crm-user-modal" hidden>
+<div class="rzpa-modal-overlay" id="crm-user-modal" style="display:none">
     <div class="rzpa-modal" style="max-width:480px">
         <div class="rzpa-modal-header">
             <h3 id="crm-user-modal-title">Opret ny bruger</h3>
@@ -123,7 +123,7 @@
 </div>
 
 <!-- Confirm Toggle Active Modal -->
-<div class="rzpa-modal-overlay" id="crm-toggle-active-modal" hidden>
+<div class="rzpa-modal-overlay" id="crm-toggle-active-modal" style="display:none">
     <div class="rzpa-modal" style="max-width:400px">
         <div class="rzpa-modal-header">
             <h3 id="toggle-active-title">Deaktivér bruger?</h3>
@@ -141,7 +141,7 @@
 </div>
 
 <!-- Confirm Reset MFA Modal -->
-<div class="rzpa-modal-overlay" id="crm-reset-mfa-modal" hidden>
+<div class="rzpa-modal-overlay" id="crm-reset-mfa-modal" style="display:none">
     <div class="rzpa-modal" style="max-width:400px">
         <div class="rzpa-modal-header">
             <h3>Nulstil 2FA?</h3>
@@ -266,8 +266,8 @@ document.querySelectorAll('.rzpa-tab').forEach(t => {
 });
 
 // ── Modal helpers ─────────────────────────────────────────────────────────────
-function openModal(id)  { const m = document.getElementById(id); if (m) m.hidden = false; }
-function closeModal(id) { const m = document.getElementById(id); if (m) m.hidden = true; }
+function openModal(id)  { const m = document.getElementById(id); if (m) m.style.display = 'flex'; }
+function closeModal(id) { const m = document.getElementById(id); if (m) m.style.display = 'none'; }
 document.querySelectorAll('[data-modal]').forEach(b => {
     b.addEventListener('click', () => closeModal(b.dataset.modal));
 });
