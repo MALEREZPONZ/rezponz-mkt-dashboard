@@ -1,4 +1,9 @@
 <?php if ( ! defined( 'ABSPATH' ) ) exit; ?>
+<script>
+window.RZPZ_CRM = window.RZPZ_CRM || {};
+window.RZPZ_CRM.apiBase = <?php echo wp_json_encode( rest_url( 'rzpa/v1/' ) ); ?>;
+window.RZPZ_CRM.nonce   = <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>;
+</script>
 <div class="rzpa-page" id="rzcrm-users-page">
 
     <div class="rzpa-page-header">
