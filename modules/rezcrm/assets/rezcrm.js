@@ -385,7 +385,20 @@
       <div><strong>Kilde:</strong> ${escHtml(sourceLabel(a.source))}</div>
       <div><strong>Oprettet:</strong> ${fmtDate(a.created_at)}</div>
       ${a.cv_url ? `<div><strong>CV:</strong> <a href="${escHtml(a.cv_url)}" target="_blank" style="color:var(--crm-neon)">Åbn CV</a></div>` : ''}
+      ${a.aon_invitation_url ? `<div><strong>AON Test:</strong>
+        <a href="${escHtml(a.aon_invitation_url)}" target="_blank" style="color:var(--crm-neon)">Åbn testlink</a>
+        <span style="margin-left:6px;font-size:11px;padding:2px 8px;border-radius:10px;background:${a.aon_status==='completed' ? 'rgba(34,197,94,.15)' : 'rgba(245,158,11,.15)'};color:${a.aon_status==='completed' ? '#4ade80' : '#fbbf24'}">${a.aon_status==='completed' ? '✓ Gennemført' : '⏳ Afventer'}</span>
+      </div>` : ''}
+      ${a.aon_result_json && a.aon_status === 'completed' ? `<div><strong>AON Resultat:</strong> <button id="crm-aon-result-btn" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#ccc;border-radius:6px;padding:2px 10px;font-size:11px;cursor:pointer">Se data</button></div>` : ''}
     `;
+
+    // AON resultat-knap event listener
+    el('crm-aon-result-btn')?.addEventListener('click', () => {
+      try {
+        const data = JSON.parse(a.aon_result_json || '{}');
+        alert(JSON.stringify(data, null, 2)); // simpel visning — kan udbygges
+      } catch(e) {}
+    });
 
     // Stage buttons
     const stageContainer = el('crm-stage-btns');

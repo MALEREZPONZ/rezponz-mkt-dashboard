@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      3.5.10
+ * Version:      3.5.11
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '3.5.10' );
+define( 'RZPA_VERSION',     '3.5.11' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -45,6 +45,7 @@ require_once RZPA_DIR . 'modules/rekruttering/class-rekruttering.php';
 // ── RezCRM Module ────────────────────────────────────────────────────────────
 require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm-db.php';
 require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm-forms-db.php';
+require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm-aon.php';
 require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm.php';
 require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm-forms.php';
 require_once RZPA_DIR . 'modules/rezcrm/class-rezcrm-auth.php';

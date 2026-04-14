@@ -353,6 +353,10 @@ class RZPA_Admin {
             'google_ads_client_id', 'google_ads_client_secret',
             // SMTP
             'smtp_host', 'smtp_username', 'smtp_password', 'smtp_from_email', 'smtp_from_name',
+            // Rubix HR integration
+            'rubix_webhook_url', 'rubix_api_token',
+            // AON Talent Assessment integration
+            'aon_api_key', 'aon_base_url', 'aon_project_id', 'aon_webhook_secret',
         ];
 
         // Textarea-felter der kræver sanitize_textarea_field

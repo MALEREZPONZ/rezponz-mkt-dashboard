@@ -108,6 +108,9 @@ class RZPZ_RezCRM {
 
             // Applicant status (offentlig — token-beskyttet)
             [ 'GET',    'crm/status/(?P<token>[a-zA-Z0-9]+)', 'api_applicant_status', false ],
+
+            // AON Talent Assessment webhook (offentlig — AON kalder dette endpoint)
+            [ 'POST',   'crm/aon/webhook',                    'api_aon_webhook',      false ],
         ];
 
         foreach ( $routes as $r ) {
@@ -172,7 +175,15 @@ class RZPZ_RezCRM {
         $app_id = RZPZ_CRM_DB::insert_application( $applicant_id, $position_id, $data['source'] ?? 'other' );
         if ( ! $app_id ) return new WP_REST_Response( [ 'message' => 'Kunne ikke oprette ansøgning' ], 500 );
 
-        // Send bekræftelses-email automatisk
+        // 1. AON Talent Assessment — opret invitation FØRST (så {{aon_test_link}} er klar til email)
+        if ( RZPZ_CRM_AON::is_configured() ) {
+            $app_obj = RZPZ_CRM_DB::get_application( $app_id );
+            if ( $app_obj ) {
+                RZPZ_CRM_AON::create_invitation( $app_obj, $app_id );
+            }
+        }
+
+        // 2. Send bekræftelses-email EFTER AON-invitation (så merge-tag {{aon_test_link}} er udfyldt)
         self::send_stage_email( $app_id, 'stage_ny' );
 
         return new WP_REST_Response( [ 'id' => $app_id ], 201 );
@@ -334,12 +345,22 @@ class RZPZ_RezCRM {
         ], 200 );
     }
 
+    // ── REST: AON Talent Assessment webhook ──────────────────────────────────
+
+    /**
+     * Modtager AON webhook-callbacks.
+     * Endpointet er offentligt — AON autentificerer via X-AON-Signature header.
+     */
+    public static function api_aon_webhook( WP_REST_Request $req ): WP_REST_Response {
+        return RZPZ_CRM_AON::handle_webhook( $req );
+    }
+
     // ── Email helpers ────────────────────────────────────────────────────────
 
     /**
      * Renderer merge-tags i skabelon.
      * Understøttede tags: {{first_name}}, {{last_name}}, {{position_title}},
-     *                     {{status_url}}, {{stage_label}}
+     *                     {{status_url}}, {{stage_label}}, {{aon_test_link}}
      */
     public static function render_template( string $tpl, object $app ): string {
         $stages = RZPZ_CRM_DB::PIPELINE_STAGES;
@@ -351,7 +372,15 @@ class RZPZ_RezCRM {
             '{{position_title}}' => esc_html( $app->position_title ?? '' ),
             '{{stage_label}}'    => esc_html( $stages[ $app->stage ?? '' ] ?? '' ),
             '{{status_url}}'     => esc_url( $status_url ),
+            '{{aon_test_link}}'  => '', // udfyldes nedenfor hvis AON-invitation eksisterer
         ];
+
+        // AON test link — hentes fra ansøgningen (sat af RZPZ_CRM_AON::create_invitation())
+        $aon_url = '';
+        if ( ! empty( $app->aon_invitation_url ) ) {
+            $aon_url = '<a href="' . esc_url( $app->aon_invitation_url ) . '" style="font-weight:bold">Tag din AON-test her &rarr;</a>';
+        }
+        $pairs['{{aon_test_link}}'] = $aon_url;
 
         return str_replace( array_keys( $pairs ), array_values( $pairs ), $tpl );
     }

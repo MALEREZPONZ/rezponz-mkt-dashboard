@@ -443,6 +443,93 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
       </div>
     </div>
 
+      <!-- ══ Rubix HR Integration ═══════════════════════════════════════════ -->
+      <div class="rzpa-card rzpa-settings-section" id="rubix-integration">
+        <h2>🔗 Rubix HR</h2>
+        <p style="font-size:13px;color:#888;margin-bottom:16px;line-height:1.7">
+          Rubix modtager automatisk medarbejderdata fra RezCRM, når en ansøger flyttes til <strong style="color:#ccc">Ansat</strong>-stadiet.<br>
+          Indstil webhook-URL og API-token herunder — formatet aftales med Rubix.
+        </p>
+        <div class="rzpa-settings-grid">
+          <div class="rzpa-field">
+            <label>Rubix Webhook URL</label>
+            <input type="url" name="rubix_webhook_url"
+                   value="<?php echo esc_attr( $opts['rubix_webhook_url'] ?? '' ); ?>"
+                   placeholder="https://app.rubix.io/webhooks/..." />
+            <small style="color:#666;font-size:11px">URL som Rezponz POSTer til, når en ansøger ansættes</small>
+          </div>
+          <div class="rzpa-field">
+            <label>Rubix API Token</label>
+            <input type="password" name="rubix_api_token"
+                   value="<?php echo esc_attr( $opts['rubix_api_token'] ?? '' ); ?>"
+                   placeholder="Bearer-token fra Rubix"
+                   autocomplete="new-password" />
+            <?php if ( ! empty( $opts['rubix_webhook_url'] ) && ! empty( $opts['rubix_api_token'] ) ) : ?>
+              <small style="color:#4ade80;font-size:11px">✅ Rubix er konfigureret — data sendes automatisk ved ansættelse</small>
+            <?php else : ?>
+              <small style="color:#666;font-size:11px">Begge felter skal udfyldes for at aktivere Rubix-integration</small>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ AON Talent Assessment ══════════════════════════════════════════ -->
+      <div class="rzpa-card rzpa-settings-section" id="aon-integration">
+        <h2>🧠 AON Talent Assessment</h2>
+        <p style="font-size:13px;color:#888;margin-bottom:16px;line-height:1.7">
+          Når en kandidat indsender sin ansøgning, oprettes der automatisk en AON-testinvitation.<br>
+          Link til testen indsættes i bekræftelsesmailen via merge-taggen <code style="color:var(--neon)">{{aon_test_link}}</code>.<br>
+          Testresultater tilknyttes ansøgningen automatisk via webhook, når kandidaten gennemfører testen.
+        </p>
+
+        <!-- Webhook URL til AON setup -->
+        <div style="background:rgba(204,255,0,.04);border:1px solid rgba(204,255,0,.12);border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:12px;color:#888;line-height:1.7">
+          <strong style="color:#ccc">AON Webhook URL (indsæt i AON-admin):</strong><br>
+          <code style="background:rgba(255,255,255,.05);color:#CCFF00;padding:4px 10px;border-radius:6px;font-size:11px;display:inline-block;margin-top:6px;word-break:break-all">
+            <?php echo esc_html( rest_url( 'rzpa/v1/crm/aon/webhook' ) ); ?>
+          </code>
+          <br><br>
+          <strong style="color:#ccc">Email merge-tag:</strong> Tilføj <code style="color:var(--neon)">{{aon_test_link}}</code> i din "Tak for din ansøgning"-skabelon under <em>Email &amp; SMS Skabeloner</em> i RezCRM.
+        </div>
+
+        <div class="rzpa-settings-grid">
+          <div class="rzpa-field">
+            <label>AON API Nøgle</label>
+            <input type="password" name="aon_api_key"
+                   value="<?php echo esc_attr( $opts['aon_api_key'] ?? '' ); ?>"
+                   placeholder="Bearer API key fra AON"
+                   autocomplete="new-password" />
+            <?php if ( ! empty( $opts['aon_api_key'] ) ) : ?>
+              <small style="color:#4ade80;font-size:11px">✅ API-nøgle gemt</small>
+            <?php else : ?>
+              <small style="color:#666;font-size:11px">Påkrævet for at aktivere AON-integration</small>
+            <?php endif; ?>
+          </div>
+          <div class="rzpa-field">
+            <label>AON API Base URL</label>
+            <input type="url" name="aon_base_url"
+                   value="<?php echo esc_attr( $opts['aon_base_url'] ?? '' ); ?>"
+                   placeholder="https://api.aon.com/v1" />
+            <small style="color:#666;font-size:11px">Grundadresse til AON API — uden afsluttende skråstreg</small>
+          </div>
+          <div class="rzpa-field">
+            <label>AON Project / Assessment ID</label>
+            <input type="text" name="aon_project_id"
+                   value="<?php echo esc_attr( $opts['aon_project_id'] ?? '' ); ?>"
+                   placeholder="project-id eller assessment-id fra AON" />
+            <small style="color:#666;font-size:11px">Det specifikke assessment/survey kandidater skal tage</small>
+          </div>
+          <div class="rzpa-field">
+            <label>AON Webhook Hemmelighed <span style="color:#555;font-weight:normal">(valgfri signaturvalidering)</span></label>
+            <input type="password" name="aon_webhook_secret"
+                   value="<?php echo esc_attr( $opts['aon_webhook_secret'] ?? '' ); ?>"
+                   placeholder="Shared secret til at validere webhooks"
+                   autocomplete="new-password" />
+            <small style="color:#666;font-size:11px">Sammenholdes med X-AON-Signature header fra AON</small>
+          </div>
+        </div>
+      </div>
+
       <!-- ══ Google Ads ════════════════════════════════════════════════════ -->
       <div class="rzpa-card rzpa-settings-section" id="google-ads">
         <h2>🟦 Google Ads</h2>
