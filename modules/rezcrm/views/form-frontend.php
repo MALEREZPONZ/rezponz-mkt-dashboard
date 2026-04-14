@@ -46,7 +46,7 @@ $form_uid    = 'rzcrm-form-' . $form->id;
   <form class="rzcrm-form" novalidate>
     <div class="rzcrm-steps">
 
-      <?php foreach ( $sections as $step_idx => $section ) :
+      <?php foreach ( array_values( $sections ) as $step_idx => $section ) :
         $step_num = $step_idx + 1;
         $is_first = $step_num === 1;
       ?>
