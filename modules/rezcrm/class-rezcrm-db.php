@@ -258,6 +258,41 @@ class RZPZ_CRM_DB {
         return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}rzpz_crm_positions WHERE id = %d", $id ) ) ?: null;
     }
 
+    public static function get_positions_with_stats(): array {
+        global $wpdb;
+        $p = $wpdb->prefix . 'rzpz_crm_positions';
+        $a = $wpdb->prefix . 'rzpz_crm_applications';
+
+        $rows = $wpdb->get_results(
+            "SELECT pos.*,
+                COUNT(app.id)                                                AS total_applications,
+                SUM(CASE WHEN app.stage = 'ny'            THEN 1 ELSE 0 END) AS count_ny,
+                SUM(CASE WHEN app.stage = 'screening'     THEN 1 ELSE 0 END) AS count_screening,
+                SUM(CASE WHEN app.stage = 'samtale'       THEN 1 ELSE 0 END) AS count_samtale,
+                SUM(CASE WHEN app.stage = 'tilbud'        THEN 1 ELSE 0 END) AS count_tilbud,
+                SUM(CASE WHEN app.stage = 'ansat'         THEN 1 ELSE 0 END) AS count_ansat,
+                SUM(CASE WHEN app.stage = 'job_pabegyndt' THEN 1 ELSE 0 END) AS count_job_pabegyndt,
+                SUM(CASE WHEN app.stage = 'afslag'        THEN 1 ELSE 0 END) AS count_afslag
+            FROM {$p} pos
+            LEFT JOIN {$a} app ON app.position_id = pos.id
+            GROUP BY pos.id
+            ORDER BY pos.status ASC, pos.created_at DESC"
+        ) ?: [];
+
+        foreach ( $rows as $row ) {
+            $row->total_applications  = (int) $row->total_applications;
+            $row->count_ny            = (int) $row->count_ny;
+            $row->count_screening     = (int) $row->count_screening;
+            $row->count_samtale       = (int) $row->count_samtale;
+            $row->count_tilbud        = (int) $row->count_tilbud;
+            $row->count_ansat         = (int) $row->count_ansat;
+            $row->count_job_pabegyndt = (int) $row->count_job_pabegyndt;
+            $row->count_afslag        = (int) $row->count_afslag;
+        }
+
+        return $rows;
+    }
+
     public static function upsert_position( array $data ): int|false {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpz_crm_positions';

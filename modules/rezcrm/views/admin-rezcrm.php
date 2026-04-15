@@ -19,7 +19,7 @@ if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
       </select>
       <input type="search" id="crm-search" class="crm-search" placeholder="Søg ansøger…">
       <button class="crm-btn crm-btn-primary" id="crm-new-app-btn">+ Ny ansøgning</button>
-      <button class="crm-btn crm-btn-ghost" id="crm-positions-btn">Stillinger</button>
+      <button class="crm-btn crm-btn-ghost" id="crm-positions-btn" style="display:none">Stillinger</button>
       <button class="crm-btn crm-btn-ghost" id="crm-templates-btn">Skabeloner</button>
     </div>
   </div>
@@ -49,6 +49,7 @@ if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
     <button class="crm-tab crm-tab-active" data-tab="kanban">🗂 Kanban</button>
     <button class="crm-tab" data-tab="list">📋 Liste</button>
     <button class="crm-tab" data-tab="calendar">📅 Kalender</button>
+    <button class="crm-tab" data-tab="stillinger">💼 Stillinger</button>
   </div>
 
   <!-- ── Kanban Board ─────────────────────────────────────────────────────── -->
@@ -97,6 +98,42 @@ if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
         <div id="crm-cal-detail-list"></div>
       </div>
     </div>
+  </div>
+
+  <!-- ── Stillinger Tab ────────────────────────────────────────────────────── -->
+  <div id="tab-stillinger" class="crm-tab-panel" style="display:none">
+
+    <!-- Positions list view -->
+    <div id="crm-pos-tab-list">
+      <div class="crm-pos-tab-header">
+        <div>
+          <h2 class="crm-pos-tab-title">Stillinger</h2>
+          <p class="crm-pos-tab-sub">Overblik over alle jobopslag og ansøgninger</p>
+        </div>
+        <button class="crm-btn crm-btn-primary" id="crm-pos-tab-new-btn">+ Opret stilling</button>
+      </div>
+      <div class="crm-pos-tab-filters">
+        <button class="crm-pos-filter-btn crm-pos-filter-active" data-pos-status="">Alle</button>
+        <button class="crm-pos-filter-btn" data-pos-status="open">Åbne</button>
+        <button class="crm-pos-filter-btn" data-pos-status="draft">Kladder</button>
+        <button class="crm-pos-filter-btn" data-pos-status="closed">Lukkede</button>
+      </div>
+      <div id="crm-pos-tab-grid"></div>
+    </div>
+
+    <!-- Position detail view (hidden initially) -->
+    <div id="crm-pos-tab-detail" style="display:none">
+      <div class="crm-pos-detail-header">
+        <button class="crm-btn crm-btn-ghost crm-pos-back-btn" id="crm-pos-back-btn">← Alle stillinger</button>
+        <div class="crm-pos-detail-title-wrap" id="crm-pos-detail-title-wrap"></div>
+        <div class="crm-pos-detail-actions" id="crm-pos-detail-actions"></div>
+      </div>
+      <div class="crm-pos-detail-layout">
+        <div class="crm-pos-sidebar" id="crm-pos-sidebar"></div>
+        <div class="crm-pos-candidates" id="crm-pos-candidates"></div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════════════

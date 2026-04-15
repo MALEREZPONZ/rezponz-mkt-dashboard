@@ -133,7 +133,7 @@ class RZPZ_RezCRM {
     // ── REST: Positions ──────────────────────────────────────────────────────
 
     public static function api_positions_list(): WP_REST_Response {
-        return new WP_REST_Response( RZPZ_CRM_DB::get_positions(), 200 );
+        return new WP_REST_Response( RZPZ_CRM_DB::get_positions_with_stats(), 200 );
     }
 
     public static function api_positions_create( WP_REST_Request $req ): WP_REST_Response {

@@ -20,6 +20,9 @@
   let dragCloneEl     = null;
   let dragSourceEl    = null;
   let dragHoverStage  = null;
+  let activePositionId  = null;   // position ID open in detail view
+  let posDetailStage    = '';     // stage filter in position detail
+  let posTabStatusFilter = '';    // status filter in positions tab list
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const el  = id => document.getElementById(id);
@@ -151,6 +154,7 @@
     await Promise.all([loadPositions(), loadApplications(), loadTemplates()]);
     renderKanban();
     renderListView();
+    renderPositionsTab();    // NEW
     loadStats();
     initFilters();
     initTabs();
@@ -158,6 +162,7 @@
     initModals();
     initPositionModal();
     initTemplatesModal();
+    initPositionsTabHandlers();  // NEW
   }
 
   // ── Data loaders ─────────────────────────────────────────────────────────────
@@ -921,6 +926,249 @@
       : '<p style="color:var(--crm-muted);font-size:12px">Ingen beskeder sendt</p>';
   }
 
+  // ── Stillinger Tab ─────────────────────────────────────────────────────────
+
+  function renderPositionsTab() {
+    const grid = el('crm-pos-tab-grid');
+    if (!grid) return;
+
+    const filtered = posTabStatusFilter
+        ? allPositions.filter(p => p.status === posTabStatusFilter)
+        : allPositions;
+
+    if (!filtered.length) {
+        grid.innerHTML = `<div class="crm-pos-empty">
+            <span style="font-size:40px">💼</span>
+            <p>Ingen stillinger fundet. Opret din første stilling.</p>
+        </div>`;
+        return;
+    }
+
+    grid.innerHTML = filtered.map(p => {
+        const total = p.total_applications || 0;
+        const ny    = p.count_ny || 0;
+
+        const stagesBar = [
+            { key: 'ny',            label: 'Ny',          count: p.count_ny            || 0, color: 'var(--crm-blue)' },
+            { key: 'screening',     label: 'Screening',   count: p.count_screening     || 0, color: 'var(--crm-orange)' },
+            { key: 'samtale',       label: 'Samtale',     count: p.count_samtale       || 0, color: '#a78bfa' },
+            { key: 'tilbud',        label: 'Tilbud',      count: p.count_tilbud        || 0, color: 'var(--crm-neon)' },
+            { key: 'ansat',         label: 'Ansat',       count: p.count_ansat         || 0, color: 'var(--crm-success)' },
+            { key: 'job_pabegyndt', label: 'Påbegyndt',   count: p.count_job_pabegyndt || 0, color: '#34d399' },
+            { key: 'afslag',        label: 'Afslag',      count: p.count_afslag        || 0, color: 'var(--crm-danger)' },
+        ].filter(s => s.count > 0);
+
+        const stagePills = stagesBar.map(s =>
+            `<span class="crm-pos-stage-pill" style="background:${s.color}18;color:${s.color};border:1px solid ${s.color}40">${s.label} ${s.count}</span>`
+        ).join('');
+
+        const statusColor = { open: 'var(--crm-success)', draft: 'var(--crm-orange)', closed: 'var(--crm-muted)' }[p.status] || 'var(--crm-muted)';
+        const statusLabel = { open: '● Aktiv', draft: '◐ Kladde', closed: '○ Lukket' }[p.status] || p.status;
+
+        return `<div class="crm-pos-card" data-pos-id="${p.id}">
+            <div class="crm-pos-card-header">
+                <div class="crm-pos-card-info">
+                    <div class="crm-pos-card-title">${escHtml(p.title)}</div>
+                    <div class="crm-pos-card-meta">
+                        ${p.department ? escHtml(p.department) : ''}
+                        ${p.location ? '<span class="crm-pos-sep">·</span>' + escHtml(p.location) : ''}
+                    </div>
+                </div>
+                <div class="crm-pos-card-status" style="color:${statusColor}">${statusLabel}</div>
+            </div>
+            <div class="crm-pos-card-stats">
+                <div class="crm-pos-stat">
+                    <span class="crm-pos-stat-val">${total}</span>
+                    <span class="crm-pos-stat-label">Ansøgninger</span>
+                </div>
+                <div class="crm-pos-stat">
+                    <span class="crm-pos-stat-val" style="color:var(--crm-blue)">${ny}</span>
+                    <span class="crm-pos-stat-label">Nye</span>
+                </div>
+                <div class="crm-pos-stat crm-pos-stat-pipeline">
+                    ${stagePills || '<span style="color:var(--crm-muted);font-size:11px">Ingen ansøgninger endnu</span>'}
+                </div>
+            </div>
+            <div class="crm-pos-card-footer">
+                <span class="crm-pos-card-date">Oprettet ${fmtDate(p.created_at)}</span>
+                <div class="crm-pos-card-btns">
+                    ${p.source_url ? `<a href="${escHtml(p.source_url)}" target="_blank" class="crm-btn crm-btn-ghost crm-btn-xs">🔗 Opslag</a>` : ''}
+                    <button class="crm-btn crm-btn-ghost crm-btn-xs" data-pos-edit="${p.id}">✏ Rediger</button>
+                    <button class="crm-btn crm-btn-primary crm-btn-xs" data-pos-open="${p.id}">Se kandidater →</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    // Bind click handlers
+    qsa('[data-pos-open]', grid).forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            openPositionDetail(+btn.dataset.posOpen);
+        });
+    });
+    qsa('[data-pos-edit]', grid).forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            editPosition(+btn.dataset.posEdit);
+            openModal('crm-positions-modal');
+        });
+    });
+    // Click card itself → open detail
+    qsa('.crm-pos-card', grid).forEach(card => {
+        card.addEventListener('click', e => {
+            if (e.target.closest('[data-pos-edit]') || e.target.closest('[data-pos-open]') || e.target.closest('a')) return;
+            openPositionDetail(+card.dataset.posId);
+        });
+    });
+  }
+
+  function initPositionsTabHandlers() {
+    // New position button in tab
+    el('crm-pos-tab-new-btn')?.addEventListener('click', () => {
+        editingPosId = null;
+        el('crm-pos-form-title').textContent = 'Ny stilling';
+        ['pos-title','pos-dept','pos-location','pos-url'].forEach(id => { el(id).value = ''; });
+        el('pos-desc').value   = '';
+        el('pos-status').value = 'open';
+        el('crm-position-form').style.display = '';
+        openModal('crm-positions-modal');
+    });
+
+    // Back button
+    el('crm-pos-back-btn')?.addEventListener('click', backToPositionsList);
+
+    // Status filter buttons
+    qsa('[data-pos-status]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            posTabStatusFilter = btn.dataset.posStatus;
+            qsa('[data-pos-status]').forEach(b => b.classList.toggle('crm-pos-filter-active', b === btn));
+            renderPositionsTab();
+        });
+    });
+  }
+
+  function openPositionDetail(posId) {
+    activePositionId = posId;
+    posDetailStage   = '';
+    el('crm-pos-tab-list').style.display   = 'none';
+    el('crm-pos-tab-detail').style.display = '';
+    renderPositionDetailView();
+  }
+
+  function backToPositionsList() {
+    activePositionId = null;
+    el('crm-pos-tab-list').style.display   = '';
+    el('crm-pos-tab-detail').style.display = 'none';
+  }
+
+  function renderPositionDetailView() {
+    const pos = allPositions.find(p => p.id === activePositionId);
+    if (!pos) return;
+
+    // Header
+    const statusColor = { open: 'var(--crm-success)', draft: 'var(--crm-orange)', closed: 'var(--crm-muted)' }[pos.status] || 'var(--crm-muted)';
+    el('crm-pos-detail-title-wrap').innerHTML = `
+        <div class="crm-pos-detail-name">${escHtml(pos.title)}</div>
+        <div class="crm-pos-detail-sub">
+            ${pos.department ? escHtml(pos.department) : ''}
+            ${pos.location ? ' · ' + escHtml(pos.location) : ''}
+            <span style="margin-left:8px;color:${statusColor}">${pos.status === 'open' ? '● Aktiv' : pos.status === 'draft' ? '◐ Kladde' : '○ Lukket'}</span>
+        </div>`;
+
+    el('crm-pos-detail-actions').innerHTML = `
+        ${pos.source_url ? `<a href="${escHtml(pos.source_url)}" target="_blank" class="crm-btn crm-btn-ghost crm-btn-sm">🔗 Se jobopslag</a>` : ''}
+        <button class="crm-btn crm-btn-ghost crm-btn-sm" id="crm-pos-edit-from-detail">✏ Rediger stilling</button>`;
+
+    el('crm-pos-edit-from-detail')?.addEventListener('click', () => {
+        editPosition(activePositionId);
+        openModal('crm-positions-modal');
+    });
+
+    // Get apps for this position
+    const posApps = allApplications.filter(a => a.position_id === activePositionId);
+
+    // Stage counts for sidebar
+    const stages = [
+        { key: '',              label: 'Alle',        count: posApps.length },
+        { key: 'ny',            label: 'Nye',         count: posApps.filter(a => a.stage === 'ny').length },
+        { key: 'screening',     label: 'Screening',   count: posApps.filter(a => a.stage === 'screening').length },
+        { key: 'samtale',       label: 'Samtale',     count: posApps.filter(a => a.stage === 'samtale').length },
+        { key: 'tilbud',        label: 'Tilbud',      count: posApps.filter(a => a.stage === 'tilbud').length },
+        { key: 'ansat',         label: 'Ansat',       count: posApps.filter(a => a.stage === 'ansat').length },
+        { key: 'job_pabegyndt', label: 'Job påbegyndt', count: posApps.filter(a => a.stage === 'job_pabegyndt').length },
+        { key: 'afslag',        label: 'Afslag',      count: posApps.filter(a => a.stage === 'afslag').length },
+    ];
+
+    // Sidebar
+    el('crm-pos-sidebar').innerHTML = `
+        <div class="crm-pos-sidebar-section">
+            <div class="crm-pos-sidebar-heading">Kandidater</div>
+            ${stages.map(s => `
+                <button class="crm-pos-sidebar-btn${posDetailStage === s.key ? ' active' : ''}" data-detail-stage="${s.key}">
+                    <span>${escHtml(s.label)}</span>
+                    <span class="crm-pos-sidebar-count">${s.count}</span>
+                </button>`).join('')}
+        </div>`;
+
+    qsa('[data-detail-stage]', el('crm-pos-sidebar')).forEach(btn => {
+        btn.addEventListener('click', () => {
+            posDetailStage = btn.dataset.detailStage;
+            renderPositionDetailView();
+        });
+    });
+
+    // Filter apps
+    const visibleApps = posDetailStage
+        ? posApps.filter(a => a.stage === posDetailStage)
+        : posApps;
+
+    // Candidates list
+    if (!visibleApps.length) {
+        el('crm-pos-candidates').innerHTML = `<div class="crm-pos-empty crm-pos-cand-empty">
+            <span style="font-size:32px">🔍</span>
+            <p>${posDetailStage ? 'Ingen kandidater i denne fase' : 'Ingen ansøgninger til denne stilling endnu'}</p>
+        </div>`;
+        return;
+    }
+
+    el('crm-pos-candidates').innerHTML = `
+        <div class="crm-pos-cand-toolbar">
+            <span class="crm-pos-cand-count">${visibleApps.length} kandidat${visibleApps.length !== 1 ? 'er' : ''}</span>
+        </div>
+        <div class="crm-pos-cand-list">
+            ${visibleApps.map(a => {
+                const initials = ((a.first_name || '?')[0] + (a.last_name || '?')[0]).toUpperCase();
+                const avatarBg = ['#5b8dee','#ff9800','#a78bfa','#34d399','#f472b6','#CCFF00'][a.id % 6];
+                const avatarHtml = a.photo_url
+                    ? `<img src="${escHtml(a.photo_url)}" class="crm-cand-avatar crm-cand-avatar-img" alt="">`
+                    : `<div class="crm-cand-avatar" style="background:${avatarBg}">${escHtml(initials)}</div>`;
+
+                return `<div class="crm-cand-row" data-app-id="${a.id}">
+                    ${avatarHtml}
+                    <div class="crm-cand-info">
+                        <div class="crm-cand-name">${escHtml(a.first_name)} ${escHtml(a.last_name)}</div>
+                        <div class="crm-cand-email">${escHtml(a.email || '')}</div>
+                    </div>
+                    <div class="crm-cand-meta">
+                        ${a.availability ? `<span class="crm-cand-avail">📅 ${escHtml(a.availability)}</span>` : ''}
+                        ${a.phone ? `<span class="crm-cand-phone">📞 ${escHtml(a.phone)}</span>` : ''}
+                    </div>
+                    <div class="crm-cand-stage">${stagePill(a.stage)}</div>
+                    <div class="crm-cand-rating">${starsHtml(a.rating)}</div>
+                    <div class="crm-cand-actions">
+                        <button class="crm-btn crm-btn-ghost crm-btn-xs crm-cand-open-btn" data-app-id="${a.id}">Åbn →</button>
+                    </div>
+                </div>`;
+            }).join('')}
+        </div>`;
+
+    // Bind open buttons
+    qsa('[data-app-id]', el('crm-pos-candidates')).forEach(el2 => {
+        el2.addEventListener('click', () => openAppDetail(+el2.dataset.appId));
+    });
+  }
+
   // ── Positions modal ─────────────────────────────────────────────────────────
   function initPositionModal() {
     el('crm-positions-btn').addEventListener('click', () => {
@@ -1003,6 +1251,7 @@
       el('crm-position-form').style.display = 'none';
       await loadPositions();
       renderPositionsList();
+      renderPositionsTab();
     } catch(e) {
       toast('Fejl: ' + e.message, 'err');
     } finally {
