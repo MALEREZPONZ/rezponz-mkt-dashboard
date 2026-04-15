@@ -16,9 +16,10 @@ $trust_center_url = 'https://app.complycloud.com/public/trust-center?id=' . esc_
 $freq_labels  = [ 'hourly' => 'Hver time', 'twicedaily' => '2x dagligt', 'daily' => 'Dagligt', 'weekly' => 'Ugentligt' ];
 
 // Flash messages
-$saved   = isset( $_GET['saved'] );
-$reset   = isset( $_GET['reset'] );
-$check   = $_GET['check'] ?? '';
+$saved    = isset( $_GET['saved'] );
+$reset    = isset( $_GET['reset'] );
+$check    = $_GET['check'] ?? '';
+$test_to  = isset( $_GET['test_to'] ) ? rawurldecode( $_GET['test_to'] ) : '';
 ?>
 <div class="wrap rzpz-cc-wrap">
 
@@ -95,8 +96,15 @@ $check   = $_GET['check'] ?? '';
       <h1>🔒 ComplyCloud Monitor</h1>
       <p>Automatisk overvågning af dokumentopdateringer i Rezponz' Trust Center</p>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <a href="<?= esc_url( $trust_center_url ) ?>" target="_blank" class="cc-btn-ghost">↗ Åbn Trust Center</a>
+      <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" style="display:inline">
+        <?php wp_nonce_field( 'rzpz_cc_test_email' ) ?>
+        <input type="hidden" name="action" value="rzpz_cc_test_email">
+        <button type="submit" class="cc-btn-ghost" style="color:#0073aa;border-color:#0073aa;">
+          📧 Send testmail
+        </button>
+      </form>
       <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" style="display:inline">
         <?php wp_nonce_field( 'rzpz_cc_check_now' ) ?>
         <input type="hidden" name="action" value="rzpz_cc_check_now">
@@ -118,6 +126,12 @@ $check   = $_GET['check'] ?? '';
     <div class="cc-notice cc-notice-success">✓ Tjek gennemført — ingen ændringer fundet.</div>
   <?php elseif ( $check === 'check_error' ) : ?>
     <div class="cc-notice cc-notice-error">✗ Tjek fejlede. Se loggen nedenfor.</div>
+  <?php elseif ( $check === 'test_sent' ) : ?>
+    <div class="cc-notice cc-notice-success">
+      📧 Testmail sendt til <strong><?= esc_html( $test_to ) ?></strong> — tjek din indbakke (evt. spam).
+    </div>
+  <?php elseif ( $check === 'test_failed' ) : ?>
+    <div class="cc-notice cc-notice-error">✗ Testmail kunne ikke sendes. Tjek SMTP-indstillinger under Indstillinger.</div>
   <?php endif; ?>
 
   <div class="cc-grid">
