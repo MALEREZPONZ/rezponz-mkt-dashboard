@@ -596,11 +596,15 @@
 }
 
 .rz-esg-track-kpi__label {
-    font-size: .7rem;
+    font-size: .65rem;
     color: var(--esg-muted-light);
     text-transform: uppercase;
-    letter-spacing: .07em;
+    letter-spacing: .05em;
     font-weight: 600;
+    word-break: break-word;
+    hyphens: auto;
+    overflow-wrap: break-word;
+    line-height: 1.35;
 }
 
 .rz-esg-track-card__practice {
