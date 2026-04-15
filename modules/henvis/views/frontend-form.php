@@ -7,6 +7,7 @@ $cf_friend         = array_filter( $custom_fields_all, fn($f) => ($f['section']?
 /**
  * Render a single custom field input.
  */
+if ( ! function_exists( 'rzpz_render_custom_field' ) ) :
 function rzpz_render_custom_field( array $cf, array $post ) : void {
     $id    = esc_attr( $cf['id'] );
     $label = esc_html( $cf['label'] );
@@ -39,6 +40,7 @@ function rzpz_render_custom_field( array $cf, array $post ) : void {
     }
     echo '</div>';
 }
+endif; // function_exists rzpz_render_custom_field
 ?>
 <div class="rzpz-henvis-wrap">
 

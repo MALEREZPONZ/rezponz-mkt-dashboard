@@ -67,6 +67,10 @@ class RZPZ_Henvis {
     }
 
     public static function maybe_install_db() {
+        // Kør aldrig schema-opdatering under REST- eller AJAX-requests (bl.a. Elementor save)
+        if ( ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || ( defined( 'DOING_AJAX' ) && DOING_AJAX ) ) {
+            return;
+        }
         if ( get_option( self::DB_VERSION_KEY ) !== self::DB_VERSION ) {
             self::install_db();
         }
@@ -360,9 +364,9 @@ class RZPZ_Henvis {
             manager_key     VARCHAR(50)  NOT NULL DEFAULT '',
             submitted_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
             status          VARCHAR(50)  NOT NULL DEFAULT 'pending',
-            emails_log      LONGTEXT     NOT NULL DEFAULT (''),
-            notes           TEXT         NOT NULL DEFAULT (''),
-            extra_data      LONGTEXT     NOT NULL DEFAULT (''),
+            emails_log      LONGTEXT     NOT NULL DEFAULT '',
+            notes           TEXT         NOT NULL DEFAULT '',
+            extra_data      LONGTEXT     NOT NULL DEFAULT '',
             PRIMARY KEY (id),
             KEY referrer_email (referrer_email),
             KEY manager_key (manager_key),
