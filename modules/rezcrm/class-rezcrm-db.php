@@ -17,8 +17,11 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class RZPZ_CRM_DB {
 
-    const DB_VERSION     = '2'; // bumped: added photo_url, cv_url, address, city, cover_letter, notes to applicants
+    const DB_VERSION     = '3'; // bumped: added upgrade_schema for internal_notes on applications
     const DB_VERSION_KEY = 'rzpz_crm_db_ver';
+
+    // History event types (gemt i to_stage-kolonnen)
+    const HISTORY_TYPE_NOTE = 'note_added';
 
     // Pipeline-trin i rækkefølge
     const PIPELINE_STAGES = [
@@ -185,6 +188,27 @@ class RZPZ_CRM_DB {
 
         // Seed standard-skabeloner
         self::seed_default_templates();
+
+        // Schema-opgraderinger for eksisterende installationer
+        self::upgrade_schema();
+    }
+
+    // ── Schema upgrades ──────────────────────────────────────────────────────
+
+    public static function upgrade_schema(): void {
+        global $wpdb;
+        $a = $wpdb->prefix . 'rzpz_crm_applications';
+
+        // Tilføj internal_notes kolonnen hvis den ikke allerede eksisterer
+        $col = $wpdb->get_results( $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'internal_notes'",
+            DB_NAME,
+            $a
+        ) );
+        if ( empty( $col ) ) {
+            $wpdb->query( "ALTER TABLE {$a} ADD COLUMN internal_notes LONGTEXT DEFAULT NULL" );
+        }
     }
 
     // ── Default template seed ────────────────────────────────────────────────
@@ -578,6 +602,20 @@ class RZPZ_CRM_DB {
              WHERE h.application_id = %d ORDER BY h.created_at ASC",
             $application_id
         ) ) ?: [];
+    }
+
+    /**
+     * Log en generisk history-entry — bruges til note_added og andre event-typer.
+     */
+    public static function log_history( int $application_id, ?string $from_stage, string $to_stage, int $user_id = 0, string $note = '' ): void {
+        global $wpdb;
+        $wpdb->insert( $wpdb->prefix . 'rzpz_crm_history', [
+            'application_id' => $application_id,
+            'from_stage'     => $from_stage,
+            'to_stage'       => $to_stage,
+            'changed_by'     => $user_id ?: null,
+            'note'           => sanitize_textarea_field( $note ),
+        ] );
     }
 
     // ── Communications ───────────────────────────────────────────────────────

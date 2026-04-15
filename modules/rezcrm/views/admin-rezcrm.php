@@ -193,67 +193,100 @@ if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
 
         <!-- Detail-view (fyldes via JS) -->
         <div id="crm-app-detail" style="display:none">
-          <div class="crm-detail-grid">
-            <div class="crm-detail-left">
-              <div class="crm-detail-meta" id="crm-detail-meta"></div>
 
-              <div class="crm-detail-section">
-                <h3>Pipeline</h3>
-                <div class="crm-stage-buttons" id="crm-stage-btns"></div>
-                <textarea id="crm-stage-note" class="crm-textarea" rows="2" placeholder="Note til flytning (valgfri)…"></textarea>
+          <!-- Tab navigation -->
+          <div class="crm-detail-tabs">
+            <button class="crm-detail-tab active" data-dtab="overblik">👤 Overblik</button>
+            <button class="crm-detail-tab" data-dtab="kommunikation">✉ Kommunikation</button>
+            <button class="crm-detail-tab" data-dtab="aktivitet">📋 Aktivitet</button>
+            <button class="crm-detail-tab" data-dtab="noter">📝 Noter</button>
+          </div>
+
+          <!-- Tab: Overblik -->
+          <div class="crm-detail-tabpanel" id="crm-dtab-overblik">
+            <div class="crm-detail-grid crm-detail-grid--overblik">
+              <div class="crm-detail-left">
+                <div class="crm-detail-meta" id="crm-detail-meta"></div>
               </div>
-
-              <div class="crm-detail-section">
-                <h3>Rating</h3>
-                <div class="crm-stars" id="crm-stars"></div>
-              </div>
-
-              <div class="crm-detail-section" id="crm-rubix-section" style="display:none">
-                <h3>Rubix HR</h3>
-                <p style="font-size:12px;color:var(--crm-muted);margin:0 0 10px">Ansøger er ansat — klar til overførsel til Rubix HR-system.</p>
-                <button class="crm-btn crm-btn-primary" id="crm-rubix-btn" style="width:100%;justify-content:center">🔄 Overfør data til Rubix</button>
-              </div>
-
-              <div class="crm-detail-section" id="crm-rejection-section" style="display:none">
-                <div class="crm-rejection-info">
-                  <span class="crm-icon">⏳</span>
-                  <span id="crm-rejection-text">Afslag-email planlagt</span>
-                  <button class="crm-btn crm-btn-danger-sm" id="crm-cancel-rejection-btn">Annuller</button>
+              <div class="crm-detail-right">
+                <div class="crm-detail-section">
+                  <h3>Pipeline</h3>
+                  <div class="crm-stage-buttons" id="crm-stage-btns"></div>
+                  <textarea id="crm-stage-note" class="crm-textarea" rows="2" placeholder="Note til flytning (valgfri)…"></textarea>
                 </div>
-              </div>
-            </div>
-
-            <div class="crm-detail-right">
-              <!-- Kommunikation -->
-              <div class="crm-detail-section">
-                <h3>Send besked</h3>
-                <div class="crm-send-form">
-                  <select id="crm-comm-type" class="crm-select">
-                    <option value="email">📧 Email</option>
-                    <option value="sms">💬 SMS</option>
-                  </select>
-                  <select id="crm-template-select" class="crm-select">
-                    <option value="">— Vælg skabelon eller skriv manuelt —</option>
-                  </select>
-                  <input type="text" id="crm-comm-subject" class="crm-input" placeholder="Emne (kun email)">
-                  <textarea id="crm-comm-body" class="crm-textarea" rows="5" placeholder="Besked…"></textarea>
-                  <button class="crm-btn crm-btn-primary" id="crm-send-btn">Send</button>
+                <div class="crm-detail-section">
+                  <h3>Rating</h3>
+                  <div class="crm-stars" id="crm-stars"></div>
                 </div>
-              </div>
-
-              <!-- Historik -->
-              <div class="crm-detail-section">
-                <h3>Historik</h3>
-                <div id="crm-history-list" class="crm-history"></div>
-              </div>
-
-              <!-- Kommunikationslog -->
-              <div class="crm-detail-section">
-                <h3>Sendte beskeder</h3>
-                <div id="crm-comms-list" class="crm-comms"></div>
+                <div class="crm-detail-section" id="crm-rubix-section" style="display:none">
+                  <h3>Rubix HR</h3>
+                  <p style="font-size:12px;color:var(--crm-muted);margin:0 0 10px">Ansøger er ansat — klar til overførsel til Rubix HR-system.</p>
+                  <button class="crm-btn crm-btn-primary" id="crm-rubix-btn" style="width:100%;justify-content:center">🔄 Overfør data til Rubix</button>
+                </div>
+                <div class="crm-detail-section" id="crm-rejection-section" style="display:none">
+                  <div class="crm-rejection-info">
+                    <span class="crm-icon">⏳</span>
+                    <span id="crm-rejection-text">Afslag-email planlagt</span>
+                    <button class="crm-btn crm-btn-danger-sm" id="crm-cancel-rejection-btn">Annuller</button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+
+          <!-- Tab: Kommunikation -->
+          <div class="crm-detail-tabpanel" id="crm-dtab-kommunikation" style="display:none">
+            <div class="crm-detail-grid">
+              <div class="crm-detail-left">
+                <div class="crm-detail-section">
+                  <h3>Send besked</h3>
+                  <div class="crm-send-form">
+                    <select id="crm-comm-type" class="crm-select">
+                      <option value="email">📧 Email</option>
+                      <option value="sms">💬 SMS</option>
+                    </select>
+                    <select id="crm-template-select" class="crm-select">
+                      <option value="">— Vælg skabelon eller skriv manuelt —</option>
+                    </select>
+                    <input type="text" id="crm-comm-subject" class="crm-input" placeholder="Emne (kun email)">
+                    <textarea id="crm-comm-body" class="crm-textarea" rows="5" placeholder="Besked…"></textarea>
+                    <button class="crm-btn crm-btn-primary" id="crm-send-btn">Send</button>
+                  </div>
+                </div>
+              </div>
+              <div class="crm-detail-right">
+                <div class="crm-detail-section">
+                  <h3>Sendte beskeder</h3>
+                  <div id="crm-comms-list" class="crm-comms"></div>
+                </div>
+                <!-- Historik (skjult, bruges stadig af renderHistory) -->
+                <div class="crm-detail-section" style="display:none">
+                  <div id="crm-history-list" class="crm-history"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: Aktivitet -->
+          <div class="crm-detail-tabpanel" id="crm-dtab-aktivitet" style="display:none">
+            <div class="crm-activity-feed" id="crm-activity-feed">
+              <div class="crm-activity-loading">Henter aktivitet…</div>
+            </div>
+          </div>
+
+          <!-- Tab: Noter -->
+          <div class="crm-detail-tabpanel" id="crm-dtab-noter" style="display:none">
+            <div class="crm-notes-panel">
+              <div class="crm-notes-add">
+                <textarea id="crm-note-input" class="crm-textarea" rows="3" placeholder="Skriv intern note om denne ansøger…"></textarea>
+                <button class="crm-btn crm-btn-primary" id="crm-note-save-btn">Gem note</button>
+              </div>
+              <div class="crm-notes-list" id="crm-notes-list">
+                <div class="crm-activity-loading">Henter noter…</div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

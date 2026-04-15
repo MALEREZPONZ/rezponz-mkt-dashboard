@@ -57,6 +57,13 @@
     return dt.toLocaleDateString('da-DK', { day:'numeric', month:'short', year:'numeric' });
   }
 
+  function fmtDateTime(d) {
+    if (!d) return '';
+    const dt = new Date(d.includes('T') ? d : d.replace(' ','T'));
+    return dt.toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' })
+      + ' kl. ' + dt.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+  }
+
   function stagePill(stage) {
     const label = (RZPZ_CRM.stages[stage] || stage);
     return `<span class="crm-stage-pill crm-stage-${escHtml(stage)}">${escHtml(label)}</span>`;
@@ -795,20 +802,40 @@
       rejSec.style.display = 'none';
     }
 
-    // Populate template select
-    const tplSel = el('crm-template-select');
-    tplSel.innerHTML = '<option value="">— Vælg skabelon eller skriv manuelt —</option>' +
-      allTemplates.map(t => `<option value="${t.id}">${escHtml(t.name)} (${t.type})</option>`).join('');
-    tplSel.onchange = () => {
-      const tpl = allTemplates.find(t => t.id == tplSel.value);
-      if (tpl) {
-        el('crm-comm-subject').value = tpl.subject || '';
-        el('crm-comm-body').value    = tpl.body    || '';
-      }
-    };
+    // ── Detail tabs ──────────────────────────────────────────────────────────
+    // Nulstil til overblik-tab ved ny åbning
+    qsa('.crm-detail-tabpanel').forEach(p => p.style.display = 'none');
+    el('crm-dtab-overblik').style.display = '';
+    qsa('[data-dtab]').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-dtab="overblik"]')?.classList.add('active');
 
-    // Send button
-    el('crm-send-btn').onclick = () => sendComm(a.id);
+    qsa('[data-dtab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        qsa('[data-dtab]').forEach(b => b.classList.remove('active'));
+        qsa('.crm-detail-tabpanel').forEach(p => p.style.display = 'none');
+        btn.classList.add('active');
+        el('crm-dtab-' + btn.dataset.dtab).style.display = '';
+
+        if (btn.dataset.dtab === 'aktivitet') loadActivityFeed(a.id);
+        if (btn.dataset.dtab === 'noter')     loadNotesFeed(a.id);
+        if (btn.dataset.dtab === 'kommunikation') {
+          // Bind template select og send-knap når kommunikation-tab aktiveres
+          const tplSel = el('crm-template-select');
+          if (tplSel) {
+            tplSel.innerHTML = '<option value="">— Vælg skabelon eller skriv manuelt —</option>' +
+              allTemplates.map(t => `<option value="${t.id}">${escHtml(t.name)} (${t.type})</option>`).join('');
+            tplSel.onchange = () => {
+              const tpl = allTemplates.find(t => t.id == tplSel.value);
+              if (tpl) {
+                el('crm-comm-subject').value = tpl.subject || '';
+                el('crm-comm-body').value    = tpl.body    || '';
+              }
+            };
+          }
+          el('crm-send-btn').onclick = () => sendComm(a.id);
+        }
+      });
+    });
   }
 
   async function moveStage(appId, newStage) {
@@ -924,6 +951,107 @@
             <div class="crm-comm-time">${fmtDate(c.sent_at)}</div>
           </div>`).join('')
       : '<p style="color:var(--crm-muted);font-size:12px">Ingen beskeder sendt</p>';
+  }
+
+  // ── Activity feed ───────────────────────────────────────────────────────────
+
+  async function loadActivityFeed(appId) {
+    const feed = el('crm-activity-feed');
+    if (!feed) return;
+    feed.innerHTML = '<div class="crm-activity-loading">⏳ Henter…</div>';
+    try {
+      const items = await api('applications/' + appId + '/activity');
+      if (!items.length) {
+        feed.innerHTML = '<div class="crm-activity-empty">Ingen aktivitet endnu</div>';
+        return;
+      }
+
+      const stageNames = RZPZ_CRM.stages || {};
+
+      feed.innerHTML = items.map(item => {
+        let icon, title, sub = '';
+
+        if (item.type === 'stage') {
+          const from = stageNames[item.from_stage] || item.from_stage || 'Start';
+          const to   = stageNames[item.to_stage]   || item.to_stage;
+          icon  = '🔄';
+          title = `Fase ændret: <strong>${escHtml(from)} → ${escHtml(to)}</strong>`;
+          if (item.note) sub = `<div class="crm-act-note">${escHtml(item.note)}</div>`;
+        } else if (item.type === 'note') {
+          icon  = '📝';
+          title = 'Note tilføjet';
+          sub   = `<div class="crm-act-note">${escHtml(item.note)}</div>`;
+        } else if (item.type === 'comm') {
+          const typeLabel = item.comm_type === 'sms' ? 'SMS sendt' : 'Email sendt';
+          icon  = item.comm_type === 'sms' ? '💬' : '✉';
+          title = escHtml(typeLabel) + (item.subject ? `: <em>${escHtml(item.subject)}</em>` : '');
+          if (item.status === 'error') title += ' <span class="crm-act-err">⚠ Fejl</span>';
+        }
+
+        const timeStr = item.at ? fmtDateTime(item.at) : '';
+        const byStr   = item.by && item.by !== 'System' ? item.by : '';
+
+        return `<div class="crm-act-item crm-act-${escHtml(item.type)}">
+          <div class="crm-act-icon">${icon}</div>
+          <div class="crm-act-body">
+            <div class="crm-act-title">${title}</div>
+            ${sub}
+            <div class="crm-act-meta">
+              ${byStr ? `<span class="crm-act-by">${escHtml(byStr)}</span>` : ''}
+              ${timeStr ? `<span class="crm-act-time">${escHtml(timeStr)}</span>` : ''}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    } catch(e) {
+      feed.innerHTML = '<div class="crm-activity-empty">Kunne ikke hente aktivitet</div>';
+    }
+  }
+
+  // ── Notes feed ──────────────────────────────────────────────────────────────
+
+  async function loadNotesFeed(appId) {
+    const list = el('crm-notes-list');
+    if (!list) return;
+    list.innerHTML = '<div class="crm-activity-loading">⏳ Henter noter…</div>';
+    try {
+      const items = await api('applications/' + appId + '/activity');
+      const notes = items.filter(i => i.type === 'note');
+      if (!notes.length) {
+        list.innerHTML = '<div class="crm-activity-empty">Ingen noter endnu</div>';
+      } else {
+        list.innerHTML = notes.map(n => `
+          <div class="crm-note-item">
+            <div class="crm-note-text">${escHtml(n.note)}</div>
+            <div class="crm-note-meta">
+              ${n.by && n.by !== 'System' ? escHtml(n.by) + ' · ' : ''}${fmtDateTime(n.at)}
+            </div>
+          </div>`).join('');
+      }
+    } catch(e) {
+      list.innerHTML = '<div class="crm-activity-empty">Kunne ikke hente noter</div>';
+    }
+
+    // Gem note — fjern evt. tidligere listener ved at erstatte knappen
+    const saveBtn = el('crm-note-save-btn');
+    if (saveBtn) {
+      const newBtn = saveBtn.cloneNode(true);
+      saveBtn.parentNode.replaceChild(newBtn, saveBtn);
+      newBtn.addEventListener('click', async () => {
+        const input = el('crm-note-input');
+        const text  = input?.value.trim();
+        if (!text) { toast('Skriv en note', 'err'); return; }
+        try {
+          await api(`applications/${appId}/note`, {
+            method: 'POST',
+            body: JSON.stringify({ note: text }),
+          });
+          input.value = '';
+          toast('Note gemt ✓');
+          loadNotesFeed(appId);
+        } catch(e) { toast('Fejl: ' + e.message, 'err'); }
+      });
+    }
   }
 
   // ── Stillinger Tab ─────────────────────────────────────────────────────────

@@ -91,6 +91,8 @@ class RZPZ_RezCRM {
             // History
             [ 'GET',    'crm/applications/(?P<id>\d+)/history',   'api_history' ],
             [ 'GET',    'crm/applications/(?P<id>\d+)/comms',     'api_communications' ],
+            [ 'GET',    'crm/applications/(?P<id>\d+)/activity',  'api_activity' ],
+            [ 'POST',   'crm/applications/(?P<id>\d+)/note',      'api_add_note' ],
 
             // Email/SMS
             [ 'POST',   'crm/applications/(?P<id>\d+)/send',  'api_send_comm' ],
@@ -268,6 +270,65 @@ class RZPZ_RezCRM {
 
     public static function api_communications( WP_REST_Request $req ): WP_REST_Response {
         return new WP_REST_Response( RZPZ_CRM_DB::get_communications( (int) $req->get_param( 'id' ) ), 200 );
+    }
+
+    // ── REST: Activity feed (history + comms merged) ─────────────────────────
+
+    public static function api_activity( WP_REST_Request $req ): WP_REST_Response {
+        $id = (int) $req->get_param( 'id' );
+
+        $history = RZPZ_CRM_DB::get_history( $id );
+        $comms   = RZPZ_CRM_DB::get_communications( $id );
+
+        $feed = [];
+
+        foreach ( $history as $h ) {
+            $type   = $h->to_stage === RZPZ_CRM_DB::HISTORY_TYPE_NOTE ? 'note' : 'stage';
+            $feed[] = [
+                'type'       => $type,
+                'at'         => $h->created_at,
+                'by'         => $h->display_name ?: 'System',
+                'from_stage' => $h->from_stage,
+                'to_stage'   => $h->to_stage,
+                'note'       => $h->note,
+            ];
+        }
+
+        foreach ( $comms as $c ) {
+            $feed[] = [
+                'type'      => 'comm',
+                'at'        => $c->sent_at,
+                'by'        => 'System',
+                'comm_type' => $c->type,
+                'subject'   => $c->subject,
+                'status'    => $c->status,
+            ];
+        }
+
+        usort( $feed, fn( $a, $b ) => strcmp( $b['at'], $a['at'] ) );
+
+        return new WP_REST_Response( $feed, 200 );
+    }
+
+    // ── REST: Add internal note ──────────────────────────────────────────────
+
+    public static function api_add_note( WP_REST_Request $req ): WP_REST_Response {
+        $id   = (int) $req->get_param( 'id' );
+        $text = sanitize_textarea_field( $req->get_json_params()['note'] ?? '' );
+
+        if ( ! $text ) {
+            return new WP_REST_Response( [ 'error' => 'Tom note' ], 400 );
+        }
+
+        // Tjek at ansøgningen eksisterer
+        $app = RZPZ_CRM_DB::get_application( $id );
+        if ( ! $app ) {
+            return new WP_REST_Response( [ 'error' => 'Ansøgning ikke fundet' ], 404 );
+        }
+
+        RZPZ_CRM_DB::log_history( $id, null, RZPZ_CRM_DB::HISTORY_TYPE_NOTE, get_current_user_id(), $text );
+
+        return new WP_REST_Response( [ 'ok' => true ], 200 );
     }
 
     // ── REST: Send email/SMS ─────────────────────────────────────────────────
