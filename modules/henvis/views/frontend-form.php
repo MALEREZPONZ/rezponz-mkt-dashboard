@@ -70,28 +70,9 @@ endif; // function_exists rzpz_render_custom_field
 
 <form class="rzpz-henvis-form" method="post" id="rzpz-henvis-form">
     <?php wp_nonce_field( 'rzpz_henvis_submit' ); ?>
-    <input type="hidden" name="rzpz_captcha_expected" value="<?php echo esc_attr( $expected ); ?>">
-    <input type="hidden" name="rzpz_captcha_hash"     value="<?php echo esc_attr( $hash ); ?>">
-
-    <!-- ── CAPTCHA ──────────────────────────────────────────────────────────── -->
-    <?php if ( $cfg['show_captcha'] ) : ?>
-    <div class="rzpz-captcha-card" id="rzpz-captcha-step">
-        <div class="rzpz-captcha-icon">🛡️</div>
-        <h3><?php _e( 'Bekræft at du er et menneske', 'rezponz-analytics' ); ?></h3>
-        <p class="rzpz-captcha-question">
-            <?php printf( __( 'Hvad er %d + %d?', 'rezponz-analytics' ), $a, $b ); ?>
-        </p>
-        <input type="number" name="rzpz_captcha_answer" id="rzpz_captcha_answer"
-               class="rzpz-captcha-input" placeholder="Dit svar…" autocomplete="off"
-               <?php if ( ! empty( $result['error'] ) && strpos( $result['error'], 'menneskeverifikation' ) !== false ) : ?>autofocus<?php endif; ?>>
-        <button type="button" class="rzpz-captcha-btn" id="rzpz-captcha-confirm">
-            ✅ <?php _e( 'Bekræft', 'rezponz-analytics' ); ?>
-        </button>
-    </div>
-    <?php endif; ?>
 
     <!-- ── Form fields ─────────────────────────────────────────────────────── -->
-    <div class="rzpz-form-fields" id="rzpz-form-fields" <?php echo $cfg['show_captcha'] ? 'style="display:none;"' : ''; ?>>
+    <div class="rzpz-form-fields" id="rzpz-form-fields">
 
         <!-- Section: Referrer -->
         <div class="rzpz-form-section">
@@ -177,10 +158,37 @@ endif; // function_exists rzpz_render_custom_field
         </div>
 
         <div class="rzpz-submit-row">
-            <button type="submit" name="rzpz_henvis_submit" value="1" class="rzpz-submit-btn">
-                <?php echo esc_html( $cfg['submit_text'] ); ?>
-            </button>
+            <?php if ( $cfg['show_captcha'] ) : ?>
+                <!-- Trigger-knap der viser CAPTCHA inline -->
+                <button type="button" class="rzpz-submit-btn" id="rzpz-submit-trigger">
+                    <?php echo esc_html( $cfg['submit_text'] ); ?>
+                </button>
+            <?php else : ?>
+                <button type="submit" name="rzpz_henvis_submit" value="1" class="rzpz-submit-btn">
+                    <?php echo esc_html( $cfg['submit_text'] ); ?>
+                </button>
+            <?php endif; ?>
         </div>
+
+        <?php if ( $cfg['show_captcha'] ) : ?>
+        <!-- ── Inline CAPTCHA — vises kun når Send-knappen trykkes ───────────── -->
+        <div class="rzpz-captcha-inline" id="rzpz-captcha-step" style="display:none;">
+            <div class="rzpz-captcha-inner">
+                <div class="rzpz-captcha-icon">🛡️</div>
+                <p class="rzpz-captcha-label"><?php _e( 'Bekræft at du er et menneske', 'rezponz-analytics' ); ?></p>
+                <p class="rzpz-captcha-question">
+                    <?php printf( __( 'Hvad er %d + %d?', 'rezponz-analytics' ), $a, $b ); ?>
+                </p>
+                <input type="number" name="rzpz_captcha_answer" id="rzpz_captcha_answer"
+                       class="rzpz-captcha-input" placeholder="Dit svar…" autocomplete="off">
+                <button type="submit" name="rzpz_henvis_submit" value="1" class="rzpz-captcha-btn" id="rzpz-captcha-confirm">
+                    ✅ <?php _e( 'Send nu', 'rezponz-analytics' ); ?>
+                </button>
+            </div>
+        </div>
+        <input type="hidden" name="rzpz_captcha_expected" value="<?php echo esc_attr( $expected ); ?>">
+        <input type="hidden" name="rzpz_captcha_hash"     value="<?php echo esc_attr( $hash ); ?>">
+        <?php endif; ?>
 
     </div><!-- /.rzpz-form-fields -->
 </form>

@@ -78,23 +78,32 @@
     margin: 0 !important;
 }
 
-/* ── CAPTCHA card ── */
-.rzpz-henvis-wrap .rzpz-captcha-card {
+/* ── CAPTCHA inline (vises efter Send-klik) ── */
+.rzpz-henvis-wrap .rzpz-captcha-inline {
+    margin-top: 20px !important;
+    animation: rzpz-captcha-in .25s ease-out;
+}
+@keyframes rzpz-captcha-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.rzpz-henvis-wrap .rzpz-captcha-inner {
     text-align: center !important;
-    padding: 36px 24px !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
+    padding: 28px 24px !important;
+    background: rgba(255,255,255,.04) !important;
+    border: 1px solid rgba(204,255,0,.25) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 0 0 4px rgba(204,255,0,.06) !important;
 }
 .rzpz-henvis-wrap .rzpz-captcha-icon {
-    font-size: 40px !important;
-    margin-bottom: 12px !important;
+    font-size: 32px !important;
+    margin-bottom: 8px !important;
 }
-.rzpz-henvis-wrap .rzpz-captcha-card h3 {
-    font-size: 18px !important;
+.rzpz-henvis-wrap .rzpz-captcha-label {
+    font-size: 14px !important;
     font-weight: 700 !important;
     color: #fff !important;
-    margin: 0 0 8px !important;
+    margin: 0 0 4px !important;
     padding: 0 !important;
     background: none !important;
     border: none !important;
