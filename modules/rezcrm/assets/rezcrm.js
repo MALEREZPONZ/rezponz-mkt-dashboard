@@ -591,12 +591,21 @@
              </a>`
           : ''}
         <div class="crm-attach-edit" id="crm-attach-edit" style="display:none">
-          <input type="url" id="crm-photo-url-input" class="crm-input crm-input-sm" placeholder="Foto URL (https://...)" value="${escHtml(a.photo_url||'')}">
-          <input type="url" id="crm-cv-url-input" class="crm-input crm-input-sm" placeholder="CV/fil URL (https://...)" value="${escHtml(a.cv_url||'')}">
-          <button class="crm-btn crm-btn-primary crm-btn-sm" id="crm-attach-save-btn">Gem</button>
+          <label class="crm-attach-label">
+            <span>📷 Profilfoto</span>
+            <input type="file" id="crm-photo-file" accept="image/*" class="crm-attach-file-input">
+            <span class="crm-attach-filename" id="crm-photo-filename">${a.photo_url ? '✓ Foto uploadet' : 'Vælg billede…'}</span>
+          </label>
+          <label class="crm-attach-label">
+            <span>📄 CV / fil</span>
+            <input type="file" id="crm-cv-file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="crm-attach-file-input">
+            <span class="crm-attach-filename" id="crm-cv-filename">${a.cv_url ? '✓ Fil uploadet' : 'Vælg fil…'}</span>
+          </label>
+          <button class="crm-btn crm-btn-primary crm-btn-sm" id="crm-attach-save-btn">Upload &amp; gem</button>
+          <span class="crm-attach-spinner" id="crm-attach-spinner" style="display:none;font-size:12px;color:var(--crm-muted)">⏳ Uploader…</span>
         </div>
         <button class="crm-btn crm-btn-ghost crm-btn-sm" id="crm-attach-toggle-btn" style="margin-top:8px">
-          ✎ ${a.photo_url || a.cv_url ? 'Rediger URLs' : 'Tilføj foto/fil'}
+          ✎ ${a.photo_url || a.cv_url ? 'Skift foto/fil' : 'Tilføj foto/fil'}
         </button>
       </div>`;
 
@@ -668,18 +677,60 @@
       const d = el('crm-attach-edit');
       if (d) d.style.display = d.style.display === 'none' ? '' : 'none';
     });
+    el('crm-photo-file')?.addEventListener('change', () => {
+      const f = el('crm-photo-file').files[0];
+      if (f) el('crm-photo-filename').textContent = f.name;
+    });
+    el('crm-cv-file')?.addEventListener('change', () => {
+      const f = el('crm-cv-file').files[0];
+      if (f) el('crm-cv-filename').textContent = f.name;
+    });
+
     el('crm-attach-save-btn')?.addEventListener('click', async () => {
-      const photo = (el('crm-photo-url-input')?.value || '').trim();
-      const cv    = (el('crm-cv-url-input')?.value    || '').trim();
+      const spinner  = el('crm-attach-spinner');
+      const saveBtn  = el('crm-attach-save-btn');
+      const photoFile = el('crm-photo-file')?.files[0];
+      const cvFile    = el('crm-cv-file')?.files[0];
+
+      if (!photoFile && !cvFile) { toast('Vælg mindst én fil', 'err'); return; }
+
+      spinner.style.display = '';
+      saveBtn.disabled = true;
+
       try {
+        // Upload helper — bruger samme endpoint som frontend-formularen
+        async function uploadFile(file) {
+          const fd = new FormData();
+          fd.append('file', file);
+          const res = await fetch(RZPZ_CRM.apiBase.replace('/crm/', '/crm/') + '../crm/upload-file', {
+            method: 'POST',
+            headers: { 'X-WP-Nonce': RZPZ_CRM.nonce },
+            body: fd,
+          });
+          if (!res.ok) throw new Error('Upload fejlede (' + res.status + ')');
+          const d = await res.json();
+          return d.url || '';
+        }
+
+        let photo_url = a.photo_url || '';
+        let cv_url    = a.cv_url    || '';
+
+        if (photoFile) photo_url = await uploadFile(photoFile);
+        if (cvFile)    cv_url    = await uploadFile(cvFile);
+
         await api(`applications/${a.id}/attachments`, {
           method: 'PATCH',
-          body: JSON.stringify({ photo_url: photo, cv_url: cv }),
+          body: JSON.stringify({ photo_url, cv_url }),
         });
         toast('Filer gemt ✓');
         activeApp = await api('applications/' + a.id);
         renderAppDetail(activeApp);
-      } catch(e) { toast('Fejl: ' + e.message, 'err'); }
+      } catch(e) {
+        toast('Fejl: ' + e.message, 'err');
+      } finally {
+        spinner.style.display = 'none';
+        saveBtn.disabled = false;
+      }
     });
 
     // AON resultat
