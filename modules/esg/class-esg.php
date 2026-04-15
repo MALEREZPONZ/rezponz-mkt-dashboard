@@ -4,7 +4,7 @@
  *
  * Renders a full, SEO-friendly ESG page via the [rezponz_esg] shortcode.
  * Content is automatically synced daily from the Rezponz ESG PDF report
- * using OpenAI gpt-4.1 to extract structured data.
+ * using OpenAI gpt-4o to extract structured data.
  *
  * ┌──────────────────────────────────────────────────────────────┐
  * │  SHORTCODE USAGE                                             │
@@ -222,12 +222,46 @@ class RZPA_ESG {
             return self::log_sync( 'error', 'PDF for lille — muligvis ikke en gyldig fil' );
         }
 
-        // ── 3. Send to OpenAI for extraction ─────────────────────────────────
-        $b64    = base64_encode( $pdf_binary );
-        $prompt = self::build_extraction_prompt();
+        // ── 3. Upload PDF to OpenAI Files API ────────────────────────────────
+        // gpt-4o requires uploading the file first and referencing it via file_id
+        $boundary  = 'WPBoundary' . bin2hex( random_bytes( 8 ) );
+        $eol       = "\r\n";
+        $file_body = '--' . $boundary . $eol
+            . 'Content-Disposition: form-data; name="purpose"' . $eol . $eol
+            . 'user_data' . $eol
+            . '--' . $boundary . $eol
+            . 'Content-Disposition: form-data; name="file"; filename="rezponz-esg.pdf"' . $eol
+            . 'Content-Type: application/pdf' . $eol . $eol
+            . $pdf_binary . $eol
+            . '--' . $boundary . '--' . $eol;
 
+        $upload_res = wp_remote_post( 'https://api.openai.com/v1/files', [
+            'timeout' => 60,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $api_key,
+                'Content-Type'  => 'multipart/form-data; boundary=' . $boundary,
+            ],
+            'body' => $file_body,
+        ] );
+
+        if ( is_wp_error( $upload_res ) ) {
+            return self::log_sync( 'error', 'PDF-upload til OpenAI fejlede: ' . $upload_res->get_error_message() );
+        }
+
+        $upload_http = (int) wp_remote_retrieve_response_code( $upload_res );
+        $upload_data = json_decode( wp_remote_retrieve_body( $upload_res ), true );
+
+        if ( $upload_http !== 200 || empty( $upload_data['id'] ) ) {
+            $err = $upload_data['error']['message'] ?? "HTTP $upload_http";
+            return self::log_sync( 'error', 'PDF-upload til OpenAI fejlede: ' . $err );
+        }
+
+        $file_id = $upload_data['id'];
+
+        // ── 4. Send to OpenAI for extraction ─────────────────────────────────
+        $prompt  = self::build_extraction_prompt();
         $ai_body = wp_json_encode( [
-            'model'      => 'gpt-4.1',
+            'model'      => 'gpt-4o',
             'max_tokens' => 4000,
             'messages'   => [
                 [
@@ -235,10 +269,7 @@ class RZPA_ESG {
                     'content' => [
                         [
                             'type' => 'file',
-                            'file' => [
-                                'filename'  => 'rezponz-esg-rapport.pdf',
-                                'file_data' => 'data:application/pdf;base64,' . $b64,
-                            ],
+                            'file' => [ 'file_id' => $file_id ],
                         ],
                         [
                             'type' => 'text',
@@ -256,6 +287,13 @@ class RZPA_ESG {
                 'Content-Type'  => 'application/json',
             ],
             'body' => $ai_body,
+        ] );
+
+        // Clean up — delete uploaded file regardless of result
+        wp_remote_request( 'https://api.openai.com/v1/files/' . $file_id, [
+            'method'  => 'DELETE',
+            'timeout' => 15,
+            'headers' => [ 'Authorization' => 'Bearer ' . $api_key ],
         ] );
 
         if ( is_wp_error( $ai_res ) ) {
@@ -296,7 +334,7 @@ class RZPA_ESG {
         update_option( self::OPTION_SYNC_LOG, $log );
 
         return self::log_sync( 'ok', sprintf(
-            'PDF synket (%s KB, gpt-4.1)',
+            'PDF synket (%s KB, gpt-4o)',
             number_format( $pdf_size / 1024, 0 )
         ) );
     }
