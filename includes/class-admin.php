@@ -128,6 +128,9 @@ class RZPA_Admin {
      * Vises på alle admin-sider så sektions-headers altid er pæne.
      */
     public static function menu_styles() : void {
+        // Kun load CSS + JS på Rezponz admin-sider — sparer alle andre admin-sider
+        $page = $_GET['page'] ?? '';
+        if ( ! $page || strpos( $page, 'rzpa' ) === false ) return;
         ?>
         <style id="rzpa-menu-styles">
         /* Sektions-headers i Rezponz-menuen */

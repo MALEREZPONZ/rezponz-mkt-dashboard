@@ -20,11 +20,11 @@ class RZPZ_RezCRM {
         // Kør én gang ved første admin-besøg efter installation/opdatering:
         // seed default-stillinger + migrer forældreløse ansøgninger
         add_action( 'admin_init', function () {
-            if ( get_option( 'rzpz_crm_positions_seeded' ) !== '1' ) {
-                RZPZ_CRM_DB::ensure_default_positions();
-                RZPZ_CRM_DB::migrate_orphan_applications();
-                update_option( 'rzpz_crm_positions_seeded', '1' );
-            }
+            // Brug transient (cached) fremfor get_option der altid rammer DB
+            if ( get_transient( 'rzpz_crm_seeded_v2' ) ) return;
+            RZPZ_CRM_DB::ensure_default_positions();
+            RZPZ_CRM_DB::migrate_orphan_applications();
+            set_transient( 'rzpz_crm_seeded_v2', 1, 30 * DAY_IN_SECONDS );
         } );
 
         // Cron hooks

@@ -301,9 +301,13 @@ PROMPT;
 
     public static function media_list(): WP_REST_Response {
         $attachments = get_posts( [
-            'post_type' => 'attachment', 'post_mime_type' => 'image',
-            'post_status' => 'inherit', 'posts_per_page' => 60,
-            'orderby' => 'date', 'order' => 'DESC',
+            'post_type'      => 'attachment',
+            'post_mime_type' => 'image',
+            'post_status'    => 'inherit',
+            'posts_per_page' => 60,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+            'no_found_rows'  => true,   // spring SQL COUNT(*) over
         ] );
         $images = [];
         foreach ( $attachments as $att ) {
@@ -323,7 +327,7 @@ PROMPT;
     // ── WordPress categories ──────────────────────────────────────────────────
 
     public static function categories_list(): WP_REST_Response {
-        $cats = get_categories( [ 'hide_empty' => false ] );
+        $cats = get_categories( [ 'hide_empty' => false, 'number' => 200 ] );
         return new WP_REST_Response(
             array_map( fn( $c ) => [ 'id' => $c->term_id, 'name' => $c->name ], $cats ),
             200

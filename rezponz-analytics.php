@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      3.5.40
+ * Version:      3.5.41
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '3.5.40' );
+define( 'RZPA_VERSION',     '3.5.41' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -160,8 +160,11 @@ add_action( 'wp_head', function () {
     if ( ! is_singular() ) return;
     $post_id = get_the_ID();
 
-    // FAQ JSON-LD (FAQPage schema) — decode+re-encode to guarantee valid JSON output
-    $faq_schema = get_post_meta( $post_id, '_rzpa_faq_schema', true );
+    // Hent begge meta-felter i ét kald — WP cache sørger for at de kun hentes én gang
+    $faq_schema     = get_post_meta( $post_id, '_rzpa_faq_schema',     true );
+    $article_schema = get_post_meta( $post_id, '_rzpa_article_schema', true );
+
+    // FAQ JSON-LD
     if ( $faq_schema ) {
         $decoded = json_decode( $faq_schema, true );
         if ( $decoded ) {
@@ -169,18 +172,14 @@ add_action( 'wp_head', function () {
         }
     }
 
-    // Article JSON-LD (BlogPosting schema)
-    $article_schema = get_post_meta( $post_id, '_rzpa_article_schema', true );
+    // Article JSON-LD
     if ( $article_schema ) {
         $decoded = json_decode( $article_schema, true );
         if ( $decoded ) {
             echo "\n" . wp_json_encode( $decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) . "\n";
         }
-    }
-
-    // GEO meta-tags — kun på AI-genererede blogindlæg (lokal SEO + AI-synlighed Nordjylland)
-    if ( get_post_meta( $post_id, '_rzpa_article_schema', true ) ) {
-        echo '<meta name="geo.region"    content="DK-81">' . "\n";   // DK-81 = Nordjylland
+        // GEO meta-tags — kun på AI-genererede blogindlæg
+        echo '<meta name="geo.region"    content="DK-81">' . "\n";
         echo '<meta name="geo.placename" content="Aalborg, Danmark">' . "\n";
         echo '<meta name="geo.position"  content="57.0488;9.9217">' . "\n";
         echo '<meta name="ICBM"          content="57.0488, 9.9217">' . "\n";
@@ -189,6 +188,7 @@ add_action( 'wp_head', function () {
 
 // Forhindre caching af sider med Profil-Quiz shortcode
 add_action( 'template_redirect', function () {
+    if ( ! is_singular() ) return;
     global $post;
     if ( $post && has_shortcode( $post->post_content, 'rezponz_quiz' ) ) {
         if ( ! defined( 'DONOTCACHEPAGE' ) ) {
@@ -199,7 +199,10 @@ add_action( 'template_redirect', function () {
 
 // ── SMTP-konfiguration via phpmailer_init (kører for alle wp_mail()-kald) ──────
 add_action( 'phpmailer_init', function ( $phpmailer ) {
-    $opts = get_option( 'rzpa_settings', [] );
+    static $opts = null;
+    if ( null === $opts ) {
+        $opts = get_option( 'rzpa_settings', [] );
+    }
     if ( empty( $opts['smtp_enabled'] ) ) return;
 
     $phpmailer->isSMTP();
