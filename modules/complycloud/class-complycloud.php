@@ -48,7 +48,7 @@ class RZPZ_ComplyCloud {
 
     public static function admin_menu(): void {
         add_submenu_page(
-            'rzpa-rezcrm',
+            'rzpa-dashboard',
             'ComplyCloud Monitor',
             '🔒 ComplyCloud',
             'manage_options',

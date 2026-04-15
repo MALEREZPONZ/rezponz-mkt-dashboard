@@ -135,7 +135,8 @@ class RZPA_Admin {
         #adminmenu a[href$="rzpa-section-crew"],
         #adminmenu a[href$="rzpa-section-refs"],
         #adminmenu a[href$="rzpa-section-seo"],
-        #adminmenu a[href$="rzpa-section-system"] {
+        #adminmenu a[href$="rzpa-section-system"],
+        #adminmenu a[href$="rzpa-section-crm"] {
             color: #CCFF00 !important;
             font-size: 11px !important;
             font-weight: 500 !important;
@@ -154,7 +155,8 @@ class RZPA_Admin {
         #adminmenu a[href$="rzpa-section-crew"]::after,
         #adminmenu a[href$="rzpa-section-refs"]::after,
         #adminmenu a[href$="rzpa-section-seo"]::after,
-        #adminmenu a[href$="rzpa-section-system"]::after {
+        #adminmenu a[href$="rzpa-section-system"]::after,
+        #adminmenu a[href$="rzpa-section-crm"]::after {
             content: '▾';
             font-size: 10px;
             opacity: .7;
@@ -165,14 +167,16 @@ class RZPA_Admin {
         #adminmenu li.rzpa-collapsed a[href$="rzpa-section-crew"]::after,
         #adminmenu li.rzpa-collapsed a[href$="rzpa-section-refs"]::after,
         #adminmenu li.rzpa-collapsed a[href$="rzpa-section-seo"]::after,
-        #adminmenu li.rzpa-collapsed a[href$="rzpa-section-system"]::after {
+        #adminmenu li.rzpa-collapsed a[href$="rzpa-section-system"]::after,
+        #adminmenu li.rzpa-collapsed a[href$="rzpa-section-crm"]::after {
             transform: rotate(-90deg);
         }
         #adminmenu li:has(a[href$="rzpa-section-ads"]),
         #adminmenu li:has(a[href$="rzpa-section-crew"]),
         #adminmenu li:has(a[href$="rzpa-section-refs"]),
         #adminmenu li:has(a[href$="rzpa-section-seo"]),
-        #adminmenu li:has(a[href$="rzpa-section-system"]) {
+        #adminmenu li:has(a[href$="rzpa-section-system"]),
+        #adminmenu li:has(a[href$="rzpa-section-crm"]) {
             border-top: 1px solid rgba(204,255,0,.12) !important;
             margin-top: 4px !important;
         }

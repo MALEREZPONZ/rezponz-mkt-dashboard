@@ -16,33 +16,13 @@ class RZPA_Rekruttering {
 
     public static function add_menu() {
         $cap     = 'manage_options';
-        $crm_icon = 'data:image/svg+xml;base64,' . base64_encode(
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
-            . '<path fill="#a7aaad" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 2c4.41 0 8 3.59 8 8s-3.59 8-8 8-8-3.59-8-8 3.59-8 8-8zm0 2c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 2c2.21 0 4 1.79 4 4s-1.79 4-4 4-4-1.79-4-4 1.79-4 4-4zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>'
-            . '</svg>'
-        );
-
-        // ── RezCRM: eget top-level menu ───────────────────────────────────────
-        add_menu_page(
-            'RezCRM',
-            '🎯 RezCRM',
-            $cap,
-            'rzpa-rezcrm',
-            [ 'RZPZ_CRM_Admin', 'render_page' ],
-            $crm_icon,
-            56
-        );
-
-        // ── Under-menuer ──────────────────────────────────────────────────────
-        // Pipeline (= første item = topmenu gentaget — standard WP-mønster)
-        add_submenu_page( 'rzpa-rezcrm', 'RezCRM – Pipeline',           '🗂 Pipeline',              $cap, 'rzpa-rezcrm',         [ 'RZPZ_CRM_Admin', 'render_page' ] );
-        add_submenu_page( 'rzpa-rezcrm', 'Rekruttering – Rezponz',      '📣 Rekrutteringskampagner', $cap, 'rzpa-rekruttering',   [ __CLASS__, 'page_rekruttering' ] );
-        add_submenu_page( 'rzpa-rezcrm', 'Ansøgningsformularer',        '📋 Formularer',             $cap, 'rzpa-rezcrm-forms',   [ __CLASS__, 'page_forms' ] );
-        add_submenu_page( 'rzpa-rezcrm', 'RezCRM Brugere & Sikkerhed',  '🔐 Brugere & Sikkerhed',   $cap, 'rzpa-rezcrm-users',   [ __CLASS__, 'page_users' ] );
-        // ComplyCloud registreres af RZPZ_ComplyCloud::admin_menu() — parent = rzpa-rezcrm
-
-        // ── Fjern gammel HR & Crew sektion fra Rezponz-menuen ─────────────────
-        // (sektionshovedet fjernes — de øvrige Crew/Henvis-punkter beholder rzpa-dashboard som parent)
+        // ── Sektion: RezCRM (under Rezponz-menuen) ───────────────────────────
+        add_submenu_page( 'rzpa-dashboard', '',                              '🎯 RezCRM',                $cap, 'rzpa-section-crm',    [ 'RZPZ_CRM_Admin', 'render_page' ] );
+        add_submenu_page( 'rzpa-dashboard', 'RezCRM – Pipeline',            '🗂 Pipeline',               $cap, 'rzpa-rezcrm',         [ 'RZPZ_CRM_Admin', 'render_page' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Rekruttering – Rezponz',       '📣 Rekrutteringskampagner', $cap, 'rzpa-rekruttering',   [ __CLASS__, 'page_rekruttering' ] );
+        add_submenu_page( 'rzpa-dashboard', 'Ansøgningsformularer',         '📋 Formularer',             $cap, 'rzpa-rezcrm-forms',   [ __CLASS__, 'page_forms' ] );
+        add_submenu_page( 'rzpa-dashboard', 'RezCRM Brugere & Sikkerhed',   '🔐 Brugere & Sikkerhed',   $cap, 'rzpa-rezcrm-users',   [ __CLASS__, 'page_users' ] );
+        // ComplyCloud registreres af RZPZ_ComplyCloud::admin_menu() — parent = rzpa-dashboard
     }
 
     public static function page_forms() {
