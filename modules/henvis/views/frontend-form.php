@@ -54,12 +54,6 @@ endif; // function_exists rzpz_render_custom_field
 
 <?php else : ?>
 
-    <!-- Hero -->
-    <div class="rzpz-hero">
-        <div class="rzpz-hero-bonus">& få 500 kr. hvis din ven bliver ansat</div>
-        <h2><?php echo esc_html( $cfg['form_title'] ); ?><br><em>til et fedt job</em></h2>
-        <p class="rzpz-hero-sub"><?php echo esc_html( $cfg['form_subtitle'] ); ?></p>
-    </div>
 
 <?php if ( ! empty( $result['error'] ) ) : ?>
     <div class="rzpz-henvis-error">
