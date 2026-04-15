@@ -443,6 +443,20 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
       </div>
     </div>
 
+      <!-- ══ Formularer ════════════════════════════════════════════════════ -->
+      <div class="rzpa-card rzpa-settings-section" id="formularer">
+        <h2>📋 Formularer</h2>
+        <table class="form-table">
+          <tr>
+            <th>Privatlivspolitik URL</th>
+            <td>
+              <input type="url" name="rzpa_settings[crm_privacy_url]" value="<?php echo esc_attr($opts['crm_privacy_url'] ?? ''); ?>" class="regular-text" placeholder="https://..." />
+              <p class="description">Link til betingelserne for databehandling i ansøgningsskemaer</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+
       <!-- ══ Rubix HR Integration ═══════════════════════════════════════════ -->
       <div class="rzpa-card rzpa-settings-section" id="rubix-integration">
         <h2>🔗 Rubix HR</h2>

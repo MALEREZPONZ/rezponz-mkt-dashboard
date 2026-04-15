@@ -14,7 +14,12 @@
   let activeApp       = null;  // application currently open in detail modal
   let editingPosId    = null;
   let editingTplId    = null;
+  // Drag state (mouse-based — bypasses WordPress admin HTML5 DnD conflicts)
   let dragId          = null;
+  let dragActive      = false;
+  let dragCloneEl     = null;
+  let dragSourceEl    = null;
+  let dragHoverStage  = null;
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const el  = id => document.getElementById(id);
@@ -66,6 +71,81 @@
     return RZPZ_CRM.sources[src] || src || '–';
   }
 
+  // ── Calendar tab ─────────────────────────────────────────────────────────
+  let calYear, calMonth;
+
+  function initCalendar() {
+      const now = new Date();
+      calYear  = now.getFullYear();
+      calMonth = now.getMonth();
+      el('crm-cal-prev').addEventListener('click', () => { calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCalendar(); });
+      el('crm-cal-next').addEventListener('click', () => { calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendar(); });
+      renderCalendar();
+  }
+
+  function renderCalendar() {
+      const label = new Date(calYear, calMonth, 1).toLocaleDateString('da-DK', { month: 'long', year: 'numeric' });
+      el('crm-cal-month-label').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+      el('crm-cal-detail').style.display = 'none';
+
+      const grid = el('crm-cal-grid');
+      grid.innerHTML = '';
+
+      // Day headers
+      ['Man','Tir','Ons','Tor','Fre','Lør','Søn'].forEach(d => {
+          const h = document.createElement('div');
+          h.className = 'crm-cal-dayname';
+          h.textContent = d;
+          grid.appendChild(h);
+      });
+
+      const firstDay = new Date(calYear, calMonth, 1);
+      const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+      const startOffset = (firstDay.getDay() + 6) % 7;
+
+      for (let i = 0; i < startOffset; i++) {
+          const blank = document.createElement('div');
+          blank.className = 'crm-cal-day crm-cal-day-empty';
+          grid.appendChild(blank);
+      }
+
+      const today = new Date();
+
+      for (let d = 1; d <= daysInMonth; d++) {
+          const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const dayApps = allApplications.filter(a => a.created_at && a.created_at.startsWith(dateStr));
+
+          const cell = document.createElement('div');
+          cell.className = 'crm-cal-day' +
+              (d === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear() ? ' crm-cal-today' : '') +
+              (dayApps.length > 0 ? ' crm-cal-has-apps' : '');
+          cell.innerHTML = `<span class="crm-cal-daynum">${d}</span>` +
+              (dayApps.length > 0 ? `<span class="crm-cal-dot">${dayApps.length}</span>` : '');
+
+          if (dayApps.length > 0) {
+              cell.addEventListener('click', () => showCalDay(dateStr, dayApps));
+          }
+          grid.appendChild(cell);
+      }
+  }
+
+  function showCalDay(dateStr, apps) {
+      const [y,m,d] = dateStr.split('-');
+      const label = new Date(y,m-1,d).toLocaleDateString('da-DK',{weekday:'long',day:'numeric',month:'long'});
+      el('crm-cal-detail-title').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+      el('crm-cal-detail-list').innerHTML = apps.map(a =>
+          `<div class="crm-cal-app-item" style="cursor:pointer" data-id="${a.id}">
+              <span>${escHtml(a.first_name)} ${escHtml(a.last_name)}</span>
+              <span style="color:var(--crm-muted);font-size:12px">${escHtml(a.position_title || 'Generel ansøgning')}</span>
+              ${stagePill(a.stage)}
+           </div>`
+      ).join('');
+      el('crm-cal-detail-list').querySelectorAll('[data-id]').forEach(item => {
+          item.addEventListener('click', () => openAppDetail(+item.dataset.id));
+      });
+      el('crm-cal-detail').style.display = '';
+  }
+
   // ── Boot ────────────────────────────────────────────────────────────────────
   async function boot() {
     await Promise.all([loadPositions(), loadApplications(), loadTemplates()]);
@@ -74,6 +154,7 @@
     loadStats();
     initFilters();
     initTabs();
+    initCalendar();
     initModals();
     initPositionModal();
     initTemplatesModal();
@@ -117,8 +198,9 @@
     const filter  = el('crm-position-filter');
     const appSel  = el('app-position');
 
-    const opts = allPositions.filter(p => p.status === 'open').map(p =>
-      `<option value="${p.id}">${escHtml(p.title)}</option>`
+    // Vis alle stillinger (ikke kun 'open') — 'closed'/'draft' stadig valgbare ved manuel oprettelse
+    const opts = allPositions.filter(p => p.status !== 'draft').map(p =>
+      `<option value="${p.id}">${escHtml(p.title)}${p.status !== 'open' ? ' (' + escHtml(p.status) + ')' : ''}</option>`
     ).join('');
 
     if (filter) {
@@ -153,19 +235,95 @@
         </div>`;
 
       kanban.appendChild(col);
-
-      // Drag-over events
-      const cardsDiv = col.querySelector('.crm-cards');
-      cardsDiv.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('drag-over'); });
-      cardsDiv.addEventListener('dragleave', () => col.classList.remove('drag-over'));
-      cardsDiv.addEventListener('drop', e => { e.preventDefault(); col.classList.remove('drag-over'); handleDrop(stage); });
     });
 
-    // Card click + drag events
+    // ── Mouse-based drag & drop (avoids WordPress admin HTML5 DnD conflicts) ──
     qsa('.crm-card').forEach(card => {
-      card.addEventListener('click', () => openAppDetail(+card.dataset.id));
-      card.addEventListener('dragstart', () => { dragId = +card.dataset.id; card.classList.add('dragging'); });
-      card.addEventListener('dragend',   () => card.classList.remove('dragging'));
+      let _didDrag = false;
+
+      card.addEventListener('mousedown', e => {
+        if (e.button !== 0 || e.target.closest('a,button,select,textarea,input')) return;
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        _didDrag = false;
+
+        const onMove = moveE => {
+          const dx = moveE.clientX - startX;
+          const dy = moveE.clientY - startY;
+
+          // Only start drag after moving 6px (avoids accidental drags on clicks)
+          if (!dragActive && Math.hypot(dx, dy) < 6) return;
+
+          if (!dragActive) {
+            dragActive    = true;
+            dragId        = +card.dataset.id;
+            dragSourceEl  = card;
+            _didDrag      = true;
+
+            // Create floating ghost clone
+            const rect = card.getBoundingClientRect();
+            dragCloneEl = card.cloneNode(true);
+            Object.assign(dragCloneEl.style, {
+              position:  'fixed',
+              zIndex:    '99999',
+              width:     rect.width + 'px',
+              pointerEvents: 'none',
+              opacity:   '0.88',
+              boxShadow: '0 16px 48px rgba(0,0,0,.55)',
+              transform: 'rotate(2deg) scale(1.03)',
+              transition: 'none',
+              left:      rect.left + 'px',
+              top:       rect.top  + 'px',
+              cursor:    'grabbing',
+            });
+            document.body.appendChild(dragCloneEl);
+            card.style.opacity = '0.2';
+            document.body.style.userSelect = 'none';
+          }
+
+          // Follow cursor
+          dragCloneEl.style.left = (moveE.clientX - dragCloneEl.offsetWidth / 2) + 'px';
+          dragCloneEl.style.top  = (moveE.clientY - 24) + 'px';
+
+          // Highlight column under cursor
+          qsa('.crm-col').forEach(c => c.classList.remove('drag-over'));
+          dragHoverStage = null;
+          dragCloneEl.style.display = 'none';
+          const under = document.elementFromPoint(moveE.clientX, moveE.clientY);
+          dragCloneEl.style.display = '';
+          const hoverCol = under?.closest('.crm-col');
+          if (hoverCol) {
+            hoverCol.classList.add('drag-over');
+            dragHoverStage = hoverCol.dataset.stage;
+          }
+        };
+
+        const onUp = async () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup',   onUp);
+          document.body.style.userSelect = '';
+
+          if (dragActive) {
+            dragCloneEl?.remove();
+            dragCloneEl = null;
+            if (dragSourceEl) dragSourceEl.style.opacity = '';
+            qsa('.crm-col').forEach(c => c.classList.remove('drag-over'));
+
+            if (dragHoverStage) await handleDrop(dragHoverStage);
+
+            dragActive = false; dragId = null; dragSourceEl = null; dragHoverStage = null;
+          }
+        };
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup',   onUp);
+      });
+
+      card.addEventListener('click', () => {
+        if (_didDrag) { _didDrag = false; return; }
+        openAppDetail(+card.dataset.id);
+      });
     });
   }
 
@@ -173,9 +331,16 @@
     const rejBadge = a.rejection_scheduled_at && !a.rejection_sent_at
       ? `<div class="crm-card-rejection">⏳ Afslag-email ${fmtDate(a.rejection_scheduled_at)}</div>`
       : '';
-    return `<div class="crm-card" data-id="${a.id}" draggable="true">
-      <div class="crm-card-name">${escHtml(a.first_name)} ${escHtml(a.last_name)}</div>
-      <div class="crm-card-pos">${escHtml(a.position_title || '')}</div>
+    return `<div class="crm-card" data-id="${a.id}">
+      <div class="crm-card-header">
+        ${a.photo_url
+          ? `<img src="${escHtml(a.photo_url)}" class="crm-card-photo" alt="">`
+          : `<div class="crm-card-initials">${escHtml(((a.first_name||'')[0]||'').toUpperCase() + ((a.last_name||'')[0]||'').toUpperCase())}</div>`}
+        <div>
+          <div class="crm-card-name">${escHtml(a.first_name)} ${escHtml(a.last_name)}</div>
+          <div class="crm-card-pos">${escHtml(a.position_title || '')}</div>
+        </div>
+      </div>
       <div class="crm-card-meta">
         <span class="crm-source-badge">${escHtml(sourceLabel(a.source))}</span>
         <span class="crm-rating-stars">${'★'.repeat(a.rating || 0)}</span>
@@ -375,28 +540,153 @@
   }
 
   function renderAppDetail(a) {
-    // Meta info
+    // ── Initialer / avatar farve ─────────────────────────────────────────────
+    const initials = ((a.first_name||'')[0]||'') + ((a.last_name||'')[0]||'');
+    const avatarColors = ['#5d8089','#8b6fbd','#e05c8a','#4a9e7f','#c97b3a'];
+    const avatarBg = avatarColors[(a.id || 0) % avatarColors.length];
+
+    // ── Parse form-noter til struktureret liste ──────────────────────────────
+    function parseNotes(raw) {
+      if (!raw) return [];
+      return raw.trim().split(/\r?\n/)
+        .map(line => {
+          line = line.trim();
+          if (!line) return null;
+          const idx = line.lastIndexOf(':');   // brug SIDSTE kolon — spørgsmål kan indeholde kolon
+          if (idx < 1) return null;
+          const label = line.slice(0, idx).trim();
+          const value = line.slice(idx + 1).trim();
+          return (label && value) ? { label, value } : null;
+        })
+        .filter(Boolean);
+    }
+    const formRows = parseNotes(a.notes);
+
+    // ── Kontakt-rækker ───────────────────────────────────────────────────────
+    const infoRows = [
+      a.email    && { icon: '✉', label: 'Email',    val: `<a href="mailto:${escHtml(a.email)}" class="crm-link">${escHtml(a.email)}</a>` },
+      a.phone    && { icon: '📞', label: 'Telefon',  val: escHtml(a.phone) },
+      a.city     && { icon: '📍', label: 'By',       val: escHtml(a.city) },
+      { icon: '💼', label: 'Stilling',  val: escHtml(a.position_title || 'Generel ansøgning') },
+      { icon: '📣', label: 'Kilde',     val: escHtml(sourceLabel(a.source)) },
+      { icon: '🗓', label: 'Modtaget',  val: fmtDate(a.created_at) },
+    ].filter(Boolean);
+
+    // ── Filer-kort ───────────────────────────────────────────────────────────
+    const filerHtml = `
+      <div class="crm-info-card crm-files-card">
+        <div class="crm-card-heading">Filer &amp; vedhæftninger</div>
+        ${a.cv_url
+          ? `<a href="${escHtml(a.cv_url)}" target="_blank" class="crm-file-link">
+               <span class="crm-file-icon">📄</span>
+               <span class="crm-file-name">CV / ansøgningsfil</span>
+               <span class="crm-file-action">Åbn ↗</span>
+             </a>`
+          : `<p class="crm-files-empty">Ingen CV eller filer tilknyttet</p>`}
+        ${a.photo_url
+          ? `<a href="${escHtml(a.photo_url)}" target="_blank" class="crm-file-link">
+               <span class="crm-file-icon">🖼</span>
+               <span class="crm-file-name">Profilfoto</span>
+               <span class="crm-file-action">Åbn ↗</span>
+             </a>`
+          : ''}
+        <div class="crm-attach-edit" id="crm-attach-edit" style="display:none">
+          <input type="url" id="crm-photo-url-input" class="crm-input crm-input-sm" placeholder="Foto URL (https://...)" value="${escHtml(a.photo_url||'')}">
+          <input type="url" id="crm-cv-url-input" class="crm-input crm-input-sm" placeholder="CV/fil URL (https://...)" value="${escHtml(a.cv_url||'')}">
+          <button class="crm-btn crm-btn-primary crm-btn-sm" id="crm-attach-save-btn">Gem</button>
+        </div>
+        <button class="crm-btn crm-btn-ghost crm-btn-sm" id="crm-attach-toggle-btn" style="margin-top:8px">
+          ✎ ${a.photo_url || a.cv_url ? 'Rediger URLs' : 'Tilføj foto/fil'}
+        </button>
+      </div>`;
+
+    // ── AON status ───────────────────────────────────────────────────────────
+    const aonHtml = a.aon_invitation_url ? `
+      <div class="crm-info-card crm-aon-card">
+        <div class="crm-aon-header">
+          <span class="crm-aon-label">AON Talent Assessment</span>
+          <span class="crm-badge ${a.aon_status === 'completed' ? 'crm-badge-green' : 'crm-badge-amber'}">
+            ${a.aon_status === 'completed' ? '✓ Gennemført' : '⏳ Afventer'}
+          </span>
+        </div>
+        <a href="${escHtml(a.aon_invitation_url)}" target="_blank" class="crm-link" style="font-size:12px">Åbn testlink ↗</a>
+        ${a.aon_result_json && a.aon_status === 'completed'
+          ? `<button id="crm-aon-result-btn" class="crm-btn crm-btn-sm" style="margin-top:8px">Se testresultat</button>` : ''}
+      </div>` : '';
+
     el('crm-detail-meta').innerHTML = `
-      <div><strong>Navn:</strong> ${escHtml(a.first_name)} ${escHtml(a.last_name)}</div>
-      <div><strong>Email:</strong> <a href="mailto:${escHtml(a.email)}" style="color:var(--crm-neon)">${escHtml(a.email)}</a></div>
-      ${a.phone ? `<div><strong>Tlf:</strong> ${escHtml(a.phone)}</div>` : ''}
-      ${a.city  ? `<div><strong>By:</strong> ${escHtml(a.city)}</div>` : ''}
-      <div><strong>Stilling:</strong> ${escHtml(a.position_title || '–')}</div>
-      <div><strong>Kilde:</strong> ${escHtml(sourceLabel(a.source))}</div>
-      <div><strong>Oprettet:</strong> ${fmtDate(a.created_at)}</div>
-      ${a.cv_url ? `<div><strong>CV:</strong> <a href="${escHtml(a.cv_url)}" target="_blank" style="color:var(--crm-neon)">Åbn CV</a></div>` : ''}
-      ${a.aon_invitation_url ? `<div><strong>AON Test:</strong>
-        <a href="${escHtml(a.aon_invitation_url)}" target="_blank" style="color:var(--crm-neon)">Åbn testlink</a>
-        <span style="margin-left:6px;font-size:11px;padding:2px 8px;border-radius:10px;background:${a.aon_status==='completed' ? 'rgba(34,197,94,.15)' : 'rgba(245,158,11,.15)'};color:${a.aon_status==='completed' ? '#4ade80' : '#fbbf24'}">${a.aon_status==='completed' ? '✓ Gennemført' : '⏳ Afventer'}</span>
+      <!-- Ansøger-header -->
+      <div class="crm-applicant-header">
+        ${a.photo_url
+          ? `<img src="${escHtml(a.photo_url)}" class="crm-avatar crm-avatar-lg crm-avatar-photo" alt="Profil">`
+          : `<div class="crm-avatar crm-avatar-lg" style="background:${avatarBg}">${escHtml(initials.toUpperCase())}</div>`}
+        <div class="crm-applicant-name">
+          <h3>${escHtml(a.first_name)} ${escHtml(a.last_name)}</h3>
+          <span class="crm-applicant-pos">${escHtml(a.position_title || 'Generel ansøgning')}</span>
+        </div>
+        ${stagePill(a.stage)}
+      </div>
+
+      <!-- Kontakt-info -->
+      <div class="crm-info-card">
+        ${infoRows.map(r => `
+          <div class="crm-info-row">
+            <span class="crm-info-icon">${r.icon}</span>
+            <span class="crm-info-label">${r.label}</span>
+            <span class="crm-info-val">${r.val}</span>
+          </div>`).join('')}
+      </div>
+
+      <!-- Filer -->
+      ${filerHtml}
+
+      ${aonHtml}
+
+      <!-- Ansøgningstekst -->
+      ${a.cover_letter ? `
+      <div class="crm-info-card">
+        <div class="crm-card-heading">Ansøgningstekst</div>
+        <div class="crm-cover-text">${escHtml(a.cover_letter)}</div>
       </div>` : ''}
-      ${a.aon_result_json && a.aon_status === 'completed' ? `<div><strong>AON Resultat:</strong> <button id="crm-aon-result-btn" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#ccc;border-radius:6px;padding:2px 10px;font-size:11px;cursor:pointer">Se data</button></div>` : ''}
+
+      <!-- Svar fra formular -->
+      ${formRows.length ? `
+      <div class="crm-info-card">
+        <div class="crm-card-heading">Svar fra formular</div>
+        <table class="crm-form-answers">
+          ${formRows.map(r => `
+            <tr>
+              <td class="crm-fa-label">${escHtml(r.label)}</td>
+              <td class="crm-fa-val">${escHtml(r.value)}</td>
+            </tr>`).join('')}
+        </table>
+      </div>` : ''}
     `;
 
-    // AON resultat-knap event listener
+    // Filer: toggle + gem
+    el('crm-attach-toggle-btn')?.addEventListener('click', () => {
+      const d = el('crm-attach-edit');
+      if (d) d.style.display = d.style.display === 'none' ? '' : 'none';
+    });
+    el('crm-attach-save-btn')?.addEventListener('click', async () => {
+      const photo = (el('crm-photo-url-input')?.value || '').trim();
+      const cv    = (el('crm-cv-url-input')?.value    || '').trim();
+      try {
+        await api(`applications/${a.id}/attachments`, {
+          method: 'PATCH',
+          body: JSON.stringify({ photo_url: photo, cv_url: cv }),
+        });
+        toast('Filer gemt ✓');
+        activeApp = await api('applications/' + a.id);
+        renderAppDetail(activeApp);
+      } catch(e) { toast('Fejl: ' + e.message, 'err'); }
+    });
+
+    // AON resultat
     el('crm-aon-result-btn')?.addEventListener('click', () => {
       try {
         const data = JSON.parse(a.aon_result_json || '{}');
-        alert(JSON.stringify(data, null, 2)); // simpel visning — kan udbygges
+        alert(JSON.stringify(data, null, 2));
       } catch(e) {}
     });
 
@@ -415,6 +705,29 @@
     starsEl.querySelectorAll('.crm-star').forEach(star => {
       star.addEventListener('click', () => setRating(a.id, +star.dataset.r));
     });
+
+    // Job påbegyndt — Rubix-overførsel
+    const rubixSec = el('crm-rubix-section');
+    if (rubixSec) {
+      if (a.stage === 'job_pabegyndt') {
+        rubixSec.style.display = '';
+        const rubixBtn = el('crm-rubix-btn');
+        if (rubixBtn) {
+          if (a.rubix_synced) {
+            rubixBtn.textContent = '✓ Overført til Rubix';
+            rubixBtn.disabled = true;
+            rubixBtn.style.opacity = '0.6';
+          } else {
+            rubixBtn.textContent = '🔄 Overfør data til Rubix';
+            rubixBtn.disabled = false;
+            rubixBtn.style.opacity = '1';
+          }
+          rubixBtn.onclick = () => transferToRubix(a.id);
+        }
+      } else {
+        rubixSec.style.display = 'none';
+      }
+    }
 
     // Rejection info
     const rejSec = el('crm-rejection-section');
@@ -445,11 +758,13 @@
   async function moveStage(appId, newStage) {
     const note = el('crm-stage-note')?.value || '';
     try {
-      await api(`applications/${appId}/stage`, {
+      const res = await api(`applications/${appId}/stage`, {
         method: 'PATCH',
         body:   JSON.stringify({ stage: newStage, note }),
       });
-      toast(`Flyttet til ${RZPZ_CRM.stages[newStage] || newStage} ✓`);
+      // Vis faktisk stage (ansat → auto-avancerer til job_pabegyndt)
+      const actualStage = res.stage || newStage;
+      toast(`Flyttet til ${RZPZ_CRM.stages[actualStage] || actualStage} ✓`);
       activeApp = await api('applications/' + appId);
       renderAppDetail(activeApp);
       const [hist] = await Promise.all([api('applications/' + appId + '/history')]);
@@ -460,6 +775,22 @@
       loadStats();
     } catch(e) {
       toast('Fejl: ' + e.message, 'err');
+    }
+  }
+
+  async function transferToRubix(appId) {
+    const btn = el('crm-rubix-btn');
+    if (btn) { btn.textContent = '⏳ Overfører…'; btn.disabled = true; }
+    try {
+      const res = await api(`applications/${appId}/rubix-transfer`, { method: 'POST' });
+      toast(res.message || 'Overført til Rubix ✓');
+      if (btn) { btn.textContent = '✓ Overført til Rubix'; }
+      // Genindlæs for at opdatere rubix_synced flag
+      activeApp = await api('applications/' + appId);
+      renderAppDetail(activeApp);
+    } catch(e) {
+      toast('Rubix fejl: ' + e.message, 'err');
+      if (btn) { btn.textContent = '🔄 Overfør data til Rubix'; btn.disabled = false; }
     }
   }
 

@@ -25,7 +25,10 @@
   margin: 0 auto;
   font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
   color: var(--rzf-text);
-  padding: 8px 0 32px;
+  background: var(--rzf-bg);
+  border-radius: var(--rzf-radius);
+  padding: 32px 36px 40px;
+  box-shadow: var(--rzf-shadow);
 }
 
 /* ── Intro text ────────────────────────────────────────── */

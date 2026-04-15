@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      3.5.11
+ * Version:      3.5.21
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '3.5.11' );
+define( 'RZPA_VERSION',     '3.5.21' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -37,6 +37,9 @@ require_once RZPA_DIR . 'includes/api/class-google-ads.php';
 require_once RZPA_DIR . 'includes/class-sitemap-manager.php';
 require_once RZPA_DIR . 'includes/class-rest-api.php';
 require_once RZPA_DIR . 'includes/class-admin.php';
+
+// ── ESG Module ──────────────────────────────────────────────────────────────
+require_once RZPA_DIR . 'modules/esg/class-esg.php';
 
 // ── Rekruttering Module ──────────────────────────────────────────────────────
 require_once RZPA_DIR . 'modules/rekruttering/class-rekruttering.php';
@@ -237,6 +240,7 @@ add_action( 'plugins_loaded', function () {
     RZPA_Scheduler::init();
     RZPA_Rekruttering::init();
     RZPA_Sitemap_Manager::init();
+    RZPA_ESG::init();
 
     // RezCRM module
     if ( get_option( RZPZ_CRM_DB::DB_VERSION_KEY ) !== RZPZ_CRM_DB::DB_VERSION ) {

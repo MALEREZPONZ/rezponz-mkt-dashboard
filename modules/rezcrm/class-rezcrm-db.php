@@ -17,17 +17,18 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class RZPZ_CRM_DB {
 
-    const DB_VERSION     = '1';
+    const DB_VERSION     = '2'; // bumped: added photo_url, cv_url, address, city, cover_letter, notes to applicants
     const DB_VERSION_KEY = 'rzpz_crm_db_ver';
 
     // Pipeline-trin i rækkefølge
     const PIPELINE_STAGES = [
-        'ny'         => 'Ny',
-        'screening'  => 'Screening',
-        'samtale'    => 'Samtale',
-        'tilbud'     => 'Tilbud',
-        'ansat'      => 'Ansat',
-        'afslag'     => 'Afslag',
+        'ny'             => 'Ny',
+        'screening'      => 'Screening',
+        'samtale'        => 'Samtale',
+        'tilbud'         => 'Tilbud',
+        'ansat'          => 'Ansat',
+        'job_pabegyndt'  => 'Job påbegyndt',
+        'afslag'         => 'Afslag',
     ];
 
     // Kanalkilder
@@ -76,6 +77,7 @@ class RZPZ_CRM_DB {
             address          VARCHAR(255)    DEFAULT NULL,
             city             VARCHAR(100)    DEFAULT NULL,
             birthdate        DATE            DEFAULT NULL,
+            photo_url        VARCHAR(500)    DEFAULT NULL,
             cv_url           VARCHAR(500)    DEFAULT NULL,
             cover_letter     LONGTEXT        DEFAULT NULL,
             notes            TEXT            DEFAULT NULL,
@@ -302,6 +304,8 @@ class RZPZ_CRM_DB {
             'city'          => sanitize_text_field( $data['city'] ?? '' ),
             'notes'         => sanitize_textarea_field( $data['notes'] ?? '' ),
             'gdpr_consent'  => ! empty( $data['gdpr_consent'] ) ? 1 : 0,
+            'photo_url'     => esc_url_raw( $data['photo_url'] ?? '' ) ?: null,
+            'cv_url'        => esc_url_raw( $data['cv_url']    ?? '' ) ?: null,
         ];
 
         if ( $row['gdpr_consent'] && empty( $data['id'] ) ) {
@@ -310,12 +314,32 @@ class RZPZ_CRM_DB {
 
         if ( empty( $row['email'] ) || empty( $row['first_name'] ) ) return false;
 
+        // Eksplicit ID → opdater
         if ( ! empty( $data['id'] ) ) {
             $wpdb->update( $t, $row, [ 'id' => (int) $data['id'] ] );
             return (int) $data['id'];
         }
 
-        // Generer unik token til status-side
+        // Slå op på email — undgå UNIQUE-fejl og returner eksisterende ansøger
+        $existing_id = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT id FROM $t WHERE email = %s LIMIT 1",
+            $row['email']
+        ) );
+
+        if ( $existing_id > 0 ) {
+            // Opdater eksisterende ansøger med eventuel ny info (bevar token)
+            unset( $row['token'] );
+            // Bevar GDPR-dato hvis allerede sat
+            unset( $row['gdpr_consent_at'] );
+            $wpdb->update( $t, $row, [ 'id' => $existing_id ] );
+            // Opdater GDPR-dato kun hvis ny samtykke
+            if ( $row['gdpr_consent'] ) {
+                $wpdb->update( $t, [ 'gdpr_consent_at' => current_time( 'mysql' ) ], [ 'id' => $existing_id, 'gdpr_consent_at' => null ] );
+            }
+            return $existing_id;
+        }
+
+        // Ny ansøger — generer unik token til status-side
         $row['token'] = wp_generate_password( 32, false );
         $wpdb->insert( $t, $row );
         return $wpdb->insert_id ?: false;
@@ -371,7 +395,7 @@ class RZPZ_CRM_DB {
         $pos = $wpdb->prefix . 'rzpz_crm_positions';
         return $wpdb->get_row( $wpdb->prepare(
             "SELECT a.*, ap.first_name, ap.last_name, ap.email, ap.phone, ap.address, ap.city,
-                    ap.cover_letter, ap.cv_url, ap.notes, ap.token,
+                    ap.cover_letter, ap.photo_url, ap.cv_url, ap.notes, ap.token,
                     COALESCE(pos.title, 'Generel ansøgning') AS position_title,
                     COALESCE(pos.department, '')              AS department
              FROM {$a} a
@@ -418,7 +442,7 @@ class RZPZ_CRM_DB {
         $extra = [ 'stage' => $new_stage, 'updated_at' => current_time( 'mysql' ) ];
 
         // Gem ended_at for alle afsluttede stages
-        if ( in_array( $new_stage, [ 'ansat', 'afslag' ], true ) ) {
+        if ( in_array( $new_stage, [ 'ansat', 'job_pabegyndt', 'afslag' ], true ) ) {
             $extra['ended_at'] = current_time( 'mysql' );
         }
 
@@ -491,6 +515,21 @@ class RZPZ_CRM_DB {
 
         if ( empty( $row ) ) return false;
         return (bool) $wpdb->update( $wpdb->prefix . 'rzpz_crm_applications', $row, [ 'id' => $id ] );
+    }
+
+    /** Opdater foto og CV URL for ansøgeren bag en ansøgning */
+    public static function update_applicant_attachments( int $application_id, string $photo_url, string $cv_url ): bool {
+        global $wpdb;
+        $a  = $wpdb->prefix . 'rzpz_crm_applications';
+        $ap = $wpdb->prefix . 'rzpz_crm_applicants';
+        $applicant_id = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT applicant_id FROM {$a} WHERE id = %d", $application_id
+        ) );
+        if ( ! $applicant_id ) return false;
+        return false !== $wpdb->update( $ap, [
+            'photo_url' => esc_url_raw( $photo_url ) ?: null,
+            'cv_url'    => esc_url_raw( $cv_url )    ?: null,
+        ], [ 'id' => $applicant_id ] );
     }
 
     // ── History ──────────────────────────────────────────────────────────────
@@ -629,7 +668,8 @@ class RZPZ_CRM_DB {
                 'city'          => null,
                 'birthdate'     => null,
                 'cover_letter'  => null,
-                'cv_url'        => null,
+                'photo_url'     => null,
+            'cv_url'        => null,
                 'notes'         => '[GDPR anonymiseret ' . gmdate( 'Y-m-d' ) . ']',
                 'gdpr_consent'  => 0,
                 'delete_after'  => null,

@@ -115,6 +115,8 @@ class RZPA_Admin {
         add_submenu_page( 'rzpa-dashboard', 'TikTok Ads – Rezponz',       'TikTok Ads',       $cap, 'rzpa-tiktok',     [ __CLASS__, 'page_tiktok' ] );
         add_submenu_page( 'rzpa-dashboard', 'PDF Rapport – Rezponz',      'PDF Rapport',      $cap, 'rzpa-rapport',    [ __CLASS__, 'page_rapport' ] );
 
+        add_submenu_page( 'rzpa-dashboard', 'ESG – Rezponz', '🌱 ESG', $cap, 'rzpa-esg', [ 'RZPA_ESG', 'render_admin_page' ] );
+
         // ── Sektion: System ──────────────────────────────────────────────────
         add_submenu_page( 'rzpa-dashboard', '', '⚙️ System', $cap, 'rzpa-section-system', [ __CLASS__, 'page_dashboard' ] );
         add_submenu_page( 'rzpa-dashboard', 'Sitemaps – Rezponz',         'Sitemaps',         $cap, 'rzpa-sitemaps',   [ __CLASS__, 'page_sitemaps' ] );

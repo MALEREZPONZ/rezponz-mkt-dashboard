@@ -259,43 +259,21 @@ $cta     = $data['cta'];
     </section>
 
     <?php /* ══════════════════════════════════════════════════════════════════
-     SECTION 5 — Sådan måler vi (collapsible)
+     SECTION 5 — Sådan måler vi (always visible)
     ══════════════════════════════════════════════════════════════════ */ ?>
     <section class="rz-esg-metrics" id="maalemetode" aria-labelledby="rz-esg-metrics-heading">
         <div class="rz-esg-container">
-            <div class="rz-esg-metrics__toggle-wrap rz-esg-animate" id="rz-esg-metrics-toggle">
-                <h2 class="rz-esg-section-heading" id="rz-esg-metrics-heading">
-                    <?php echo esc_html( $metrics['toggle_label_open'] ); ?>
-                </h2>
-                <button
-                    class="rz-esg-metrics__toggle rz-esg-btn-outline"
-                    aria-expanded="false"
-                    aria-controls="rz-esg-metrics-panel"
-                    data-track-event="esg_metrics_toggle"
-                    data-label-open="<?php echo esc_attr( $metrics['toggle_label_open'] ); ?>"
-                    data-label-close="<?php echo esc_attr( $metrics['toggle_label_close'] ); ?>"
-                >
-                    <?php echo esc_html( $metrics['toggle_label_open'] ); ?>
-                    <span class="rz-esg-metrics__toggle-arrow" aria-hidden="true">▾</span>
-                </button>
-            </div>
-
-            <div
-                class="rz-esg-metrics__panel"
-                id="rz-esg-metrics-panel"
-                role="region"
-                aria-labelledby="rz-esg-metrics-heading"
-                hidden
-            >
-                <dl class="rz-esg-metrics__grid">
-                    <?php foreach ( $metrics['definitions'] as $def ) : ?>
-                    <div class="rz-esg-metrics__item">
-                        <dt class="rz-esg-metrics__term"><?php echo esc_html( $def['term'] ); ?></dt>
-                        <dd class="rz-esg-metrics__def"><?php echo esc_html( $def['def'] ); ?></dd>
-                    </div>
-                    <?php endforeach; ?>
-                </dl>
-            </div>
+            <h2 class="rz-esg-section-heading rz-esg-animate" id="rz-esg-metrics-heading">
+                <?php echo esc_html( $metrics['toggle_label_open'] ); ?>
+            </h2>
+            <dl class="rz-esg-metrics__grid rz-esg-animate" data-delay="80">
+                <?php foreach ( $metrics['definitions'] as $def ) : ?>
+                <div class="rz-esg-metrics__item">
+                    <dt class="rz-esg-metrics__term"><?php echo esc_html( $def['term'] ); ?></dt>
+                    <dd class="rz-esg-metrics__def"><?php echo esc_html( $def['def'] ); ?></dd>
+                </div>
+                <?php endforeach; ?>
+            </dl>
         </div>
     </section>
 
@@ -313,22 +291,24 @@ $cta     = $data['cta'];
             <div class="rz-esg-cases__grid">
                 <?php foreach ( $cases as $i => $case ) : ?>
                 <article
-                    class="rz-esg-case-card rz-esg-animate"
+                    class="rz-esg-case-card rz-esg-case-card--<?php echo esc_attr( strtolower( $case['tag'] ) ); ?> rz-esg-animate"
                     data-delay="<?php echo esc_attr( $i * 100 ); ?>"
                     aria-label="<?php echo esc_attr( $case['title'] ); ?>"
                 >
-                    <span class="rz-esg-badge rz-esg-badge--<?php echo esc_attr( strtolower( $case['tag'] ) ); ?>">
-                        <?php echo esc_html( $case['tag'] ); ?>
-                    </span>
-                    <h3 class="rz-esg-case-card__title">
-                        <?php echo esc_html( $case['title'] ); ?>
-                    </h3>
-                    <p class="rz-esg-case-card__intro">
-                        <em><?php echo esc_html( $case['intro'] ); ?></em>
-                    </p>
-                    <p class="rz-esg-case-card__body">
-                        <?php echo esc_html( $case['body'] ); ?>
-                    </p>
+                    <div class="rz-esg-case-card__inner">
+                        <span class="rz-esg-badge rz-esg-badge--<?php echo esc_attr( strtolower( $case['tag'] ) ); ?>">
+                            <?php echo esc_html( $case['tag'] ); ?>
+                        </span>
+                        <h3 class="rz-esg-case-card__title">
+                            <?php echo esc_html( $case['title'] ); ?>
+                        </h3>
+                        <p class="rz-esg-case-card__intro">
+                            <em><?php echo esc_html( $case['intro'] ); ?></em>
+                        </p>
+                        <p class="rz-esg-case-card__body">
+                            <?php echo esc_html( $case['body'] ); ?>
+                        </p>
+                    </div>
                 </article>
                 <?php endforeach; ?>
             </div>
@@ -396,13 +376,6 @@ $cta     = $data['cta'];
                         data-track-event="<?php echo esc_attr( $cta['btn_primary_track_event'] ); ?>"
                     >
                         <?php echo esc_html( $cta['btn_primary_label'] ); ?>
-                    </a>
-                    <a
-                        href="<?php echo esc_url( $cta['btn_secondary_url'] ); ?>"
-                        class="rz-esg-btn rz-esg-btn--secondary"
-                        data-track-event="<?php echo esc_attr( $cta['btn_secondary_track_event'] ); ?>"
-                    >
-                        <?php echo esc_html( $cta['btn_secondary_label'] ); ?>
                     </a>
                 </div>
             </div>

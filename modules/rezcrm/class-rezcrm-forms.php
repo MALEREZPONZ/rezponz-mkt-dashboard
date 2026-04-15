@@ -227,22 +227,31 @@ class RZPZ_CRM_Forms {
             $applicant_data['notes'] = trim( ( $applicant_data['notes'] ?? '' ) . "\n\n" . $notes );
         }
 
+        // Håndtér uploadede filer
+        if ( ! empty( $data['cv_url'] ) )    $applicant_data['cv_url']    = esc_url_raw( $data['cv_url'] );
+        if ( ! empty( $data['photo_url'] ) ) $applicant_data['photo_url'] = esc_url_raw( $data['photo_url'] );
+
         // Opret ansøger
         $applicant_id = RZPZ_CRM_DB::upsert_applicant( $applicant_data );
         if ( ! $applicant_id ) {
             return new WP_REST_Response( [ 'message' => 'Kunne ikke oprette ansøger' ], 500 );
         }
 
-        // Opret ansøgning hvis position_id er angivet
-        $application_id = null;
-        if ( $pos_id ) {
-            $source = sanitize_text_field( $data['heard_from'] ?? 'website' );
-            $application_id = RZPZ_CRM_DB::insert_application( $applicant_id, $pos_id, $source );
-        }
+        // Opret ansøgning — altid, også uden specifik stilling (pos_id = 0 = generel ansøgning)
+        $source         = sanitize_text_field( $data['heard_from'] ?? 'website' );
+        $application_id = RZPZ_CRM_DB::insert_application( $applicant_id, $pos_id, $source );
 
         // Marker session som færdig
         if ( $token ) {
             RZPZ_CRM_Forms_DB::complete_session( $token, $application_id ?? 0 );
+        }
+
+        // AON Talent Assessment — opret invitation INDEN email sendes, så {{aon_test_link}} er klar
+        if ( $application_id && class_exists( 'RZPZ_CRM_AON' ) && RZPZ_CRM_AON::is_configured() ) {
+            $app_obj = RZPZ_CRM_DB::get_application( (int) $application_id );
+            if ( $app_obj ) {
+                RZPZ_CRM_AON::create_invitation( $app_obj, (int) $application_id );
+            }
         }
 
         // Send bekræftelses-email
@@ -280,5 +289,22 @@ class RZPZ_CRM_Forms {
             'success_message' => $form->success_message ?: '<h3>Tak! 🎉</h3><p>Vi vender tilbage hurtigst muligt.</p>',
             'redirect_url'    => $safe_redirect ?: null,
         ], 200 );
+    }
+
+    /** Håndterer fil-upload fra frontend ansøgningsskema */
+    public static function api_upload_file( WP_REST_Request $req ): WP_REST_Response {
+        if ( ! function_exists( 'wp_handle_upload' ) ) require_once ABSPATH . 'wp-admin/includes/file.php';
+        $file = $_FILES['file'] ?? null;
+        if ( ! $file || $file['error'] !== UPLOAD_ERR_OK ) {
+            return new WP_REST_Response( [ 'message' => 'Upload fejlede' ], 400 );
+        }
+        $allowed = [ 'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png' ];
+        $ext = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
+        if ( ! in_array( $ext, $allowed, true ) ) {
+            return new WP_REST_Response( [ 'message' => 'Filtype ikke tilladt' ], 400 );
+        }
+        $upload = wp_handle_upload( $file, [ 'test_form' => false ] );
+        if ( isset( $upload['error'] ) ) return new WP_REST_Response( [ 'message' => $upload['error'] ], 500 );
+        return new WP_REST_Response( [ 'url' => $upload['url'] ], 200 );
     }
 }

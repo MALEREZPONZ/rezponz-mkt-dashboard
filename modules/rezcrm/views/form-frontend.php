@@ -87,7 +87,25 @@ $form_uid    = 'rzcrm-form-' . $form->id;
                        <?php echo $req; ?>>
                 <?php break;
 
-              case 'birthdate':
+              case 'birthdate': ?>
+                <div class="rzcrm-date-group">
+                  <select name="<?php echo $fkey; ?>_day" class="rzcrm-select rzcrm-date-part" aria-label="Dag">
+                    <option value="">Dag</option>
+                    <?php for($d=1;$d<=31;$d++) echo "<option value='{$d}'>{$d}</option>"; ?>
+                  </select>
+                  <select name="<?php echo $fkey; ?>_month" class="rzcrm-select rzcrm-date-part" aria-label="Måned">
+                    <option value="">Måned</option>
+                    <?php $months=['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+                    foreach($months as $mi=>$m) echo "<option value='".($mi+1)."'>{$m}</option>"; ?>
+                  </select>
+                  <select name="<?php echo $fkey; ?>_year" class="rzcrm-select rzcrm-date-part" aria-label="År">
+                    <option value="">År</option>
+                    <?php $yr=date('Y'); for($y=$yr-16;$y>=$yr-80;$y--) echo "<option value='{$y}'>{$y}</option>"; ?>
+                  </select>
+                </div>
+                <input type="hidden" name="<?php echo $fkey; ?>" class="rzcrm-date-hidden">
+                <?php break;
+
               case 'date': ?>
                 <div class="rzcrm-date-group">
                   <select name="<?php echo $fkey; ?>_day" class="rzcrm-select rzcrm-date-part" aria-label="Dag">
@@ -101,7 +119,7 @@ $form_uid    = 'rzcrm-form-' . $form->id;
                   </select>
                   <select name="<?php echo $fkey; ?>_year" class="rzcrm-select rzcrm-date-part" aria-label="År">
                     <option value="">År</option>
-                    <?php $yr=date('Y'); for($y=$yr-16;$y>=$yr-70;$y--) echo "<option value='{$y}'>{$y}</option>"; ?>
+                    <?php $yr=date('Y'); for($y=$yr+5;$y>=$yr-2;$y--) echo "<option value='{$y}'>{$y}</option>"; ?>
                   </select>
                 </div>
                 <input type="hidden" name="<?php echo $fkey; ?>" class="rzcrm-date-hidden">
@@ -198,11 +216,14 @@ $form_uid    = 'rzcrm-form-' . $form->id;
         </div><!-- /.rzcrm-fields -->
 
         <!-- GDPR på sidste step -->
-        <?php if ( $step_num === $total_steps ) : ?>
+        <?php if ( $step_num === $total_steps ) :
+          $privacy_url = get_option('rzpa_settings', [])['crm_privacy_url'] ?? '';
+          if (!$privacy_url) $privacy_url = 'https://rezponz.dk/privatliv-cookiepolitik-rezponz/';
+        ?>
           <div class="rzcrm-gdpr">
             <label class="rzcrm-checkbox-label rzcrm-gdpr-label">
               <input type="checkbox" name="gdpr_consent" id="rzcrm-gdpr-consent" required>
-              Jeg accepterer <a href="<?php echo esc_url( get_privacy_policy_url() ?: '#' ); ?>" target="_blank">betingelserne for databehandling</a>
+              Jeg accepterer <a href="<?php echo esc_url( $privacy_url ); ?>" target="_blank">betingelserne for databehandling</a>
             </label>
           </div>
         <?php endif; ?>

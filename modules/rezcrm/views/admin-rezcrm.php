@@ -48,7 +48,7 @@ if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
   <div class="crm-tabs">
     <button class="crm-tab crm-tab-active" data-tab="kanban">🗂 Kanban</button>
     <button class="crm-tab" data-tab="list">📋 Liste</button>
-    <button class="crm-tab" data-tab="sources">📊 Kanaler</button>
+    <button class="crm-tab" data-tab="calendar">📅 Kalender</button>
   </div>
 
   <!-- ── Kanban Board ─────────────────────────────────────────────────────── -->
@@ -83,10 +83,19 @@ if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
     </table>
   </div>
 
-  <!-- ── Sources ──────────────────────────────────────────────────────────── -->
-  <div id="tab-sources" class="crm-tab-panel" style="display:none">
-    <div class="crm-sources-grid" id="crm-sources-grid">
-      <!-- Genereres af JS -->
+  <!-- ── Calendar ─────────────────────────────────────────────────────────── -->
+  <div id="tab-calendar" class="crm-tab-panel" style="display:none">
+    <div class="crm-calendar-wrap">
+      <div class="crm-cal-header">
+        <button id="crm-cal-prev" class="crm-btn-icon">‹</button>
+        <span id="crm-cal-month-label"></span>
+        <button id="crm-cal-next" class="crm-btn-icon">›</button>
+      </div>
+      <div class="crm-cal-grid" id="crm-cal-grid"></div>
+      <div class="crm-cal-detail" id="crm-cal-detail" style="display:none">
+        <h4 id="crm-cal-detail-title"></h4>
+        <div id="crm-cal-detail-list"></div>
+      </div>
     </div>
   </div>
 
@@ -160,6 +169,12 @@ if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
               <div class="crm-detail-section">
                 <h3>Rating</h3>
                 <div class="crm-stars" id="crm-stars"></div>
+              </div>
+
+              <div class="crm-detail-section" id="crm-rubix-section" style="display:none">
+                <h3>Rubix HR</h3>
+                <p style="font-size:12px;color:var(--crm-muted);margin:0 0 10px">Ansøger er ansat — klar til overførsel til Rubix HR-system.</p>
+                <button class="crm-btn crm-btn-primary" id="crm-rubix-btn" style="width:100%;justify-content:center">🔄 Overfør data til Rubix</button>
               </div>
 
               <div class="crm-detail-section" id="crm-rejection-section" style="display:none">

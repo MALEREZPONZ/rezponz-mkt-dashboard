@@ -215,6 +215,28 @@
         if (Array.isArray(fieldData[k])) fieldData[k] = fieldData[k].join(', ');
       });
 
+      // Upload files — profil-foto → photo_url, øvrige filer → cv_url
+      const fileInputs = formEl.querySelectorAll('input[type="file"]');
+      for (const input of fileInputs) {
+          if (!input.files[0]) continue;
+          const fd = new FormData();
+          fd.append('file', input.files[0]);
+          try {
+              const r = await fetch(API + 'crm/upload-file', {
+                  method: 'POST',
+                  headers: { 'X-WP-Nonce': NONCE },
+                  body: fd,
+              });
+              const d = await r.json();
+              if (d.url) {
+                  // Profil-foto gemmes separat fra CV/andre filer
+                  const isPhoto = input.name === 'profile_photo' ||
+                                  input.closest('.rzcrm-photo-wrap') !== null;
+                  fieldData[isPhoto ? 'photo_url' : 'cv_url'] = d.url;
+              }
+          } catch(e) { console.warn('File upload failed', e); }
+      }
+
       try {
         const res = await fetch(API + 'crm/form-submit', {
           method:  'POST',

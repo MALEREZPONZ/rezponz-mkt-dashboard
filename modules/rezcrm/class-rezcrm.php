@@ -83,9 +83,10 @@ class RZPZ_RezCRM {
             [ 'GET',    'crm/applications',                    'api_applications_list' ],
             [ 'POST',   'crm/applications',                    'api_applications_create' ],
             [ 'GET',    'crm/applications/(?P<id>\d+)',        'api_applications_get' ],
-            [ 'PATCH',  'crm/applications/(?P<id>\d+)/stage', 'api_applications_move_stage' ],
-            [ 'PATCH',  'crm/applications/(?P<id>\d+)',        'api_applications_update' ],
-            [ 'DELETE', 'crm/applications/(?P<id>\d+)',        'api_applications_delete' ],
+            [ 'PATCH',  'crm/applications/(?P<id>\d+)/stage',          'api_applications_move_stage' ],
+            [ 'POST',   'crm/applications/(?P<id>\d+)/rubix-transfer', 'api_rubix_transfer' ],
+            [ 'PATCH',  'crm/applications/(?P<id>\d+)',                'api_applications_update' ],
+            [ 'DELETE', 'crm/applications/(?P<id>\d+)',                'api_applications_delete' ],
 
             // History
             [ 'GET',    'crm/applications/(?P<id>\d+)/history',   'api_history' ],
@@ -106,11 +107,17 @@ class RZPZ_RezCRM {
             // Cancel scheduled rejection
             [ 'DELETE', 'crm/applications/(?P<id>\d+)/rejection', 'api_cancel_rejection' ],
 
+            // Attachments (photo_url + cv_url)
+            [ 'PATCH',  'crm/applications/(?P<id>\d+)/attachments', 'api_attachments_update' ],
+
             // Applicant status (offentlig — token-beskyttet)
             [ 'GET',    'crm/status/(?P<token>[a-zA-Z0-9]+)', 'api_applicant_status', false ],
 
             // AON Talent Assessment webhook (offentlig — AON kalder dette endpoint)
             [ 'POST',   'crm/aon/webhook',                    'api_aon_webhook',      false ],
+
+            // File upload (frontend formular — nonce-beskyttet af WP REST API)
+            [ 'POST',   'crm/upload-file',                    'api_upload_file',      false ],
         ];
 
         foreach ( $routes as $r ) {
@@ -201,23 +208,40 @@ class RZPZ_RezCRM {
         $ok = RZPZ_CRM_DB::move_stage( $id, $stage, get_current_user_id(), $note );
         if ( ! $ok ) return new WP_REST_Response( [ 'message' => 'Ansøgning ikke fundet' ], 404 );
 
-        // Send automatisk stage-email
-        self::send_stage_email( $id, 'stage_' . $stage );
-
-        // Rubix-integration: synk hvis ansat
+        // Ansat → auto-flyt til "Job påbegyndt" (klar til Rubix-overførsel)
         if ( $stage === 'ansat' ) {
-            RZPZ_CRM_DB::sync_to_rubix( $id );
-            // Opret evt. i Crew-modulet (hvis tilgængeligt)
+            RZPZ_CRM_DB::move_stage( $id, 'job_pabegyndt', get_current_user_id(), 'Automatisk avanceret fra Ansat' );
             self::maybe_create_crew_member( $id );
         }
 
-        return new WP_REST_Response( [ 'ok' => true ], 200 );
+        return new WP_REST_Response( [ 'ok' => true, 'stage' => $stage === 'ansat' ? 'job_pabegyndt' : $stage ], 200 );
+    }
+
+    /** Manuel Rubix-overførsel — kaldes fra "Job påbegyndt"-knap */
+    public static function api_rubix_transfer( WP_REST_Request $req ): WP_REST_Response {
+        $id = (int) $req->get_param( 'id' );
+        $ok = RZPZ_CRM_DB::sync_to_rubix( $id );
+        if ( ! $ok ) {
+            return new WP_REST_Response( [ 'message' => 'Rubix overførsel fejlede — tjek webhook URL i indstillinger' ], 500 );
+        }
+        return new WP_REST_Response( [ 'ok' => true, 'message' => 'Data overført til Rubix ✓' ], 200 );
     }
 
     public static function api_applications_update( WP_REST_Request $req ): WP_REST_Response {
         $id  = (int) $req->get_param( 'id' );
         $ok  = RZPZ_CRM_DB::update_application( $id, $req->get_json_params() );
         return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 400 );
+    }
+
+    public static function api_attachments_update( WP_REST_Request $req ): WP_REST_Response {
+        $id     = (int) $req->get_param( 'id' );
+        $params = $req->get_json_params();
+        $ok     = RZPZ_CRM_DB::update_applicant_attachments(
+            $id,
+            sanitize_url( $params['photo_url'] ?? '' ),
+            sanitize_url( $params['cv_url']    ?? '' )
+        );
+        return new WP_REST_Response( [ 'ok' => $ok ], 200 );
     }
 
     public static function api_applications_delete( WP_REST_Request $req ): WP_REST_Response {
@@ -355,6 +379,12 @@ class RZPZ_RezCRM {
         return RZPZ_CRM_AON::handle_webhook( $req );
     }
 
+    // ── REST: File upload ─────────────────────────────────────────────────────
+
+    public static function api_upload_file( WP_REST_Request $req ): WP_REST_Response {
+        return RZPZ_CRM_Forms::api_upload_file( $req );
+    }
+
     // ── Email helpers ────────────────────────────────────────────────────────
 
     /**
@@ -364,25 +394,89 @@ class RZPZ_RezCRM {
      */
     public static function render_template( string $tpl, object $app ): string {
         $stages = RZPZ_CRM_DB::PIPELINE_STAGES;
-        $status_url = site_url( '/ansogningsstatus/?token=' . ( $app->token ?? '' ) );
 
         $pairs = [
             '{{first_name}}'     => esc_html( $app->first_name ?? '' ),
             '{{last_name}}'      => esc_html( $app->last_name  ?? '' ),
             '{{position_title}}' => esc_html( $app->position_title ?? '' ),
             '{{stage_label}}'    => esc_html( $stages[ $app->stage ?? '' ] ?? '' ),
-            '{{status_url}}'     => esc_url( $status_url ),
-            '{{aon_test_link}}'  => '', // udfyldes nedenfor hvis AON-invitation eksisterer
+            '{{status_url}}'     => '',
+            '{{aon_test_link}}'  => '',
         ];
 
-        // AON test link — hentes fra ansøgningen (sat af RZPZ_CRM_AON::create_invitation())
-        $aon_url = '';
+        // AON test link
         if ( ! empty( $app->aon_invitation_url ) ) {
-            $aon_url = '<a href="' . esc_url( $app->aon_invitation_url ) . '" style="font-weight:bold">Tag din AON-test her &rarr;</a>';
+            $pairs['{{aon_test_link}}'] =
+                '<a href="' . esc_url( $app->aon_invitation_url ) . '" '
+                . 'style="display:inline-block;background:#adff2f;color:#000;font-weight:700;'
+                . 'padding:12px 28px;border-radius:8px;text-decoration:none;font-size:15px">'
+                . 'Start din AON-test &rarr;</a>';
         }
-        $pairs['{{aon_test_link}}'] = $aon_url;
 
-        return str_replace( array_keys( $pairs ), array_values( $pairs ), $tpl );
+        $body = str_replace( array_keys( $pairs ), array_values( $pairs ), $tpl );
+
+        return self::wrap_email_html( $body );
+    }
+
+    /**
+     * Wrapper al udgående email i et branded HTML-skelet med Rezponz-logo.
+     * Kaldes automatisk af render_template() — behøver ikke kaldes manuelt.
+     */
+    private static function wrap_email_html( string $body ): string {
+        $logo_url = RZPA_URL . 'assets/Rezponz-logo.png';
+        $site_url = home_url();
+        $year     = gmdate( 'Y' );
+
+        // Konvertér plain line-breaks til <br> hvis body ikke allerede er HTML
+        if ( strpos( $body, '<' ) === false ) {
+            $body = nl2br( esc_html( $body ) );
+        }
+
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rezponz</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.08);">
+
+      <!-- Logo header -->
+      <tr>
+        <td style="background:#0d1b2a;padding:28px 40px;text-align:center;">
+          <a href="{$site_url}" style="display:inline-block;">
+            <img src="{$logo_url}" alt="Rezponz" width="160" style="display:block;height:auto;max-height:50px;object-fit:contain;">
+          </a>
+        </td>
+      </tr>
+
+      <!-- Body -->
+      <tr>
+        <td style="padding:36px 40px;color:#1a1a1a;font-size:15px;line-height:1.7;">
+          {$body}
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td style="background:#f9f9f9;padding:20px 40px;text-align:center;border-top:1px solid #eeeeee;">
+          <p style="margin:0;font-size:12px;color:#888888;">
+            &copy; {$year} <a href="{$site_url}" style="color:#888;text-decoration:none;">Rezponz</a>
+            &nbsp;&middot;&nbsp; Denne mail er sendt automatisk — svar venligst ikke direkte på den.
+          </p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>
+HTML;
     }
 
     /** Find og send standard-email for stage-trigger. */
