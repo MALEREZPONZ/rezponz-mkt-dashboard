@@ -168,6 +168,7 @@ endif; // function_exists rzpz_render_custom_field
         <!-- ── Inline CAPTCHA — vises kun når Send-knappen trykkes ───────────── -->
         <div class="rzpz-captcha-inline" id="rzpz-captcha-step" style="display:none;">
             <div class="rzpz-captcha-inner">
+                <button type="button" class="rzpz-captcha-close" id="rzpz-captcha-close" aria-label="Luk">✕</button>
                 <div class="rzpz-captcha-icon">🛡️</div>
                 <p class="rzpz-captcha-label"><?php _e( 'Bekræft at du er et menneske', 'rezponz-analytics' ); ?></p>
                 <p class="rzpz-captcha-question">

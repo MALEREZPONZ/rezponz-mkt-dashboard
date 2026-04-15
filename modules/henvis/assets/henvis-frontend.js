@@ -20,27 +20,50 @@
             if (answerInput) answerInput.focus();
         }
 
-        // Send-knappen trykkes: validér form → vis CAPTCHA inline
-        triggerBtn.addEventListener('click', function () {
-            // Brug native HTML5 form validation
-            if (form && !form.checkValidity()) {
-                form.reportValidity();
-                return;
-            }
+        var originalBtnText = triggerBtn.textContent;
 
-            // Vis CAPTCHA-boksen med smooth scroll
+        function openCaptcha() {
             captchaStep.style.display = 'block';
             captchaStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
             if (answerInput) {
                 answerInput.value = '';
                 answerInput.style.borderColor = '';
+                answerInput.style.boxShadow = '';
                 answerInput.focus();
             }
+            triggerBtn.textContent = '✏ Ret inden afsendelse';
+            triggerBtn.style.opacity = '0.55';
+        }
 
-            // Skift knap-tekst til "Ændre svar"
-            triggerBtn.textContent = '✏ Ret svar inden afsendelse';
-            triggerBtn.style.opacity = '0.6';
+        function closeCaptcha() {
+            captchaStep.style.display = 'none';
+            triggerBtn.textContent = originalBtnText;
+            triggerBtn.style.opacity = '1';
+            // Scroll back up to form
+            var firstField = form ? form.querySelector('input[name="referrer_name"]') : null;
+            if (firstField) firstField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // Send-knappen trykkes: validér form → vis CAPTCHA inline
+        triggerBtn.addEventListener('click', function () {
+            // Hvis CAPTCHA allerede er åben — luk den
+            if (captchaStep.style.display === 'block') {
+                closeCaptcha();
+                return;
+            }
+            // Brug native HTML5 form validation
+            if (form && !form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            openCaptcha();
         });
+
+        // Luk-knap inde i CAPTCHA-boksen
+        var closeBtn = document.getElementById('rzpz-captcha-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeCaptcha);
+        }
 
         // Valider CAPTCHA-input visuelt (fejlfarve fjernes ved input)
         if (answerInput) {
