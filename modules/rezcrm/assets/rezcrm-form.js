@@ -227,14 +227,38 @@
                   headers: { 'X-WP-Nonce': NONCE },
                   body: fd,
               });
+              if (!r.ok) {
+                  let msg = 'Upload fejlede (' + r.status + ')';
+                  try { const e = await r.json(); msg = e.message || msg; } catch(_) {}
+                  throw new Error(msg);
+              }
               const d = await r.json();
               if (d.url) {
                   // Profil-foto gemmes separat fra CV/andre filer
                   const isPhoto = input.name === 'profile_photo' ||
                                   input.closest('.rzcrm-photo-wrap') !== null;
                   fieldData[isPhoto ? 'photo_url' : 'cv_url'] = d.url;
+
+                  // Vis bekræftelse ved siden af feltet
+                  const zone = input.closest('.rzcrm-file-zone');
+                  if (zone) {
+                      const p = zone.querySelector('.rzcrm-file-preview');
+                      if (p) p.innerHTML = `<span style="color:#16a34a">✓ ${input.files[0].name} uploadet</span>`;
+                  }
+                  const photoWrap = input.closest('.rzcrm-photo-wrap');
+                  if (photoWrap) {
+                      const btn = photoWrap.querySelector('.rzcrm-photo-btn');
+                      if (btn) btn.style.color = '#16a34a';
+                  }
               }
-          } catch(e) { console.warn('File upload failed', e); }
+          } catch(e) {
+              // Stop indsendelsen og vis fejl til brugeren
+              showError('Fil-upload fejlede: ' + e.message + '. Prøv med en mindre fil (max 8MB) eller et andet format.');
+              submitBtn.disabled  = false;
+              submitBtn.classList.remove('loading');
+              submitBtn.textContent = 'Send ansøgning';
+              return;
+          }
       }
 
       try {
