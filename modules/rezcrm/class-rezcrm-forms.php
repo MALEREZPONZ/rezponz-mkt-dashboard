@@ -190,6 +190,7 @@ class RZPZ_CRM_Forms {
         $form_id  = (int) ( $params['form_id']    ?? 0 );
         $pos_id   = (int) ( $params['position_id'] ?? 0 );
         $token    = sanitize_text_field( $params['session_token'] ?? '' );
+        // Bemærk: pos_id bestemmes endeligt nedenfor efter form er hentet
         $data     = $params['fields'] ?? [];
 
         if ( ! $form_id ) return new WP_REST_Response( [ 'message' => 'form_id mangler' ], 400 );
@@ -235,6 +236,31 @@ class RZPZ_CRM_Forms {
         $applicant_id = RZPZ_CRM_DB::upsert_applicant( $applicant_data );
         if ( ! $applicant_id ) {
             return new WP_REST_Response( [ 'message' => 'Kunne ikke oprette ansøger' ], 500 );
+        }
+
+        // Bestem position_id: frontend-param > formularens gemt position_id > auto-link fra titel > fallback "Generel ansøgning"
+        if ( ! $pos_id && ! empty( $form->position_id ) ) {
+            $pos_id = (int) $form->position_id;
+        }
+
+        if ( ! $pos_id && ! empty( $form->title ) ) {
+            $pos_id = RZPZ_CRM_DB::find_or_create_position_for_form( $form->title );
+
+            // Gem position_id på formularen så næste indsendelse er hurtigere
+            if ( $pos_id ) {
+                global $wpdb;
+                $wpdb->update(
+                    $wpdb->prefix . 'rzpz_crm_forms',
+                    [ 'position_id' => $pos_id ],
+                    [ 'id' => $form_id ]
+                );
+            }
+        }
+
+        // Absolut fallback: brug "Generel ansøgning"
+        if ( ! $pos_id ) {
+            $defaults = RZPZ_CRM_DB::ensure_default_positions();
+            $pos_id   = $defaults['generel'] ?? 0;
         }
 
         // Opret ansøgning — altid, også uden specifik stilling (pos_id = 0 = generel ansøgning)

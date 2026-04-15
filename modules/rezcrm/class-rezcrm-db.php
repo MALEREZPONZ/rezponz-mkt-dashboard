@@ -191,6 +191,9 @@ class RZPZ_CRM_DB {
 
         // Schema-opgraderinger for eksisterende installationer
         self::upgrade_schema();
+
+        // Seed default-stillinger
+        self::ensure_default_positions();
     }
 
     // ── Schema upgrades ──────────────────────────────────────────────────────
@@ -198,6 +201,9 @@ class RZPZ_CRM_DB {
     public static function upgrade_schema(): void {
         global $wpdb;
         $a = $wpdb->prefix . 'rzpz_crm_applications';
+
+        self::ensure_default_positions();
+        self::migrate_orphan_applications();
 
         // Tilføj internal_notes kolonnen hvis den ikke allerede eksisterer
         $col = $wpdb->get_results( $wpdb->prepare(
@@ -335,6 +341,82 @@ class RZPZ_CRM_DB {
         }
         $wpdb->insert( $t, $row );
         return $wpdb->insert_id ?: false;
+    }
+
+    /**
+     * Sikrer at default-stillinger altid eksisterer.
+     * Kaldes ved install + upgrade + boot.
+     * Returnerer map: ['generel' => id, 'remote' => id, 'uopfordret' => id]
+     */
+    public static function ensure_default_positions(): array {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpz_crm_positions';
+
+        $defaults = [
+            'generel'    => [ 'title' => 'Generel ansøgning',   'department' => '',       'status' => 'open' ],
+            'remote'     => [ 'title' => 'Remote',               'department' => 'Remote', 'status' => 'open' ],
+            'uopfordret' => [ 'title' => 'Uopfordret ansøgning', 'department' => '',       'status' => 'open' ],
+        ];
+
+        $map = [];
+        foreach ( $defaults as $key => $data ) {
+            $existing = $wpdb->get_var( $wpdb->prepare(
+                "SELECT id FROM {$t} WHERE title = %s LIMIT 1", $data['title']
+            ) );
+            if ( $existing ) {
+                $map[ $key ] = (int) $existing;
+            } else {
+                $wpdb->insert( $t, [
+                    'title'      => $data['title'],
+                    'department' => $data['department'],
+                    'status'     => $data['status'],
+                ] );
+                $map[ $key ] = (int) $wpdb->insert_id;
+            }
+        }
+        return $map;
+    }
+
+    /**
+     * Find eller opret en stilling baseret på formular-titel.
+     * Bruges til at auto-linke formularer til stillinger.
+     */
+    public static function find_or_create_position_for_form( string $form_title ): int {
+        global $wpdb;
+        $t = $wpdb->prefix . 'rzpz_crm_positions';
+
+        $title = sanitize_text_field( $form_title );
+        if ( ! $title ) return 0;
+
+        $existing = $wpdb->get_var( $wpdb->prepare(
+            "SELECT id FROM {$t} WHERE title = %s LIMIT 1", $title
+        ) );
+        if ( $existing ) return (int) $existing;
+
+        $wpdb->insert( $t, [
+            'title'  => $title,
+            'status' => 'open',
+        ] );
+        return (int) $wpdb->insert_id ?: 0;
+    }
+
+    /**
+     * Migrer eksisterende ansøgninger med position_id = 0 til "Generel ansøgning"-stillingen.
+     */
+    public static function migrate_orphan_applications(): void {
+        global $wpdb;
+        $a = $wpdb->prefix . 'rzpz_crm_applications';
+        $p = $wpdb->prefix . 'rzpz_crm_positions';
+
+        $generel_id = $wpdb->get_var( $wpdb->prepare(
+            "SELECT id FROM {$p} WHERE title = %s LIMIT 1", 'Generel ansøgning'
+        ) );
+        if ( ! $generel_id ) return;
+
+        $wpdb->query( $wpdb->prepare(
+            "UPDATE {$a} SET position_id = %d WHERE position_id = 0",
+            $generel_id
+        ) );
     }
 
     // ── Applicants ───────────────────────────────────────────────────────────

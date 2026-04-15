@@ -17,6 +17,16 @@ class RZPZ_RezCRM {
         add_action( 'rest_api_init',          [ __CLASS__, 'register_routes' ] );
         add_action( 'admin_enqueue_scripts',  [ __CLASS__, 'enqueue' ] );
 
+        // Kør én gang ved første admin-besøg efter installation/opdatering:
+        // seed default-stillinger + migrer forældreløse ansøgninger
+        add_action( 'admin_init', function () {
+            if ( get_option( 'rzpz_crm_positions_seeded' ) !== '1' ) {
+                RZPZ_CRM_DB::ensure_default_positions();
+                RZPZ_CRM_DB::migrate_orphan_applications();
+                update_option( 'rzpz_crm_positions_seeded', '1' );
+            }
+        } );
+
         // Cron hooks
         add_action( 'rzpz_crm_dispatch_rejections', [ __CLASS__, 'dispatch_rejections' ] );
         add_action( 'rzpz_crm_gdpr_cleanup',        [ __CLASS__, 'gdpr_cleanup' ] );
