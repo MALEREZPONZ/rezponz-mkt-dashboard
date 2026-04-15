@@ -1176,11 +1176,20 @@
     });
   }
 
-  function openPositionDetail(posId) {
+  async function openPositionDetail(posId) {
     activePositionId = posId;
     posDetailStage   = '';
     el('crm-pos-tab-list').style.display   = 'none';
     el('crm-pos-tab-detail').style.display = '';
+
+    // Indlæs ALLE ansøgninger for denne stilling (ignorer evt. aktive filtre)
+    try {
+      const apps = await api('applications?position_id=' + posId + '&_limit=500');
+      // Merge ind i allApplications uden at miste andre
+      const otherApps = allApplications.filter(a => +a.position_id !== posId);
+      allApplications = [...otherApps, ...apps];
+    } catch(e) { /* brug eksisterende allApplications som fallback */ }
+
     renderPositionDetailView();
   }
 
@@ -1191,7 +1200,7 @@
   }
 
   function renderPositionDetailView() {
-    const pos = allPositions.find(p => p.id === activePositionId);
+    const pos = allPositions.find(p => +p.id === activePositionId);
     if (!pos) return;
 
     // Header
@@ -1214,7 +1223,7 @@
     });
 
     // Get apps for this position
-    const posApps = allApplications.filter(a => a.position_id === activePositionId);
+    const posApps = allApplications.filter(a => +a.position_id === activePositionId);
 
     // Stage counts for sidebar
     const stages = [

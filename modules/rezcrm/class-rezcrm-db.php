@@ -310,6 +310,7 @@ class RZPZ_CRM_DB {
         ) ?: [];
 
         foreach ( $rows as $row ) {
+            $row->id                  = (int) $row->id;
             $row->total_applications  = (int) $row->total_applications;
             $row->count_ny            = (int) $row->count_ny;
             $row->count_screening     = (int) $row->count_screening;
