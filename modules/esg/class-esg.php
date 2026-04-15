@@ -222,60 +222,33 @@ class RZPA_ESG {
             return self::log_sync( 'error', 'PDF for lille — muligvis ikke en gyldig fil' );
         }
 
-        // ── 3. Upload PDF to OpenAI Files API ────────────────────────────────
-        // gpt-4o requires uploading the file first and referencing it via file_id
-        $boundary  = 'WPBoundary' . bin2hex( random_bytes( 8 ) );
-        $eol       = "\r\n";
-        $file_body = '--' . $boundary . $eol
-            . 'Content-Disposition: form-data; name="purpose"' . $eol . $eol
-            . 'user_data' . $eol
-            . '--' . $boundary . $eol
-            . 'Content-Disposition: form-data; name="file"; filename="rezponz-esg.pdf"' . $eol
-            . 'Content-Type: application/pdf' . $eol . $eol
-            . $pdf_binary . $eol
-            . '--' . $boundary . '--' . $eol;
+        // ── 3. Extract text from PDF (no Files API needed) ───────────────────
+        // Decompress content streams and extract text operators in pure PHP.
+        // This avoids api.files.write and model.request scope requirements.
+        $pdf_text = self::extract_pdf_text( $pdf_binary );
 
-        $upload_res = wp_remote_post( 'https://api.openai.com/v1/files', [
-            'timeout' => 60,
-            'headers' => [
-                'Authorization' => 'Bearer ' . $api_key,
-                'Content-Type'  => 'multipart/form-data; boundary=' . $boundary,
-            ],
-            'body' => $file_body,
-        ] );
-
-        if ( is_wp_error( $upload_res ) ) {
-            return self::log_sync( 'error', 'PDF-upload til OpenAI fejlede: ' . $upload_res->get_error_message() );
+        if ( strlen( $pdf_text ) < 150 ) {
+            return self::log_sync( 'error', sprintf(
+                'PDF-tekstudtrækning fejlede — kun %d tegn fundet. PDF er muligvis scannet eller krypteret.',
+                strlen( $pdf_text )
+            ) );
         }
 
-        $upload_http = (int) wp_remote_retrieve_response_code( $upload_res );
-        $upload_data = json_decode( wp_remote_retrieve_body( $upload_res ), true );
-
-        if ( $upload_http !== 200 || empty( $upload_data['id'] ) ) {
-            $err = $upload_data['error']['message'] ?? "HTTP $upload_http";
-            return self::log_sync( 'error', 'PDF-upload til OpenAI fejlede: ' . $err );
-        }
-
-        $file_id = $upload_data['id'];
-
-        // ── 4. Send to OpenAI for extraction ─────────────────────────────────
+        // ── 4. Send extracted text to OpenAI ─────────────────────────────────
         $prompt  = self::build_extraction_prompt();
         $ai_body = wp_json_encode( [
             'model'      => 'gpt-4o',
             'max_tokens' => 4000,
             'messages'   => [
                 [
+                    'role'    => 'system',
+                    'content' => 'Du er en præcis data-ekstraktor. Returner KUN gyldigt JSON — ingen forklaringer.',
+                ],
+                [
                     'role'    => 'user',
-                    'content' => [
-                        [
-                            'type' => 'file',
-                            'file' => [ 'file_id' => $file_id ],
-                        ],
-                        [
-                            'type' => 'text',
-                            'text' => $prompt,
-                        ],
-                    ],
+                    'content' => "Her er den udtrukne tekst fra Rezponz ESG-rapporten (PDF):\n\n"
+                                 . mb_substr( $pdf_text, 0, 55000 )
+                                 . "\n\n---\n\n" . $prompt,
                 ],
             ],
         ] );
@@ -287,13 +260,6 @@ class RZPA_ESG {
                 'Content-Type'  => 'application/json',
             ],
             'body' => $ai_body,
-        ] );
-
-        // Clean up — delete uploaded file regardless of result
-        wp_remote_request( 'https://api.openai.com/v1/files/' . $file_id, [
-            'method'  => 'DELETE',
-            'timeout' => 15,
-            'headers' => [ 'Authorization' => 'Bearer ' . $api_key ],
         ] );
 
         if ( is_wp_error( $ai_res ) ) {
@@ -337,6 +303,125 @@ class RZPA_ESG {
             'PDF synket (%s KB, gpt-4o)',
             number_format( $pdf_size / 1024, 0 )
         ) );
+    }
+
+    /**
+     * Extract readable text from a PDF binary without any external libraries.
+     *
+     * Works with FlateDecode (zlib) compressed content streams — the standard
+     * format used by virtually all digitally-created PDFs. Falls back to
+     * uncompressed parsing for older PDFs.
+     */
+    private static function extract_pdf_text( string $pdf ): string {
+        $text   = '';
+        $offset = 0;
+        $len    = strlen( $pdf );
+
+        while ( $offset < $len ) {
+            // Find next 'stream' keyword
+            $stream_kw = strpos( $pdf, 'stream', $offset );
+            if ( $stream_kw === false ) break;
+
+            // Verify the byte after 'stream' is \r\n or \n (PDF spec)
+            $after = substr( $pdf, $stream_kw + 6, 2 );
+            if ( $after[0] === "\r" && isset( $after[1] ) && $after[1] === "\n" ) {
+                $data_start = $stream_kw + 8;
+            } elseif ( $after[0] === "\n" ) {
+                $data_start = $stream_kw + 7;
+            } else {
+                $offset = $stream_kw + 6;
+                continue;
+            }
+
+            $stream_end = strpos( $pdf, 'endstream', $data_start );
+            if ( $stream_end === false ) break;
+
+            $raw = substr( $pdf, $data_start, $stream_end - $data_start );
+            $raw = rtrim( $raw, "\r\n" );
+
+            // Try FlateDecode (zlib) — most common compression in modern PDFs
+            $decoded = @gzuncompress( $raw );
+            if ( $decoded === false ) {
+                $decoded = @gzinflate( $raw );
+            }
+            // Fallback: raw (uncompressed stream)
+            if ( $decoded === false || $decoded === '' ) {
+                $decoded = $raw;
+            }
+
+            // Only process if this looks like a content stream (has text operators)
+            if ( strpos( $decoded, ' Tj' ) !== false || strpos( $decoded, ' TJ' ) !== false ) {
+                $text .= self::parse_pdf_content_stream( $decoded ) . "\n";
+            }
+
+            $offset = $stream_end + 9;
+        }
+
+        // Normalise whitespace
+        $text = preg_replace( '/[ \t]+/', ' ', $text );
+        $text = preg_replace( '/\n{3,}/', "\n\n", $text );
+
+        return trim( $text );
+    }
+
+    /**
+     * Parse text operators out of a decompressed PDF content stream.
+     */
+    private static function parse_pdf_content_stream( string $stream ): string {
+        $text  = '';
+        $lines = preg_split( '/\r\n|\r|\n/', $stream );
+
+        foreach ( $lines as $line ) {
+            $line = trim( $line );
+
+            // Tj — show string:  (Hello world) Tj
+            if ( preg_match( '/^\((.*)?\)\s*Tj$/', $line, $m ) ) {
+                $text .= self::decode_pdf_string( $m[1] ) . ' ';
+                continue;
+            }
+
+            // ' — move to next line and show string:  (Hello) '
+            if ( preg_match( '/^\((.*)?\)\s*\'$/', $line, $m ) ) {
+                $text .= "\n" . self::decode_pdf_string( $m[1] ) . ' ';
+                continue;
+            }
+
+            // TJ — show array:  [(He) 10 (llo)] TJ
+            if ( preg_match( '/^\[(.*)?\]\s*TJ$/', $line, $m ) ) {
+                preg_match_all( '/\(([^)]*)\)/', $m[1], $parts );
+                foreach ( $parts[1] as $part ) {
+                    $text .= self::decode_pdf_string( $part );
+                }
+                $text .= ' ';
+                continue;
+            }
+
+            // Td / TD — new line (position change)
+            if ( preg_match( '/^[\d\s.\-]+\s+T[dD]$/', $line ) ) {
+                $text .= "\n";
+            }
+        }
+
+        return $text;
+    }
+
+    /**
+     * Decode PDF string escape sequences to UTF-8.
+     */
+    private static function decode_pdf_string( string $s ): string {
+        // Octal escapes: \ddd
+        $s = preg_replace_callback( '/\\\\([0-7]{1,3})/', static function ( $m ) {
+            return chr( octdec( $m[1] ) );
+        }, $s );
+
+        // Named escapes
+        $s = str_replace(
+            [ '\\n', '\\r', '\\t', '\\b', '\\f', '\\(', '\\)', '\\\\' ],
+            [ "\n",  "\r",  "\t",  "\x08", "\x0C", '(',   ')',   '\\' ],
+            $s
+        );
+
+        return $s;
     }
 
     /**
