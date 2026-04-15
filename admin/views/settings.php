@@ -450,7 +450,7 @@ if ( isset( $update_transient->response[ $plugin_slug ] ) ) {
           <tr>
             <th>Privatlivspolitik URL</th>
             <td>
-              <input type="url" name="rzpa_settings[crm_privacy_url]" value="<?php echo esc_attr($opts['crm_privacy_url'] ?? ''); ?>" class="regular-text" placeholder="https://..." />
+              <input type="url" name="crm_privacy_url" value="<?php echo esc_attr($opts['crm_privacy_url'] ?? ''); ?>" class="regular-text" placeholder="https://..." />
               <p class="description">Link til betingelserne for databehandling i ansøgningsskemaer</p>
             </td>
           </tr>

@@ -359,6 +359,8 @@ class RZPA_Admin {
             'rubix_webhook_url', 'rubix_api_token',
             // AON Talent Assessment integration
             'aon_api_key', 'aon_base_url', 'aon_project_id', 'aon_webhook_secret',
+            // Formularer
+            'crm_privacy_url',
         ];
 
         // Textarea-felter der kræver sanitize_textarea_field
