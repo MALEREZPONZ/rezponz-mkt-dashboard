@@ -3,7 +3,7 @@
  * Plugin Name:  Rezponz Analytics
  * Plugin URI:   https://rezponz.dk
  * Description:  Marketing Intelligence Dashboard – SEO, AI-synlighed, Meta, Snapchat og TikTok Ads.
- * Version:      3.5.25
+ * Version:      3.5.27
  * Author:       Rezponz
  * Author URI:   https://rezponz.dk
  * License:      GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'RZPA_VERSION',     '3.5.25' );
+define( 'RZPA_VERSION',     '3.5.27' );
 define( 'RZPA_PLUGIN_FILE', __FILE__ );
 define( 'RZPA_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'RZPA_URL',         plugin_dir_url( __FILE__ ) );
@@ -113,6 +113,9 @@ require_once RZPA_DIR . 'modules/quiz/class-quiz.php';
 // ── ESG Module ───────────────────────────────────────────────────────────────
 require_once RZPA_DIR . 'modules/esg/class-esg.php';
 
+// ── ComplyCloud Monitor Module ───────────────────────────────────────────────
+require_once RZPA_DIR . 'modules/complycloud/class-complycloud.php';
+
 register_activation_hook( __FILE__, function () {
     RZPA_Database::install();
     RZPZ_Crew_DB::install();
@@ -134,6 +137,7 @@ register_deactivation_hook( __FILE__, [ 'RZPZ_CRM_Auth', 'remove_role' ] );
 register_deactivation_hook( __FILE__, function() {
     wp_clear_scheduled_hook( 'rzpz_crm_dispatch_rejections' );
     wp_clear_scheduled_hook( 'rzpz_crm_gdpr_cleanup' );
+    RZPZ_ComplyCloud::deactivate();
 } );
 
 // ── Blog Generator: gem indstilling via AJAX ─────────────────────────────────
@@ -241,6 +245,7 @@ add_action( 'plugins_loaded', function () {
     RZPA_Rekruttering::init();
     RZPA_Sitemap_Manager::init();
     RZPA_ESG::init();
+    RZPZ_ComplyCloud::init();
 
     // RezCRM module
     if ( get_option( RZPZ_CRM_DB::DB_VERSION_KEY ) !== RZPZ_CRM_DB::DB_VERSION ) {
