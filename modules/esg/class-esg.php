@@ -204,37 +204,50 @@ class RZPA_ESG {
             return false;
         }
 
-        // ── 2. Download PDF ──────────────────────────────────────────────────
-        $pdf_res = wp_remote_get( $pdf_url, [ 'timeout' => 60, 'redirection' => 5 ] );
-        if ( is_wp_error( $pdf_res ) ) {
-            return self::log_sync( 'error', 'Download fejlede: ' . $pdf_res->get_error_message() );
+        // ── 2. Download rapport-indhold ──────────────────────────────────────
+        $res = wp_remote_get( $pdf_url, [
+            'timeout'    => 60,
+            'redirection'=> 5,
+            'user-agent' => 'Mozilla/5.0 (compatible; RezponzESGBot/1.0)',
+        ] );
+        if ( is_wp_error( $res ) ) {
+            return self::log_sync( 'error', 'Download fejlede: ' . $res->get_error_message() );
         }
 
-        $http_code = (int) wp_remote_retrieve_response_code( $pdf_res );
+        $http_code    = (int) wp_remote_retrieve_response_code( $res );
         if ( $http_code !== 200 ) {
             return self::log_sync( 'error', "Download fejlede med HTTP $http_code" );
         }
 
-        $pdf_binary = wp_remote_retrieve_body( $pdf_res );
-        $pdf_size   = strlen( $pdf_binary );
+        $body         = wp_remote_retrieve_body( $res );
+        $content_type = wp_remote_retrieve_header( $res, 'content-type' );
+        $body_size    = strlen( $body );
 
-        if ( $pdf_size < 1000 ) {
-            return self::log_sync( 'error', 'PDF for lille — muligvis ikke en gyldig fil' );
+        if ( $body_size < 500 ) {
+            return self::log_sync( 'error', 'Indhold for lille — URL returnerede næsten ingenting' );
         }
 
-        // ── 3. Extract text from PDF (no Files API needed) ───────────────────
-        // Decompress content streams and extract text operators in pure PHP.
-        // This avoids api.files.write and model.request scope requirements.
-        $pdf_text = self::extract_pdf_text( $pdf_binary );
+        // ── 3. Udtræk tekst (HTML eller PDF auto-detekteret) ─────────────────
+        $is_pdf = str_contains( $content_type, 'pdf' )
+               || str_starts_with( $body, '%PDF' );
 
-        if ( strlen( $pdf_text ) < 150 ) {
+        if ( $is_pdf ) {
+            $source_text = self::extract_pdf_text( $body );
+            $source_type = 'PDF';
+        } else {
+            // HTML rapport (fx Valified, Google Docs preview, o.l.)
+            $source_text = self::extract_html_text( $body );
+            $source_type = 'HTML';
+        }
+
+        if ( strlen( $source_text ) < 150 ) {
             return self::log_sync( 'error', sprintf(
-                'PDF-tekstudtrækning fejlede — kun %d tegn fundet. PDF er muligvis scannet eller krypteret.',
-                strlen( $pdf_text )
+                'Tekstudtrækning fejlede (%s) — kun %d tegn fundet. Prøv at gemme URL\'en igen.',
+                $source_type, strlen( $source_text )
             ) );
         }
 
-        // ── 4. Send extracted text to OpenAI ─────────────────────────────────
+        // ── 4. Send tekst til OpenAI ──────────────────────────────────────────
         $prompt  = self::build_extraction_prompt();
         $ai_body = wp_json_encode( [
             'model'      => 'gpt-4o',
@@ -246,8 +259,8 @@ class RZPA_ESG {
                 ],
                 [
                     'role'    => 'user',
-                    'content' => "Her er den udtrukne tekst fra Rezponz ESG-rapporten (PDF):\n\n"
-                                 . mb_substr( $pdf_text, 0, 55000 )
+                    'content' => "Her er indholdet fra Rezponz ESG-rapporten (kilde: {$source_type}):\n\n"
+                                 . mb_substr( $source_text, 0, 55000 )
                                  . "\n\n---\n\n" . $prompt,
                 ],
             ],
@@ -300,9 +313,34 @@ class RZPA_ESG {
         update_option( self::OPTION_SYNC_LOG, $log );
 
         return self::log_sync( 'ok', sprintf(
-            'PDF synket (%s KB, gpt-4o)',
-            number_format( $pdf_size / 1024, 0 )
+            'Rapport synket (%s KB, %s, gpt-4o)',
+            number_format( $body_size / 1024, 0 ),
+            $source_type
         ) );
+    }
+
+    /**
+     * Extract readable text from an HTML page.
+     * Strips scripts, styles, nav and other non-content tags, then returns
+     * clean plain text — ideal for sending ESG report HTML to OpenAI.
+     */
+    private static function extract_html_text( string $html ): string {
+        // Remove script / style / nav / footer blocks entirely
+        $html = preg_replace( '/<(script|style|noscript|nav|footer|header|svg)[^>]*>[\s\S]*?<\/\1>/i', ' ', $html );
+
+        // Remove all remaining tags, preserve whitespace between blocks
+        $html = preg_replace( '/<(p|div|li|tr|h[1-6]|br)[^>]*>/i', "\n", $html );
+        $html = preg_replace( '/<[^>]+>/', ' ', $html );
+
+        // Decode HTML entities
+        $text = html_entity_decode( $html, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
+        // Normalise whitespace
+        $text = preg_replace( '/[ \t]+/', ' ', $text );
+        $text = preg_replace( '/\n[ \t]+/', "\n", $text );
+        $text = preg_replace( '/\n{3,}/', "\n\n", $text );
+
+        return trim( $text );
     }
 
     /**

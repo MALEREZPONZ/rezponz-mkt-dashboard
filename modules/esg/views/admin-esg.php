@@ -83,7 +83,7 @@ $saved      = isset( $_GET['saved'] );
 
 <div class="rzpa-esg-info-box">
     <strong>🤖 Automatisk daglig synkronisering</strong>
-    ESG-sidens indhold hentes automatisk fra PDF-rapporten én gang i døgnet. Hvis PDF'en er ændret, bruger systemet GPT-4.1 til at udtrække struktureret data og opdatere hjemmesiden. Klik "Synk nu" for at tvinge en opdatering med det samme.
+    ESG-sidens indhold hentes automatisk fra rapport-URL'en én gang i døgnet. Systemet registrerer automatisk om det er en PDF eller HTML-rapport og udtrækker struktureret data via GPT-4o. Klik "Synk nu" for at tvinge en opdatering med det samme.
 </div>
 
 <div class="rzpa-esg-cards">
@@ -135,7 +135,7 @@ $saved      = isset( $_GET['saved'] );
             <?php wp_nonce_field( 'rzpa_save_esg_settings' ); ?>
             <input type="hidden" name="action" value="rzpa_save_esg_settings">
             <div class="rzpa-esg-field">
-                <label for="esg_pdf_url">PDF URL</label>
+                <label for="esg_pdf_url">Rapport URL</label>
                 <input
                     type="url"
                     id="esg_pdf_url"
@@ -158,7 +158,7 @@ $saved      = isset( $_GET['saved'] );
                 ?>
             </div>
             <div class="rzpa-esg-meta" style="font-size:12px; color:#888; margin-top:4px">
-                🤖 Model: GPT-4.1 · Kræver OpenAI API-nøgle i <a href="<?php echo admin_url('admin.php?page=rzpa-settings'); ?>">Indstillinger</a>
+                🤖 Model: GPT-4o · Kræver OpenAI API-nøgle i <a href="<?php echo admin_url('admin.php?page=rzpa-settings'); ?>">Indstillinger</a>
             </div>
         </div>
     </div>
