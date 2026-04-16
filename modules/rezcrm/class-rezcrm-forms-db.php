@@ -13,13 +13,14 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class RZPZ_CRM_Forms_DB {
 
-    const DB_VERSION     = '1';
+    const DB_VERSION     = '2';
     const DB_VERSION_KEY = 'rzpz_crm_forms_db_ver';
 
     /** Felttyper understøttet i form builder */
     const FIELD_TYPES = [
         'section'   => 'Sektion-overskrift',
         'text'      => 'Tekstfelt',
+        'url'       => 'URL-link',
         'textarea'  => 'Tekstboks (lang)',
         'email'     => 'Email',
         'phone'     => 'Telefonnummer',
@@ -45,10 +46,184 @@ class RZPZ_CRM_Forms_DB {
         'birthdate'    => 'Fødselsdato',
         'cover_letter' => 'Ansøgningstekst',
         'cv_url'       => 'CV-link',
+        'video_url'    => 'Video-link',
         'notes'        => 'Interne noter',
     ];
 
     // ── Install ──────────────────────────────────────────────────────────────
+
+    // ── Schema upgrade ───────────────────────────────────────────────────────
+
+    public static function maybe_upgrade(): void {
+        $current = get_option( self::DB_VERSION_KEY, '0' );
+        if ( version_compare( $current, self::DB_VERSION, '>=' ) ) return;
+
+        // v2: tilføj video_url felt til alle eksisterende formularer der mangler det
+        if ( version_compare( $current, '2', '<' ) ) {
+            self::add_video_url_to_existing_forms();
+        }
+
+        update_option( self::DB_VERSION_KEY, self::DB_VERSION );
+    }
+
+    private static function add_video_url_to_existing_forms(): void {
+        global $wpdb;
+        $ff = $wpdb->prefix . 'rzpz_crm_form_fields';
+        $ft = $wpdb->prefix . 'rzpz_crm_forms';
+
+        $forms = $wpdb->get_results( "SELECT id FROM {$ft}" );
+        foreach ( $forms as $form ) {
+            $exists = $wpdb->get_var( $wpdb->prepare(
+                "SELECT id FROM {$ff} WHERE form_id = %d AND field_key = 'video_url' LIMIT 1",
+                $form->id
+            ) );
+            if ( $exists ) continue;
+
+            // Find max sort_order i denne formular
+            $max = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT MAX(sort_order) FROM {$ff} WHERE form_id = %d", $form->id
+            ) );
+
+            $wpdb->insert( $ff, [
+                'form_id'     => $form->id,
+                'field_type'  => 'url',
+                'field_key'   => 'video_url',
+                'label'       => 'Link til videopræsentation (valgfrit)',
+                'placeholder' => 'https://www.youtube.com/watch?v=...',
+                'help_text'   => 'Indsæt et link til en kort videopræsentation (YouTube, Google Drive, Dropbox el. lign.)',
+                'core_map'    => 'video_url',
+                'required'    => 0,
+                'sort_order'  => $max + 1,
+            ] );
+        }
+    }
+
+    // ── Provision formularer til alle stillinger ─────────────────────────────
+
+    /**
+     * Opretter en standard ansøgningsformular for alle stillinger
+     * der endnu ikke har en linked formular.
+     *
+     * @return int Antal nyoprettede formularer
+     */
+    public static function provision_forms_for_positions(): int {
+        global $wpdb;
+        $ft  = $wpdb->prefix . 'rzpz_crm_forms';
+        $ff  = $wpdb->prefix . 'rzpz_crm_form_fields';
+        $pos = $wpdb->prefix . 'rzpz_crm_positions';
+
+        $positions = $wpdb->get_results( "SELECT id, title FROM {$pos} ORDER BY created_at ASC" );
+        if ( ! $positions ) return 0;
+
+        $created = 0;
+
+        foreach ( $positions as $p ) {
+            // Tjek om der allerede eksisterer en formular for denne stilling
+            $existing = $wpdb->get_var( $wpdb->prepare(
+                "SELECT id FROM {$ft} WHERE position_id = %d LIMIT 1", $p->id
+            ) );
+            if ( $existing ) continue;
+
+            // Opret slug — unikt per stilling
+            $base_slug = sanitize_title( $p->title ) . '-' . $p->id;
+            $slug      = $base_slug;
+            $n         = 2;
+            while ( $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$ft} WHERE slug = %s", $slug ) ) ) {
+                $slug = $base_slug . '-' . $n++;
+            }
+
+            $wpdb->insert( $ft, [
+                'title'           => $p->title . ' — Ansøgningsformular',
+                'slug'            => $slug,
+                'position_id'     => (int) $p->id,
+                'intro_text'      => '<p>Søg stillingen som <strong>' . esc_html( $p->title ) . '</strong> hos Rezponz. Udfyld formularen herunder — det tager ca. 5 minutter.</p>',
+                'success_message' => '<h3>Tak for din ansøgning! 🎉</h3><p>Vi vil vende tilbage til dig hurtigst muligt.</p>',
+                'is_active'       => 1,
+                'show_progress'   => 1,
+                'multi_step'      => 1,
+            ] );
+
+            $form_id = $wpdb->insert_id;
+            if ( ! $form_id ) continue;
+
+            foreach ( self::default_fields() as $f ) {
+                $wpdb->insert( $ff, array_merge( [
+                    'form_id'    => $form_id,
+                    'field_key'  => '',
+                    'label'      => '',
+                    'required'   => 0,
+                    'sort_order' => 0,
+                ], $f ) );
+            }
+
+            $created++;
+        }
+
+        return $created;
+    }
+
+    // ── Default felt-skabelon ────────────────────────────────────────────────
+
+    /**
+     * Returnerer det fuldstændige sæt standardfelter for en ansøgningsformular.
+     * Bruges af seed_default_form() og provision_forms_for_positions().
+     */
+    private static function default_fields(): array {
+        return [
+            // ── Stamdata ──────────────────────────────────────────────────────
+            [ 'field_type'=>'section',       'label'=>'Dine stamdata',              'sort_order'=>1  ],
+            [ 'field_type'=>'profile_photo', 'label'=>'Profilbillede',              'field_key'=>'profile_photo',   'sort_order'=>2  ],
+            [ 'field_type'=>'text',  'label'=>'Fornavn',         'field_key'=>'first_name', 'core_map'=>'first_name', 'required'=>1, 'sort_order'=>3 ],
+            [ 'field_type'=>'text',  'label'=>'Efternavn',       'field_key'=>'last_name',  'core_map'=>'last_name',  'required'=>1, 'sort_order'=>4 ],
+            [ 'field_type'=>'email', 'label'=>'Email',           'field_key'=>'email',      'core_map'=>'email',      'required'=>1, 'sort_order'=>5 ],
+            [ 'field_type'=>'phone', 'label'=>'Telefonnummer',   'field_key'=>'phone',      'core_map'=>'phone',      'required'=>1, 'sort_order'=>6 ],
+            [ 'field_type'=>'text',  'label'=>'Adresse',         'field_key'=>'address',    'core_map'=>'address',    'sort_order'=>7 ],
+            [ 'field_type'=>'text',  'label'=>'Postnummer',      'field_key'=>'postcode',                             'sort_order'=>8 ],
+            [ 'field_type'=>'text',  'label'=>'By',              'field_key'=>'city',       'core_map'=>'city',       'sort_order'=>9 ],
+            [ 'field_type'=>'birthdate', 'label'=>'Fødselsdato', 'field_key'=>'birthdate',  'core_map'=>'birthdate',  'sort_order'=>10 ],
+            [ 'field_type'=>'yes_no','label'=>'Har du mulighed for at have skiftende arbejdstider og arbejde på fuld tid, mellem 75-45 timer/ugen (dag, aften, weekend)?',
+              'field_key'=>'shift_work', 'required'=>1, 'sort_order'=>11 ],
+            [ 'field_type'=>'yes_no','label'=>'Taler du flydende dansk?', 'field_key'=>'speaks_danish', 'required'=>1, 'sort_order'=>12 ],
+
+            // ── Ansøgning ─────────────────────────────────────────────────────
+            [ 'field_type'=>'section', 'label'=>'Din ansøgning', 'sort_order'=>13 ],
+            [ 'field_type'=>'radio',  'label'=>'Hvad er din nuværende arbejdssituation?',
+              'field_key'=>'job_situation', 'options'=>wp_json_encode(['Ledig','Fuldtidsjob','I deltidsjob','Studerende']), 'sort_order'=>14 ],
+            [ 'field_type'=>'textarea','label'=>'Hvad er din uddannelsesmæssige baggrund?', 'field_key'=>'education', 'sort_order'=>15 ],
+            [ 'field_type'=>'yes_no', 'label'=>'Har du børn?',   'field_key'=>'has_children',     'sort_order'=>16 ],
+            [ 'field_type'=>'yes_no', 'label'=>'Har du planlagt ferie indenfor de næste 3 måneder?', 'field_key'=>'planned_vacation', 'sort_order'=>17 ],
+            [ 'field_type'=>'date',   'label'=>'Hvornår kan du starte i jobbet?', 'field_key'=>'availability', 'core_map'=>'availability', 'sort_order'=>18 ],
+
+            // ── Motivation ────────────────────────────────────────────────────
+            [ 'field_type'=>'section', 'label'=>'Om din motivation og erfaring', 'sort_order'=>19 ],
+            [ 'field_type'=>'textarea','label'=>'Hvad er din motivation for at søge netop dette job?',
+              'field_key'=>'motivation', 'core_map'=>'cover_letter', 'required'=>1, 'sort_order'=>20 ],
+            [ 'field_type'=>'textarea','label'=>'Din øvrige erhvervserfaring',
+              'placeholder'=>'Beskriv hvilken virksomhed, hvilken stilling og hvilken periode du var ansat',
+              'field_key'=>'work_experience', 'sort_order'=>21 ],
+
+            // ── Om dig som person ─────────────────────────────────────────────
+            [ 'field_type'=>'section', 'label'=>'Om dig som person', 'sort_order'=>22 ],
+            [ 'field_type'=>'textarea','label'=>'Fortæl om dine fremtidsplaner', 'field_key'=>'future_plans', 'sort_order'=>23 ],
+            [ 'field_type'=>'textarea','label'=>'Beskriv dine fritidsinteresser', 'field_key'=>'hobbies',      'sort_order'=>24 ],
+
+            // ── Filer & video ─────────────────────────────────────────────────
+            [ 'field_type'=>'section', 'label'=>'Filer & video', 'sort_order'=>25 ],
+            [ 'field_type'=>'file', 'label'=>'Her kan du uploade filer, såsom CV, eksamensbevis, lign.',
+              'field_key'=>'cv_upload', 'core_map'=>'cv_url', 'sort_order'=>26 ],
+            [ 'field_type'=>'url',  'label'=>'Link til videopræsentation (valgfrit)',
+              'field_key'=>'video_url', 'core_map'=>'video_url',
+              'placeholder'=>'https://www.youtube.com/watch?v=...',
+              'help_text'=>'Indsæt et link til en kort videopræsentation (YouTube, Google Drive, Dropbox el. lign.)',
+              'sort_order'=>27 ],
+
+            // ── Afslutning ────────────────────────────────────────────────────
+            [ 'field_type'=>'select', 'label'=>'Hvor har du hørt om os?',
+              'field_key'=>'heard_from',
+              'options'=>wp_json_encode(['Jobindex','LinkedIn','Facebook','Instagram','TikTok','Snapchat','En ven','Andet']),
+              'sort_order'=>28 ],
+        ];
+    }
 
     public static function install(): void {
         global $wpdb;
@@ -143,38 +318,7 @@ class RZPZ_CRM_Forms_DB {
 
         $form_id = $wpdb->insert_id;
 
-        $fields = [
-            [ 'section_name'=>'Dine stamdata', 'field_type'=>'section',   'label'=>'Dine stamdata',          'sort_order'=>1  ],
-            [ 'field_type'=>'profile_photo',  'label'=>'Profilbillede',   'field_key'=>'profile_photo',      'sort_order'=>2  ],
-            [ 'field_type'=>'text',    'label'=>'Fornavn',     'field_key'=>'first_name', 'core_map'=>'first_name', 'required'=>1, 'sort_order'=>3 ],
-            [ 'field_type'=>'text',    'label'=>'Efternavn',   'field_key'=>'last_name',  'core_map'=>'last_name',  'required'=>1, 'sort_order'=>4 ],
-            [ 'field_type'=>'email',   'label'=>'Email',       'field_key'=>'email',      'core_map'=>'email',      'required'=>1, 'sort_order'=>5 ],
-            [ 'field_type'=>'phone',   'label'=>'Telefonnummer','field_key'=>'phone',     'core_map'=>'phone',      'required'=>1, 'sort_order'=>6 ],
-            [ 'field_type'=>'text',    'label'=>'Adresse',     'field_key'=>'address',    'core_map'=>'address',    'sort_order'=>7 ],
-            [ 'field_type'=>'text',    'label'=>'Postnummer',  'field_key'=>'postcode',   'sort_order'=>8 ],
-            [ 'field_type'=>'text',    'label'=>'By',          'field_key'=>'city',       'core_map'=>'city',       'sort_order'=>9 ],
-            [ 'field_type'=>'birthdate','label'=>'Fødselsdato','field_key'=>'birthdate',  'core_map'=>'birthdate',  'sort_order'=>10 ],
-            [ 'field_type'=>'yes_no',  'label'=>'Har du mulighed for at have skiftende arbejdstider og arbejde på fuld tid, mellem 75-45 timer/ugen (dag, aften, weekend)?', 'field_key'=>'shift_work', 'required'=>1, 'sort_order'=>11 ],
-            [ 'field_type'=>'yes_no',  'label'=>'Taler du flydende dansk?', 'field_key'=>'speaks_danish', 'required'=>1, 'sort_order'=>12 ],
-            [ 'section_name'=>'Din ansøgning', 'field_type'=>'section', 'label'=>'Din ansøgning', 'sort_order'=>13 ],
-            [ 'field_type'=>'radio',   'label'=>'Hvad er din nuværende arbejdssituation?', 'field_key'=>'job_situation',
-              'options'=>wp_json_encode(['Ledig','Fuldtidsjob','I deltidsjob','Studerende']), 'sort_order'=>14 ],
-            [ 'field_type'=>'textarea','label'=>'Hvad er din uddannelsesmæssige baggrund?','field_key'=>'education', 'sort_order'=>15 ],
-            [ 'field_type'=>'yes_no',  'label'=>'Har du børn?', 'field_key'=>'has_children', 'sort_order'=>16 ],
-            [ 'field_type'=>'yes_no',  'label'=>'Har du planlagt ferie indenfor de næste 3 måneder?', 'field_key'=>'planned_vacation', 'sort_order'=>17 ],
-            [ 'field_type'=>'date',    'label'=>'Hvornår kan du starte i jobbet?', 'field_key'=>'availability', 'sort_order'=>18 ],
-            [ 'section_name'=>'Om din motivation og erfaring', 'field_type'=>'section', 'label'=>'Om din motivation og erfaring', 'sort_order'=>19 ],
-            [ 'field_type'=>'textarea','label'=>'Hvad er din motivation for at søge netop dette job?', 'field_key'=>'motivation', 'core_map'=>'cover_letter', 'required'=>1, 'sort_order'=>20 ],
-            [ 'field_type'=>'textarea','label'=>'Din øvrige erhvervserfaring', 'placeholder'=>'Beskriv hvilken virksomhed, hvilken stilling og hvilken periode du var ansat', 'field_key'=>'work_experience', 'sort_order'=>21 ],
-            [ 'section_name'=>'Om dig som person', 'field_type'=>'section', 'label'=>'Om dig som person', 'sort_order'=>22 ],
-            [ 'field_type'=>'textarea','label'=>'Fortæl om dine fremtidsplaner', 'field_key'=>'future_plans', 'sort_order'=>23 ],
-            [ 'field_type'=>'textarea','label'=>'Beskriv dine fritidsinteresser', 'field_key'=>'hobbies', 'sort_order'=>24 ],
-            [ 'field_type'=>'file',    'label'=>'Her kan du uploade filer, såsom CV, eksamensbevis, lign.', 'field_key'=>'cv_upload', 'core_map'=>'cv_url', 'sort_order'=>25 ],
-            [ 'field_type'=>'select',  'label'=>'Hvor har du hørt om os?', 'field_key'=>'heard_from',
-              'options'=>wp_json_encode(['Jobindex','LinkedIn','Facebook','Instagram','TikTok','Snapchat','En ven','Andet']), 'sort_order'=>26 ],
-        ];
-
-        foreach ( $fields as $f ) {
+        foreach ( self::default_fields() as $f ) {
             $wpdb->insert( $ff, array_merge( [
                 'form_id'    => $form_id,
                 'field_key'  => '',

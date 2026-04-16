@@ -44,6 +44,31 @@
     // New form
     el('fb-new-form-btn')?.addEventListener('click', createNewForm);
 
+    // Provision formularer til alle stillinger
+    el('fb-provision-btn')?.addEventListener('click', async function () {
+      const btn = el('fb-provision-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Opretter…';
+      try {
+        const res = await fetch(RZPZ_FB.apiBase + 'crm/forms/provision-positions', {
+          method: 'POST',
+          headers: { 'X-WP-Nonce': RZPZ_FB.nonce, 'Content-Type': 'application/json' },
+        });
+        const data = await res.json();
+        if (data.created === 0) {
+          toast('Alle stillinger har allerede en formular ✓');
+        } else {
+          toast(`${data.created} formular${data.created !== 1 ? 'er' : ''} oprettet ✓ — genindlæs siden for at se dem`);
+          setTimeout(() => location.reload(), 1800);
+        }
+      } catch(e) {
+        toast('Fejl: ' + e.message, 'err');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '⚡ Opret formularer til alle stillinger';
+      }
+    });
+
     // Edit fields
     document.addEventListener('click', function(e) {
       const editBtn = e.target.closest('.fb-edit-btn');

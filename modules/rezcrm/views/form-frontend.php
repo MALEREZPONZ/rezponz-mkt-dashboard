@@ -76,6 +76,7 @@ $form_uid    = 'rzcrm-form-' . $form->id;
             <?php endif; ?>
 
             <?php switch ( $field->field_type ) :
+              case 'url':
               case 'text':
               case 'email':
               case 'phone': ?>

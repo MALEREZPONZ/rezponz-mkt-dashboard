@@ -27,6 +27,9 @@ wp_localize_script( 'rzpz-crm-fb', 'RZPZ_FB', [
       <p class="rzpa-page-sub">Opret og administrér ansøgningsformularer til dine stillinger</p>
     </div>
     <div class="rzpa-header-actions">
+      <button class="rzpa-btn rzpa-btn-ghost" id="fb-provision-btn" title="Opretter automatisk en ansøgningsformular for alle stillinger der endnu ikke har en">
+        ⚡ Opret formularer til alle stillinger
+      </button>
       <button class="rzpa-btn rzpa-btn-primary" id="fb-new-form-btn">+ Ny formular</button>
     </div>
   </div>

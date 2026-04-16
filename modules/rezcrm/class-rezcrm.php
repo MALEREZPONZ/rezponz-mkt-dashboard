@@ -27,6 +27,14 @@ class RZPZ_RezCRM {
             set_transient( 'rzpz_crm_seeded_v2', 1, 30 * DAY_IN_SECONDS );
         } );
 
+        // DB-migrering for forms + auto-provision formularer til alle stillinger
+        add_action( 'admin_init', function () {
+            RZPZ_CRM_Forms_DB::maybe_upgrade();
+            if ( get_transient( 'rzpz_crm_forms_provisioned_v1' ) ) return;
+            RZPZ_CRM_Forms_DB::provision_forms_for_positions();
+            set_transient( 'rzpz_crm_forms_provisioned_v1', 1, 30 * DAY_IN_SECONDS );
+        } );
+
         // Cron hooks
         add_action( 'rzpz_crm_dispatch_rejections', [ __CLASS__, 'dispatch_rejections' ] );
         add_action( 'rzpz_crm_gdpr_cleanup',        [ __CLASS__, 'gdpr_cleanup' ] );
@@ -128,6 +136,9 @@ class RZPZ_RezCRM {
 
             // Attachments (photo_url + cv_url)
             [ 'PATCH',  'crm/applications/(?P<id>\d+)/attachments', 'api_attachments_update' ],
+
+            // Forms: opret formularer til alle stillinger der mangler
+            [ 'POST',   'crm/forms/provision-positions',             'api_provision_forms' ],
 
             // Applicant status (offentlig — token-beskyttet)
             [ 'GET',    'crm/status/(?P<token>[a-zA-Z0-9]+)', 'api_applicant_status', false ],
@@ -278,6 +289,12 @@ class RZPZ_RezCRM {
         $id  = (int) $req->get_param( 'id' );
         $ok  = RZPZ_CRM_DB::update_application( $id, $req->get_json_params() );
         return new WP_REST_Response( [ 'ok' => $ok ], $ok ? 200 : 400 );
+    }
+
+    public static function api_provision_forms( WP_REST_Request $req ): WP_REST_Response {
+        delete_transient( 'rzpz_crm_forms_provisioned_v1' ); // tillad re-kørsel
+        $count = RZPZ_CRM_Forms_DB::provision_forms_for_positions();
+        return new WP_REST_Response( [ 'ok' => true, 'created' => $count ], 200 );
     }
 
     public static function api_attachments_update( WP_REST_Request $req ): WP_REST_Response {
