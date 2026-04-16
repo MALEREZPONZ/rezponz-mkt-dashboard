@@ -1473,9 +1473,12 @@
         </table>
         </div>`;
 
-    // Bind open buttons
+    // Bind open buttons — ignore clicks originating from interactive elements
     qsa('[data-app-id]', el('crm-pos-candidates')).forEach(el2 => {
-        el2.addEventListener('click', () => openAppDetail(+el2.dataset.appId));
+        el2.addEventListener('click', (e) => {
+            if (e.target.closest('select, input, a, label')) return;
+            openAppDetail(+el2.dataset.appId);
+        });
     });
 
     // Bind folder selects
