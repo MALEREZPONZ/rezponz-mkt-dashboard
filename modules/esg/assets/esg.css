@@ -651,13 +651,30 @@
 /* Milestone */
 .rz-esg-milestone {
     display: grid;
-    grid-template-columns: 80px 1fr;
+    grid-template-columns: 80px 1fr 64px;
     gap: 32px;
-    align-items: start;
+    align-items: center;
     padding: 28px 0;
     border-bottom: 1px solid rgba(255,255,255,.04);
 }
 .rz-esg-milestone:last-child { border-bottom: none; }
+
+/* Progress ring (injected by JS) */
+.rz-esg-ring {
+    display: block;
+    flex-shrink: 0;
+    justify-self: center;
+    align-self: center;
+    opacity: 0;
+    transform: scale(0.7) rotate(-10deg);
+    transition: opacity 0.5s var(--esg-ease), transform 0.5s var(--esg-ease);
+    filter: drop-shadow(0 0 6px rgba(0,0,0,.3));
+}
+.rz-esg-milestone:has(.rz-esg-ring[data-animated]) .rz-esg-ring,
+.rz-esg-ring[data-animated="1"] {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+}
 
 .rz-esg-milestone__dot {
     display: flex;
@@ -1215,7 +1232,7 @@
         grid-template-columns: 52px 1fr;
     }
     .rz-esg-roadmap__track::before { left: 52px; }
-    .rz-esg-milestone { grid-template-columns: 52px 1fr; gap: 20px; }
+    .rz-esg-milestone { grid-template-columns: 52px 1fr 52px; gap: 20px; }
 
     .rz-esg-hero__chips {
         gap: 20px 0;

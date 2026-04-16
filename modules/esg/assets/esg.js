@@ -467,6 +467,187 @@
     }
 
     // ──────────────────────────────────────────────────────────────────────────
+    // Milestone progress rings (animated SVG, injected right side)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    function initMilestoneRings() {
+        if (!('IntersectionObserver' in window)) return;
+
+        var PROGRESS = { done: 100, ongoing: 65, next: 15, target: 0 };
+        var COLOR    = {
+            done:    '#70C898',
+            ongoing: '#E8A84A',
+            next:    '#70A0D0',
+            target:  '#C070C8'
+        };
+        var GLOW = {
+            done:    'rgba(112,200,152,.35)',
+            ongoing: 'rgba(232,168,74,.35)',
+            next:    'rgba(112,160,208,.35)',
+            target:  'rgba(192,112,200,.35)'
+        };
+
+        var R    = 22;
+        var CX   = 28;
+        var CY   = 28;
+        var SIZE = 56;
+        var CIRC = 2 * Math.PI * R; // ≈ 138.23
+
+        var milestones = document.querySelectorAll('.rz-esg-milestone');
+        if (!milestones.length) return;
+
+        milestones.forEach(function (el) {
+            // Determine status from class list
+            var status = 'next';
+            el.classList.forEach(function (c) {
+                if (c.startsWith('rz-esg-milestone--')) {
+                    status = c.replace('rz-esg-milestone--', '');
+                }
+            });
+
+            var pct    = PROGRESS[status] !== undefined ? PROGRESS[status] : 0;
+            var color  = COLOR[status]  || '#888';
+            var glow   = GLOW[status]   || 'rgba(136,136,136,.3)';
+            var offset = CIRC - (pct / 100) * CIRC;
+
+            // Build SVG ring
+            var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('class', 'rz-esg-ring');
+            svg.setAttribute('width', SIZE);
+            svg.setAttribute('height', SIZE);
+            svg.setAttribute('viewBox', '0 0 ' + SIZE + ' ' + SIZE);
+            svg.setAttribute('aria-hidden', 'true');
+            svg.dataset.status = status;
+
+            // Track circle
+            var track = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            track.setAttribute('cx', CX);
+            track.setAttribute('cy', CY);
+            track.setAttribute('r',  R);
+            track.setAttribute('fill', 'none');
+            track.setAttribute('stroke', 'rgba(255,255,255,.07)');
+            track.setAttribute('stroke-width', '2.5');
+
+            // Progress circle
+            var prog = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            prog.setAttribute('class', 'rz-esg-ring__arc');
+            prog.setAttribute('cx', CX);
+            prog.setAttribute('cy', CY);
+            prog.setAttribute('r',  R);
+            prog.setAttribute('fill', 'none');
+            prog.setAttribute('stroke', color);
+            prog.setAttribute('stroke-width', '2.5');
+            prog.setAttribute('stroke-linecap', 'round');
+            prog.setAttribute('stroke-dasharray', CIRC.toFixed(3));
+            prog.setAttribute('stroke-dashoffset', CIRC.toFixed(3)); // start hidden
+            prog.setAttribute('transform', 'rotate(-90 ' + CX + ' ' + CY + ')');
+            prog.dataset.targetOffset = offset.toFixed(3);
+            prog.dataset.color = color;
+
+            // Percentage label
+            var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', CX);
+            text.setAttribute('y', CY);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('dominant-baseline', 'middle');
+            text.setAttribute('fill', color);
+            text.setAttribute('font-family', "'JetBrains Mono', monospace");
+            text.setAttribute('font-size', '9.5');
+            text.setAttribute('font-weight', '500');
+            text.setAttribute('letter-spacing', '-0.03em');
+            text.setAttribute('opacity', '0');
+            text.setAttribute('class', 'rz-esg-ring__text');
+            text.textContent = pct + '%';
+
+            svg.appendChild(track);
+            svg.appendChild(prog);
+            svg.appendChild(text);
+            el.appendChild(svg);
+
+            // Glow filter (inline, unique id per milestone)
+            var filterId = 'rz-glow-' + status + '-' + Math.random().toString(36).slice(2, 7);
+            var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            var filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+            filter.setAttribute('id', filterId);
+            filter.setAttribute('x', '-50%');
+            filter.setAttribute('y', '-50%');
+            filter.setAttribute('width', '200%');
+            filter.setAttribute('height', '200%');
+            var feGaussian = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+            feGaussian.setAttribute('stdDeviation', '2.5');
+            feGaussian.setAttribute('result', 'blur');
+            filter.appendChild(feGaussian);
+            defs.appendChild(filter);
+            svg.insertBefore(defs, svg.firstChild);
+
+            // Glow duplicate arc (behind)
+            var glow_arc = prog.cloneNode(false);
+            glow_arc.setAttribute('stroke', color);
+            glow_arc.setAttribute('stroke-width', '4');
+            glow_arc.setAttribute('opacity', '0.4');
+            glow_arc.setAttribute('filter', 'url(#' + filterId + ')');
+            glow_arc.setAttribute('class', 'rz-esg-ring__glow');
+            glow_arc.removeAttribute('class');
+            glow_arc.setAttribute('class', 'rz-esg-ring__glow');
+            svg.insertBefore(glow_arc, prog);
+        });
+
+        // Animate rings as milestones enter viewport
+        var obs = new IntersectionObserver(function (entries) {
+            entries.forEach(function (e) {
+                if (!e.isIntersecting) return;
+
+                var ring = e.target.querySelector('.rz-esg-ring');
+                if (!ring || ring.dataset.animated) return;
+                ring.dataset.animated = '1';
+
+                var arc   = ring.querySelector('.rz-esg-ring__arc');
+                var glow  = ring.querySelector('.rz-esg-ring__glow');
+                var label = ring.querySelector('.rz-esg-ring__text');
+                if (!arc) return;
+
+                var targetOffset = parseFloat(arc.dataset.targetOffset);
+                var DURATION     = prefersReducedMotion() ? 0 : 1100;
+                var startTime    = null;
+                var startOffset  = CIRC;
+
+                function animateArc(ts) {
+                    if (!startTime) startTime = ts;
+                    var progress = Math.min((ts - startTime) / DURATION, 1);
+                    var eased    = easeOutExpo(progress);
+                    var current  = startOffset + (targetOffset - startOffset) * eased;
+
+                    arc.setAttribute('stroke-dashoffset', current.toFixed(3));
+                    if (glow) glow.setAttribute('stroke-dashoffset', current.toFixed(3));
+
+                    // Fade label in at 60% through animation
+                    if (label && progress > 0.6) {
+                        var labelOpacity = Math.min((progress - 0.6) / 0.4, 1);
+                        label.setAttribute('opacity', labelOpacity.toFixed(3));
+                    }
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animateArc);
+                    }
+                }
+
+                // Small delay per milestone stagger (uses position in list)
+                var allMilestones = Array.from(document.querySelectorAll('.rz-esg-milestone'));
+                var idx           = allMilestones.indexOf(e.target);
+                var delay         = idx * 120;
+
+                setTimeout(function () {
+                    requestAnimationFrame(animateArc);
+                }, delay);
+
+                obs.unobserve(e.target);
+            });
+        }, { threshold: 0.25 });
+
+        milestones.forEach(function (el) { obs.observe(el); });
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
     // Boot
     // ──────────────────────────────────────────────────────────────────────────
 
@@ -482,6 +663,7 @@
         initChipCounters();
         initRoadmapLine();
         initMilestones();
+        initMilestoneRings();
         initActionCards();
         initTilt();
         initFaq();
