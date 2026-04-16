@@ -1457,6 +1457,7 @@
                     <td class="crm-ctd-stage">${stagePill(a.stage)}</td>
                     <td class="crm-ctd-rating"><div class="crm-cand-rating">${starsHtml(a.rating)}</div></td>
                     <td class="crm-ctd-actions">
+                        <div class="crm-cand-actions-wrap">
                         ${positiveFolders.length ? `
                         <select class="crm-cand-folder-sel crm-select-xs" data-app-folder-id="${a.id}" title="Flyt til mappe">
                             <option value="">📁 Mappe…</option>
@@ -1464,6 +1465,7 @@
                             ${a.folder_id ? `<option value="__remove">↩ Fjern fra mappe</option>` : ''}
                         </select>` : ''}
                         <button class="crm-btn crm-btn-ghost crm-btn-xs crm-cand-open-btn" data-app-id="${a.id}">Åbn →</button>
+                        </div>
                     </td>
                 </tr>`;
             }).join('')}

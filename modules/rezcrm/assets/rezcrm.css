@@ -717,7 +717,17 @@
 .crm-cand-rating .crm-star { font-size: 12px; }
 
 /* Actions cell */
-.crm-ctd-actions { white-space: nowrap; text-align: right; }
+.crm-ctd-actions {
+    white-space: nowrap;
+    text-align: right;
+    vertical-align: middle;
+}
+.crm-cand-actions-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-end;
+}
 
 /* Legacy compat */
 .crm-cand-avail,
@@ -849,9 +859,50 @@
 }
 .crm-pos-folder-add-btn:hover { background: rgba(204,255,0,.1); }
 .crm-pos-folder-btn { justify-content: space-between; }
+/* ── Folder select ───────────────────────────────────────────────────────── */
 .crm-select-xs {
-    background: var(--crm-surface); border: 1px solid var(--crm-border);
-    color: var(--crm-text); border-radius: 6px; padding: 3px 6px; font-size: 11px;
-    cursor: pointer; max-width: 130px;
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: #141414;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    border: 1px solid #2e2e2e;
+    color: rgba(229,229,229,.75);
+    border-radius: 7px;
+    padding: 5px 26px 5px 9px;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    min-width: 120px;
+    max-width: 148px;
+    transition: border-color .15s, color .15s;
+    line-height: 1;
+}
+.crm-select-xs:hover {
+    border-color: #3a3a3a;
+    color: var(--crm-text);
+}
+.crm-select-xs:focus {
+    outline: none;
+    border-color: rgba(204,255,0,.35);
+    color: var(--crm-text);
+}
+
+/* ── Open-candidate button ───────────────────────────────────────────────── */
+.crm-cand-open-btn {
+    background: rgba(204,255,0,.07) !important;
+    border-color: rgba(204,255,0,.18) !important;
+    color: var(--crm-neon) !important;
+    padding: 5px 12px !important;
+    font-size: 11px !important;
+    letter-spacing: .02em;
+    border-radius: 7px !important;
+    transition: background .15s, border-color .15s, transform .15s !important;
+}
+.crm-cand-open-btn:hover {
+    background: rgba(204,255,0,.14) !important;
+    border-color: rgba(204,255,0,.45) !important;
+    transform: translateX(2px);
 }
 .crm-input-sm { padding: 5px 8px !important; font-size: 12px !important; }
