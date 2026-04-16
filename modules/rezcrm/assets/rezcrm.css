@@ -860,33 +860,45 @@
 .crm-pos-folder-add-btn:hover { background: rgba(204,255,0,.1); }
 .crm-pos-folder-btn { justify-content: space-between; }
 /* ── Folder select ───────────────────────────────────────────────────────── */
+#rzpz-crm-app .crm-select-xs,
+#wpcontent .crm-select-xs,
 .crm-select-xs {
-    appearance: none;
-    -webkit-appearance: none;
-    background-color: #141414;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 9px center;
-    border: 1px solid #2e2e2e;
-    color: rgba(229,229,229,.75);
-    border-radius: 7px;
-    padding: 5px 26px 5px 9px;
-    font-size: 11px;
-    font-family: inherit;
-    cursor: pointer;
-    min-width: 120px;
-    max-width: 148px;
-    transition: border-color .15s, color .15s;
-    line-height: 1;
+    -webkit-appearance: none !important;
+    -moz-appearance:    none !important;
+    appearance:         none !important;
+    background-color:   #141414 !important;
+    background-image:   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+    background-repeat:  no-repeat !important;
+    background-position: right 9px center !important;
+    background-size:    10px 6px !important;
+    border:             1px solid #303030 !important;
+    color:              rgba(229,229,229,.72) !important;
+    border-radius:      7px !important;
+    padding:            5px 26px 5px 9px !important;
+    font-size:          11px !important;
+    font-family:        inherit !important;
+    cursor:             pointer !important;
+    min-width:          120px !important;
+    max-width:          148px !important;
+    transition:         border-color .15s, color .15s !important;
+    line-height:        1.4 !important;
+    height:             auto !important;
+    box-shadow:         none !important;
+    color-scheme:       dark;
 }
+#rzpz-crm-app .crm-select-xs:hover,
+#wpcontent .crm-select-xs:hover,
 .crm-select-xs:hover {
-    border-color: #3a3a3a;
-    color: var(--crm-text);
+    border-color: #3e3e3e !important;
+    color: #e5e5e5 !important;
 }
+#rzpz-crm-app .crm-select-xs:focus,
+#wpcontent .crm-select-xs:focus,
 .crm-select-xs:focus {
-    outline: none;
-    border-color: rgba(204,255,0,.35);
-    color: var(--crm-text);
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(204,255,0,.2) !important;
+    border-color: rgba(204,255,0,.4) !important;
+    color: #e5e5e5 !important;
 }
 
 /* ── Open-candidate button ───────────────────────────────────────────────── */
