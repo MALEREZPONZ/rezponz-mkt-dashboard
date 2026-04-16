@@ -80,7 +80,8 @@ class RZPA_Database {
             period_days   TINYINT UNSIGNED DEFAULT 30,
             fetched_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY idx_period (period_days)
+            KEY idx_period (period_days),
+            KEY idx_date_start (date_start)
         ) $c;" );
 
         dbDelta( "CREATE TABLE {$wpdb->prefix}rzpa_snap_campaigns (
@@ -185,6 +186,23 @@ class RZPA_Database {
         ) $c;" );
 
         update_option( 'rzpa_db_version', RZPA_DB_VER );
+
+        // ── Performance migrations ───────────────────────────────────────────
+        // v7: Add idx_date_start to meta_campaigns if missing (existing installs)
+        $meta_t = $wpdb->prefix . 'rzpa_meta_campaigns';
+        $idx = $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = 'idx_date_start'",
+            DB_NAME, $meta_t
+        ) );
+        if ( ! $idx ) {
+            $wpdb->query( "ALTER TABLE `{$meta_t}` ADD KEY idx_date_start (date_start)" ); // phpcs:ignore
+        }
+
+        // v7: Ensure rzpa_settings is not autoloaded (reduces frontend memory)
+        $wpdb->query(
+            "UPDATE {$wpdb->options} SET autoload = 'no' WHERE option_name = 'rzpa_settings'"
+        ); // phpcs:ignore
     }
 
     // ── SEO ─────────────────────────────────────────────────────────────────

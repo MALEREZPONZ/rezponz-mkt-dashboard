@@ -72,6 +72,7 @@ class RZPZ_RezCRM {
             'nonce'    => wp_create_nonce( 'wp_rest' ),
             'stages'   => RZPZ_CRM_DB::PIPELINE_STAGES,
             'sources'  => RZPZ_CRM_DB::SOURCES,
+            'jobTypes' => RZPZ_CRM_DB::JOB_TYPES,
             'siteUrl'  => site_url(),
         ] );
     }
@@ -112,6 +113,12 @@ class RZPZ_RezCRM {
             [ 'POST',   'crm/templates',                       'api_templates_save' ],
             [ 'PUT',    'crm/templates/(?P<id>\d+)',           'api_templates_update' ],
             [ 'DELETE', 'crm/templates/(?P<id>\d+)',           'api_templates_delete' ],
+
+            // Folders / buckets
+            [ 'GET',    'crm/positions/(?P<pos_id>\d+)/folders', 'api_folders_list'   ],
+            [ 'POST',   'crm/positions/(?P<pos_id>\d+)/folders', 'api_folder_create'  ],
+            [ 'DELETE', 'crm/folders/(?P<id>\d+)',               'api_folder_delete'  ],
+            [ 'PATCH',  'crm/applications/(?P<id>\d+)/folder',   'api_app_set_folder' ],
 
             // Stats
             [ 'GET',    'crm/stats',                           'api_stats' ],
@@ -159,6 +166,34 @@ class RZPZ_RezCRM {
         $data['id'] = (int) $req->get_param( 'id' );
         $id = RZPZ_CRM_DB::upsert_position( $data );
         if ( ! $id ) return new WP_REST_Response( [ 'message' => 'Fejl' ], 400 );
+        return new WP_REST_Response( [ 'ok' => true ], 200 );
+    }
+
+    // ── REST: Folders ────────────────────────────────────────────────────────
+
+    public static function api_folders_list( WP_REST_Request $req ): WP_REST_Response {
+        $pos_id = (int) $req->get_param( 'pos_id' );
+        return new WP_REST_Response( RZPZ_CRM_DB::get_folders( $pos_id ), 200 );
+    }
+
+    public static function api_folder_create( WP_REST_Request $req ): WP_REST_Response {
+        $pos_id = (int) $req->get_param( 'pos_id' );
+        $name   = sanitize_text_field( $req->get_json_params()['name'] ?? '' );
+        if ( ! $name ) return new WP_REST_Response( [ 'message' => 'Navn påkrævet' ], 400 );
+        $id = RZPZ_CRM_DB::create_folder( $pos_id, $name );
+        if ( ! $id ) return new WP_REST_Response( [ 'message' => 'Fejl' ], 500 );
+        return new WP_REST_Response( [ 'id' => $id ], 201 );
+    }
+
+    public static function api_folder_delete( WP_REST_Request $req ): WP_REST_Response {
+        RZPZ_CRM_DB::delete_folder( (int) $req->get_param( 'id' ) );
+        return new WP_REST_Response( [ 'ok' => true ], 200 );
+    }
+
+    public static function api_app_set_folder( WP_REST_Request $req ): WP_REST_Response {
+        $app_id    = (int) $req->get_param( 'id' );
+        $folder_id = $req->get_json_params()['folder_id'] ?? null;
+        RZPZ_CRM_DB::assign_app_to_folder( $app_id, $folder_id ? (int) $folder_id : null );
         return new WP_REST_Response( [ 'ok' => true ], 200 );
     }
 

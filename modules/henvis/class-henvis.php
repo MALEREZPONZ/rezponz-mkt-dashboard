@@ -618,9 +618,11 @@ class RZPZ_Henvis {
         global $wpdb;
         $table = $wpdb->prefix . 'rzpz_referrals';
 
-        $filter_mgr    = sanitize_key( $_GET['mgr']    ?? '' );
-        $filter_status = sanitize_key( $_GET['status'] ?? '' );
-        $search        = sanitize_text_field( $_GET['s'] ?? '' );
+        $filter_mgr    = sanitize_key( $_GET['mgr']        ?? '' );
+        $filter_status = sanitize_key( $_GET['status']     ?? '' );
+        $search        = sanitize_text_field( $_GET['s']   ?? '' );
+        $date_from     = sanitize_text_field( $_GET['date_from'] ?? '' );
+        $date_to       = sanitize_text_field( $_GET['date_to']   ?? '' );
 
         $where  = '1=1';
         $params = [];
@@ -632,6 +634,8 @@ class RZPZ_Henvis {
             $params[] = '%' . $wpdb->esc_like( $search ) . '%';
             $params[] = '%' . $wpdb->esc_like( $search ) . '%';
         }
+        if ( $date_from ) { $where .= ' AND DATE(submitted_at) >= %s'; $params[] = $date_from; }
+        if ( $date_to )   { $where .= ' AND DATE(submitted_at) <= %s'; $params[] = $date_to; }
 
         $query     = "SELECT * FROM {$table} WHERE {$where} ORDER BY submitted_at DESC";
         $referrals = $params

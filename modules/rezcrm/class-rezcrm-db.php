@@ -17,8 +17,17 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class RZPZ_CRM_DB {
 
-    const DB_VERSION     = '3'; // bumped: added upgrade_schema for internal_notes on applications
+    const DB_VERSION     = '6'; // bumped: added app_folders table + folder_id on applications
     const DB_VERSION_KEY = 'rzpz_crm_db_ver';
+
+    // Standard stillingstyper — bruges som dropdown i formular og filter i UI
+    const JOB_TYPES = [
+        'ecs'   => 'Education & Customer Service Advisor',
+        'csa'   => 'Customer Success Advisor',
+        'csa_m' => 'Customer Success Advisor – Mobil',
+        'tm'    => 'Team Manager',
+        'ra'    => 'Rezponz Academy',
+    ];
 
     // History event types (gemt i to_stage-kolonnen)
     const HISTORY_TYPE_NOTE = 'note_added';
@@ -59,6 +68,7 @@ class RZPZ_CRM_DB {
         dbDelta( "CREATE TABLE {$wpdb->prefix}rzpz_crm_positions (
             id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             title          VARCHAR(255)    NOT NULL,
+            job_type       VARCHAR(100)    DEFAULT NULL,
             department     VARCHAR(100)    DEFAULT NULL,
             location       VARCHAR(100)    DEFAULT NULL,
             description    LONGTEXT        DEFAULT NULL,
@@ -67,7 +77,8 @@ class RZPZ_CRM_DB {
             created_at     DATETIME        DEFAULT CURRENT_TIMESTAMP,
             updated_at     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY idx_status (status)
+            KEY idx_status (status),
+            KEY idx_job_type (job_type)
         ) {$c};" );
 
         // 2. Ansøger-profiler (GDPR-enhed — slettes 6 måneder efter afslutning)
@@ -82,6 +93,7 @@ class RZPZ_CRM_DB {
             birthdate        DATE            DEFAULT NULL,
             photo_url        VARCHAR(500)    DEFAULT NULL,
             cv_url           VARCHAR(500)    DEFAULT NULL,
+            video_url        VARCHAR(500)    DEFAULT NULL,
             cover_letter     LONGTEXT        DEFAULT NULL,
             notes            TEXT            DEFAULT NULL,
             gdpr_consent     TINYINT(1)      NOT NULL DEFAULT 0,
@@ -116,6 +128,7 @@ class RZPZ_CRM_DB {
             rejection_scheduled_at DATETIME DEFAULT NULL,
             rejection_sent_at      DATETIME DEFAULT NULL,
             ended_at        DATETIME        DEFAULT NULL,
+            folder_id       BIGINT UNSIGNED DEFAULT NULL,
             created_at      DATETIME        DEFAULT CURRENT_TIMESTAMP,
             updated_at      DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
@@ -184,6 +197,18 @@ class RZPZ_CRM_DB {
             KEY idx_send_after (send_after, status)
         ) {$c};" );
 
+        // 8. Mapper (folder/bucket system for applications)
+        dbDelta( "CREATE TABLE {$wpdb->prefix}rzpz_crm_app_folders (
+            id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            position_id BIGINT UNSIGNED DEFAULT NULL,
+            name        VARCHAR(100)    NOT NULL,
+            sort_order  TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            created_by  BIGINT UNSIGNED DEFAULT NULL,
+            created_at  DATETIME        DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_position (position_id)
+        ) {$c};" );
+
         update_option( self::DB_VERSION_KEY, self::DB_VERSION );
 
         // Seed standard-skabeloner
@@ -201,19 +226,63 @@ class RZPZ_CRM_DB {
     public static function upgrade_schema(): void {
         global $wpdb;
         $a = $wpdb->prefix . 'rzpz_crm_applications';
+        $p = $wpdb->prefix . 'rzpz_crm_positions';
 
         self::ensure_default_positions();
         self::migrate_orphan_applications();
 
-        // Tilføj internal_notes kolonnen hvis den ikke allerede eksisterer
+        // v3: internal_notes på applications
         $col = $wpdb->get_results( $wpdb->prepare(
             "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
              WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'internal_notes'",
-            DB_NAME,
-            $a
+            DB_NAME, $a
         ) );
         if ( empty( $col ) ) {
             $wpdb->query( "ALTER TABLE {$a} ADD COLUMN internal_notes LONGTEXT DEFAULT NULL" );
+        }
+
+        // v4: job_type på positions
+        $col2 = $wpdb->get_results( $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'job_type'",
+            DB_NAME, $p
+        ) );
+        if ( empty( $col2 ) ) {
+            $wpdb->query( "ALTER TABLE {$p} ADD COLUMN job_type VARCHAR(100) DEFAULT NULL AFTER title" );
+            $wpdb->query( "ALTER TABLE {$p} ADD KEY idx_job_type (job_type)" );
+        }
+
+        // v5: folders table + folder_id on applications
+        $col3 = $wpdb->get_results( $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'folder_id'",
+            DB_NAME, $a
+        ) );
+        if ( empty( $col3 ) ) {
+            $wpdb->query( "ALTER TABLE `{$a}` ADD COLUMN folder_id BIGINT UNSIGNED DEFAULT NULL" );
+        }
+        // Also install folders table
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        $c = $wpdb->get_charset_collate();
+        dbDelta( "CREATE TABLE {$wpdb->prefix}rzpz_crm_app_folders (
+            id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            position_id BIGINT UNSIGNED DEFAULT NULL,
+            name        VARCHAR(100)    NOT NULL,
+            sort_order  TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            created_by  BIGINT UNSIGNED DEFAULT NULL,
+            created_at  DATETIME        DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_position (position_id)
+        ) {$c};" );
+
+        // v6: video_url on applicants
+        $ap2 = $wpdb->prefix . 'rzpz_crm_applicants';
+        $col6 = $wpdb->get_results( $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'video_url'",
+            DB_NAME, $ap2
+        ) );
+        if ( empty( $col6 ) ) {
+            $wpdb->query( "ALTER TABLE `{$ap2}` ADD COLUMN video_url VARCHAR(500) DEFAULT NULL AFTER cv_url" );
         }
     }
 
@@ -327,8 +396,10 @@ class RZPZ_CRM_DB {
     public static function upsert_position( array $data ): int|false {
         global $wpdb;
         $t = $wpdb->prefix . 'rzpz_crm_positions';
+        $valid_types = array_keys( self::JOB_TYPES );
         $row = [
             'title'       => sanitize_text_field( $data['title'] ?? '' ),
+            'job_type'    => in_array( $data['job_type'] ?? '', $valid_types, true ) ? $data['job_type'] : null,
             'department'  => sanitize_text_field( $data['department'] ?? '' ),
             'location'    => sanitize_text_field( $data['location'] ?? '' ),
             'description' => wp_kses_post( $data['description'] ?? '' ),
@@ -354,9 +425,16 @@ class RZPZ_CRM_DB {
         $t = $wpdb->prefix . 'rzpz_crm_positions';
 
         $defaults = [
-            'generel'    => [ 'title' => 'Generel ansøgning',   'department' => '',       'status' => 'open' ],
-            'remote'     => [ 'title' => 'Remote',               'department' => 'Remote', 'status' => 'open' ],
-            'uopfordret' => [ 'title' => 'Uopfordret ansøgning', 'department' => '',       'status' => 'open' ],
+            // ── Generiske fallback-stillinger ──────────────────────────────
+            'generel'    => [ 'title' => 'Generel ansøgning',   'job_type' => null,    'department' => '',       'status' => 'open' ],
+            'remote'     => [ 'title' => 'Remote',               'job_type' => null,    'department' => 'Remote', 'status' => 'open' ],
+            'uopfordret' => [ 'title' => 'Uopfordret ansøgning', 'job_type' => null,    'department' => '',       'status' => 'open' ],
+            // ── Rezponz standard-stillingstyper ─────────────────────────────
+            'ecs'        => [ 'title' => 'Education & Customer Service Advisor', 'job_type' => 'ecs',   'department' => 'Education & Customer Service', 'status' => 'open' ],
+            'csa'        => [ 'title' => 'Customer Success Advisor',             'job_type' => 'csa',   'department' => 'Customer Success',            'status' => 'open' ],
+            'csa_m'      => [ 'title' => 'Customer Success Advisor – Mobil',     'job_type' => 'csa_m', 'department' => 'Customer Success',            'status' => 'open' ],
+            'tm'         => [ 'title' => 'Team Manager',                         'job_type' => 'tm',    'department' => 'Management',                  'status' => 'open' ],
+            'ra'         => [ 'title' => 'Rezponz Academy',                      'job_type' => 'ra',    'department' => 'Academy',                     'status' => 'open' ],
         ];
 
         $map = [];
@@ -365,13 +443,21 @@ class RZPZ_CRM_DB {
                 "SELECT id FROM {$t} WHERE title = %s LIMIT 1", $data['title']
             ) );
             if ( $existing ) {
+                // Opdater job_type hvis det mangler (migration for eksisterende rækker)
+                if ( $data['job_type'] ) {
+                    $wpdb->query( $wpdb->prepare(
+                        "UPDATE {$t} SET job_type = %s WHERE id = %d AND (job_type IS NULL OR job_type = '')",
+                        $data['job_type'], (int) $existing
+                    ) );
+                }
                 $map[ $key ] = (int) $existing;
             } else {
-                $wpdb->insert( $t, [
+                $wpdb->insert( $t, array_filter( [
                     'title'      => $data['title'],
+                    'job_type'   => $data['job_type'],
                     'department' => $data['department'],
                     'status'     => $data['status'],
-                ] );
+                ], fn( $v ) => $v !== null ) );
                 $map[ $key ] = (int) $wpdb->insert_id;
             }
         }
@@ -516,6 +602,7 @@ class RZPZ_CRM_DB {
         $offset = isset( $filters['offset'] ) ? (int) $filters['offset'] : 0;
 
         $sql = "SELECT a.*, ap.first_name, ap.last_name, ap.email, ap.phone, ap.token,
+                       ap.birthdate, ap.video_url,
                        COALESCE(pos.title, 'Generel ansøgning') AS position_title
                 FROM {$a} a
                 JOIN {$ap}      ap  ON a.applicant_id = ap.id
@@ -945,5 +1032,53 @@ class RZPZ_CRM_DB {
             'hired'           => $hired,
             'conversion_rate' => $total > 0 ? round( $hired / $total * 100, 1 ) : 0,
         ];
+    }
+
+    // ── Folder / bucket methods ──────────────────────────────────────────────
+
+    public static function get_folders( int $position_id ): array {
+        global $wpdb;
+        $t    = $wpdb->prefix . 'rzpz_crm_app_folders';
+        $a    = $wpdb->prefix . 'rzpz_crm_applications';
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT f.*, COUNT(a.id) AS app_count
+             FROM {$t} f
+             LEFT JOIN {$a} a ON a.folder_id = f.id
+             WHERE f.position_id = %d
+             GROUP BY f.id
+             ORDER BY f.sort_order ASC, f.created_at ASC",
+            $position_id
+        ) ) ?: [];
+        foreach ( $rows as $r ) {
+            $r->id        = (int) $r->id;
+            $r->app_count = (int) $r->app_count;
+        }
+        return $rows;
+    }
+
+    public static function create_folder( int $position_id, string $name, int $user_id = 0 ): int|false {
+        global $wpdb;
+        $wpdb->insert( $wpdb->prefix . 'rzpz_crm_app_folders', [
+            'position_id' => $position_id,
+            'name'        => sanitize_text_field( $name ),
+            'created_by'  => $user_id ?: get_current_user_id(),
+        ] );
+        return $wpdb->insert_id ?: false;
+    }
+
+    public static function delete_folder( int $folder_id ): void {
+        global $wpdb;
+        // Unassign apps from folder before deleting
+        $wpdb->update( $wpdb->prefix . 'rzpz_crm_applications', [ 'folder_id' => null ], [ 'folder_id' => $folder_id ] );
+        $wpdb->delete( $wpdb->prefix . 'rzpz_crm_app_folders', [ 'id' => $folder_id ] );
+    }
+
+    public static function assign_app_to_folder( int $app_id, ?int $folder_id ): void {
+        global $wpdb;
+        $wpdb->update(
+            $wpdb->prefix . 'rzpz_crm_applications',
+            [ 'folder_id' => $folder_id ],
+            [ 'id'        => $app_id ]
+        );
     }
 }

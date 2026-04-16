@@ -113,10 +113,19 @@ if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
         <button class="crm-btn crm-btn-primary" id="crm-pos-tab-new-btn">+ Opret stilling</button>
       </div>
       <div class="crm-pos-tab-filters">
-        <button class="crm-pos-filter-btn crm-pos-filter-active" data-pos-status="">Alle</button>
-        <button class="crm-pos-filter-btn" data-pos-status="open">Åbne</button>
-        <button class="crm-pos-filter-btn" data-pos-status="draft">Kladder</button>
-        <button class="crm-pos-filter-btn" data-pos-status="closed">Lukkede</button>
+        <div class="crm-pos-filter-group">
+          <button class="crm-pos-filter-btn crm-pos-filter-active" data-pos-status="">Alle</button>
+          <button class="crm-pos-filter-btn" data-pos-status="open">Åbne</button>
+          <button class="crm-pos-filter-btn" data-pos-status="draft">Kladder</button>
+          <button class="crm-pos-filter-btn" data-pos-status="closed">Lukkede</button>
+        </div>
+        <div class="crm-pos-filter-sep"></div>
+        <div class="crm-pos-filter-group">
+          <button class="crm-pos-type-btn crm-pos-type-active" data-pos-type="">Alle typer</button>
+          <?php foreach ( RZPZ_CRM_DB::JOB_TYPES as $key => $label ) : ?>
+            <button class="crm-pos-type-btn" data-pos-type="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></button>
+          <?php endforeach; ?>
+        </div>
       </div>
       <div id="crm-pos-tab-grid"></div>
     </div>
@@ -306,6 +315,15 @@ if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
         <div id="crm-position-form" style="display:none;margin-top:20px">
           <h3 id="crm-pos-form-title">Ny stilling</h3>
           <div class="crm-form-grid">
+            <div class="crm-field crm-field-full">
+              <label>Stillingstype</label>
+              <select id="pos-job-type" class="crm-select">
+                <option value="">— Ingen specifik type —</option>
+                <?php foreach ( RZPZ_CRM_DB::JOB_TYPES as $key => $label ) : ?>
+                  <option value="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
             <div class="crm-field crm-field-full">
               <label>Jobtitel *</label>
               <input type="text" id="pos-title" class="crm-input" placeholder="Kundeservicemedarbejder">

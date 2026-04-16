@@ -55,7 +55,7 @@ class RZPA_Admin {
                 $data = json_decode( wp_remote_retrieve_body( $res ), true );
                 if ( ! empty( $data['refresh_token'] ) ) {
                     $opts['google_refresh_token'] = $data['refresh_token'];
-                    update_option( 'rzpa_settings', $opts );
+                    update_option( 'rzpa_settings', $opts, 'no' );
                     wp_redirect( admin_url( 'admin.php?page=rzpa-settings&google_connected=1' ) );
                     exit;
                 }
@@ -81,7 +81,7 @@ class RZPA_Admin {
             $body = json_decode( wp_remote_retrieve_body( $res ), true );
             if ( ! empty( $body['refresh_token'] ) ) {
                 $opts['google_ads_refresh_token'] = $body['refresh_token'];
-                update_option( 'rzpa_settings', $opts );
+                update_option( 'rzpa_settings', $opts, 'no' );
                 wp_redirect( admin_url( 'admin.php?page=rzpa-settings&gads_connected=1' ) );
             } else {
                 wp_redirect( admin_url( 'admin.php?page=rzpa-settings&gads_error=1' ) );
@@ -388,7 +388,7 @@ class RZPA_Admin {
         $opts['smtp_encryption'] = in_array( $_POST['smtp_encryption'] ?? 'tls', [ 'tls', 'ssl', 'none' ], true )
                                     ? sanitize_text_field( $_POST['smtp_encryption'] ) : 'tls';
 
-        update_option( 'rzpa_settings', $opts );
+        update_option( 'rzpa_settings', $opts, 'no' );
 
         // Gem + redirect til OAuth hvis brugeren klikkede på forbind-knappen
         if ( ! empty( $_POST['rzpa_redirect_oauth'] ) && ! empty( $_POST['rzpa_gads_oauth_url'] ) ) {

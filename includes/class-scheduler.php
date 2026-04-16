@@ -15,8 +15,13 @@ class RZPA_Scheduler {
         if ( ! wp_next_scheduled( 'rzpa_sixhour_ads_sync' ) ) {
             wp_schedule_event( time(), 'every_6_hours', 'rzpa_sixhour_ads_sync' );
         }
-        if ( ! wp_next_scheduled( 'rzpa_blog_calendar_tick' ) ) {
-            wp_schedule_event( time(), 'hourly', 'rzpa_blog_calendar_tick' );
+        // Reschedule from hourly → twicedaily if still on old schedule
+        $next = wp_next_scheduled( 'rzpa_blog_calendar_tick' );
+        if ( ! $next ) {
+            wp_schedule_event( time(), 'twicedaily', 'rzpa_blog_calendar_tick' );
+        } elseif ( wp_get_schedule( 'rzpa_blog_calendar_tick' ) === 'hourly' ) {
+            wp_unschedule_event( $next, 'rzpa_blog_calendar_tick' );
+            wp_schedule_event( time(), 'twicedaily', 'rzpa_blog_calendar_tick' );
         }
     }
 

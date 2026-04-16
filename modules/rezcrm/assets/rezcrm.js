@@ -20,9 +20,12 @@
   let dragCloneEl     = null;
   let dragSourceEl    = null;
   let dragHoverStage  = null;
-  let activePositionId  = null;   // position ID open in detail view
-  let posDetailStage    = '';     // stage filter in position detail
-  let posTabStatusFilter = '';    // status filter in positions tab list
+  let activePositionId   = null;   // position ID open in detail view
+  let posDetailStage     = '';     // stage filter in position detail
+  let posDetailFolder    = null;   // active folder ID filter in position detail
+  let positiveFolders    = [];     // folders for current position
+  let posTabStatusFilter = '';     // status filter in positions tab list
+  let posTabTypeFilter   = '';     // job_type filter in positions tab list
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const el  = id => document.getElementById(id);
@@ -79,6 +82,41 @@
 
   function sourceLabel(src) {
     return RZPZ_CRM.sources[src] || src || '–';
+  }
+
+  function fmtDateShort(d) {
+    if (!d || d === '0000-00-00') return '–';
+    const dt = new Date(d.includes('T') ? d : d + 'T00:00:00');
+    return dt.toLocaleDateString('da-DK', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  function parseAonScores(jsonStr) {
+    if (!jsonStr) return {};
+    try {
+      const d = JSON.parse(jsonStr);
+      const scores = {};
+      // Flat keys
+      const flat = d.scores || d.results || d;
+      if (flat && typeof flat === 'object') {
+        Object.entries(flat).forEach(([k, v]) => {
+          const kl = k.toLowerCase();
+          if (kl.includes('kunde') || kl === 'cs') scores.kundeservice = v;
+          if (kl.includes('outbound') || kl === 'ob') scores.outbound = v;
+          if (kl.includes('logisk') || kl.includes('logical') || kl.includes('logic')) scores.logisk = v;
+        });
+      }
+      // Array structure
+      if (Array.isArray(d.assessments || d.sections)) {
+        (d.assessments || d.sections).forEach(a => {
+          const n = (a.name || a.title || a.type || '').toLowerCase();
+          const val = a.score ?? a.result ?? a.value ?? a.scaled_score ?? null;
+          if (n.includes('kunde') || n.includes('customer')) scores.kundeservice = val;
+          if (n.includes('outbound')) scores.outbound = val;
+          if (n.includes('logisk') || n.includes('logical') || n.includes('logic')) scores.logisk = val;
+        });
+      }
+      return scores;
+    } catch(e) { return {}; }
   }
 
   // ── Calendar tab ─────────────────────────────────────────────────────────
@@ -468,6 +506,44 @@
 
     // Save new application
     el('crm-app-save-btn').addEventListener('click', saveNewApplication);
+
+    // ── Detail tabs — bind ONCE here, never in renderAppDetail ──────────────
+    // Using activeApp.id at click-time prevents stale closures and duplicate
+    // listeners that caused the activity feed to load inconsistently.
+    qsa('[data-dtab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        qsa('[data-dtab]').forEach(b => b.classList.remove('active'));
+        qsa('.crm-detail-tabpanel').forEach(p => p.style.display = 'none');
+        btn.classList.add('active');
+        const panel = el('crm-dtab-' + btn.dataset.dtab);
+        if (panel) panel.style.display = '';
+
+        if (!activeApp) return;
+        const appId = activeApp.id;
+
+        if (btn.dataset.dtab === 'aktivitet') {
+          loadActivityFeed(appId);
+        }
+        if (btn.dataset.dtab === 'noter') {
+          loadNotesFeed(appId);
+        }
+        if (btn.dataset.dtab === 'kommunikation') {
+          const tplSel = el('crm-template-select');
+          if (tplSel) {
+            tplSel.innerHTML = '<option value="">— Vælg skabelon eller skriv manuelt —</option>' +
+              allTemplates.map(t => `<option value="${t.id}">${escHtml(t.name)} (${t.type})</option>`).join('');
+            tplSel.onchange = () => {
+              const tpl = allTemplates.find(t => t.id == tplSel.value);
+              if (tpl) {
+                el('crm-comm-subject').value = tpl.subject || '';
+                el('crm-comm-body').value    = tpl.body    || '';
+              }
+            };
+          }
+          el('crm-send-btn').onclick = () => sendComm(appId);
+        }
+      });
+    });
   }
 
   function openModal(id) {
@@ -538,6 +614,13 @@
     try {
       activeApp = await api('applications/' + id);
       renderAppDetail(activeApp);
+
+      // Nulstil til overblik-tab ved ny åbning
+      qsa('.crm-detail-tabpanel').forEach(p => p.style.display = 'none');
+      const overblikPanel = el('crm-dtab-overblik');
+      if (overblikPanel) overblikPanel.style.display = '';
+      qsa('[data-dtab]').forEach(b => b.classList.remove('active'));
+      document.querySelector('[data-dtab="overblik"]')?.classList.add('active');
 
       // Load history + comms
       const [hist, comms] = await Promise.all([
@@ -802,40 +885,6 @@
       rejSec.style.display = 'none';
     }
 
-    // ── Detail tabs ──────────────────────────────────────────────────────────
-    // Nulstil til overblik-tab ved ny åbning
-    qsa('.crm-detail-tabpanel').forEach(p => p.style.display = 'none');
-    el('crm-dtab-overblik').style.display = '';
-    qsa('[data-dtab]').forEach(b => b.classList.remove('active'));
-    document.querySelector('[data-dtab="overblik"]')?.classList.add('active');
-
-    qsa('[data-dtab]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        qsa('[data-dtab]').forEach(b => b.classList.remove('active'));
-        qsa('.crm-detail-tabpanel').forEach(p => p.style.display = 'none');
-        btn.classList.add('active');
-        el('crm-dtab-' + btn.dataset.dtab).style.display = '';
-
-        if (btn.dataset.dtab === 'aktivitet') loadActivityFeed(a.id);
-        if (btn.dataset.dtab === 'noter')     loadNotesFeed(a.id);
-        if (btn.dataset.dtab === 'kommunikation') {
-          // Bind template select og send-knap når kommunikation-tab aktiveres
-          const tplSel = el('crm-template-select');
-          if (tplSel) {
-            tplSel.innerHTML = '<option value="">— Vælg skabelon eller skriv manuelt —</option>' +
-              allTemplates.map(t => `<option value="${t.id}">${escHtml(t.name)} (${t.type})</option>`).join('');
-            tplSel.onchange = () => {
-              const tpl = allTemplates.find(t => t.id == tplSel.value);
-              if (tpl) {
-                el('crm-comm-subject').value = tpl.subject || '';
-                el('crm-comm-body').value    = tpl.body    || '';
-              }
-            };
-          }
-          el('crm-send-btn').onclick = () => sendComm(a.id);
-        }
-      });
-    });
   }
 
   async function moveStage(appId, newStage) {
@@ -1060,9 +1109,12 @@
     const grid = el('crm-pos-tab-grid');
     if (!grid) return;
 
-    const filtered = posTabStatusFilter
+    let filtered = posTabStatusFilter
         ? allPositions.filter(p => p.status === posTabStatusFilter)
         : allPositions;
+    if (posTabTypeFilter) {
+        filtered = filtered.filter(p => p.job_type === posTabTypeFilter);
+    }
 
     if (!filtered.length) {
         grid.innerHTML = `<div class="crm-pos-empty">
@@ -1092,10 +1144,13 @@
 
         const statusColor = { open: 'var(--crm-success)', draft: 'var(--crm-orange)', closed: 'var(--crm-muted)' }[p.status] || 'var(--crm-muted)';
         const statusLabel = { open: '● Aktiv', draft: '◐ Kladde', closed: '○ Lukket' }[p.status] || p.status;
+        const jobTypes    = RZPZ_CRM.jobTypes || {};
+        const typeLabel   = p.job_type ? (jobTypes[p.job_type] || p.job_type) : null;
 
-        return `<div class="crm-pos-card" data-pos-id="${p.id}">
+        return `<div class="crm-pos-card" data-pos-id="${p.id}" data-job-type="${escHtml(p.job_type||'')}">
             <div class="crm-pos-card-header">
                 <div class="crm-pos-card-info">
+                    ${typeLabel ? `<div class="crm-pos-type-badge">${escHtml(typeLabel)}</div>` : ''}
                     <div class="crm-pos-card-title">${escHtml(p.title)}</div>
                     <div class="crm-pos-card-meta">
                         ${p.department ? escHtml(p.department) : ''}
@@ -1159,6 +1214,7 @@
         ['pos-title','pos-dept','pos-location','pos-url'].forEach(id => { el(id).value = ''; });
         el('pos-desc').value   = '';
         el('pos-status').value = 'open';
+        if (el('pos-job-type')) el('pos-job-type').value = '';
         el('crm-position-form').style.display = '';
         openModal('crm-positions-modal');
     });
@@ -1174,11 +1230,22 @@
             renderPositionsTab();
         });
     });
+
+    // Job type filter buttons
+    qsa('[data-pos-type]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            posTabTypeFilter = btn.dataset.posType;
+            qsa('[data-pos-type]').forEach(b => b.classList.toggle('crm-pos-type-active', b === btn));
+            renderPositionsTab();
+        });
+    });
   }
 
   async function openPositionDetail(posId) {
     activePositionId = posId;
     posDetailStage   = '';
+    posDetailFolder  = null;
+    positiveFolders  = [];
     el('crm-pos-tab-list').style.display   = 'none';
     el('crm-pos-tab-detail').style.display = '';
 
@@ -1189,6 +1256,10 @@
       const otherApps = allApplications.filter(a => +a.position_id !== posId);
       allApplications = [...otherApps, ...apps];
     } catch(e) { /* brug eksisterende allApplications som fallback */ }
+
+    try {
+      positiveFolders = await api('positions/' + posId + '/folders');
+    } catch(e) { positiveFolders = []; }
 
     renderPositionDetailView();
   }
@@ -1237,28 +1308,98 @@
         { key: 'afslag',        label: 'Afslag',      count: posApps.filter(a => a.stage === 'afslag').length },
     ];
 
-    // Sidebar
+    // Sidebar — stages section
+    const foldersSection = `
+<div class="crm-pos-sidebar-section" style="margin-top:12px">
+    <div class="crm-pos-sidebar-heading" style="display:flex;align-items:center;justify-content:space-between">
+        <span>Mapper</span>
+        <button class="crm-pos-folder-add-btn" id="crm-pos-folder-add-btn" title="Opret ny mappe">+</button>
+    </div>
+    <div id="crm-pos-folder-new" style="display:none;padding:6px 0">
+        <input type="text" id="crm-pos-folder-name-input" class="crm-input crm-input-sm" placeholder="Mappenavn…" style="width:100%;margin-bottom:6px">
+        <div style="display:flex;gap:6px">
+            <button class="crm-btn crm-btn-primary crm-btn-xs" id="crm-pos-folder-save-btn">Gem</button>
+            <button class="crm-btn crm-btn-ghost crm-btn-xs" id="crm-pos-folder-cancel-btn">Annuller</button>
+        </div>
+    </div>
+    ${positiveFolders.length ? positiveFolders.map(f => `
+        <button class="crm-pos-sidebar-btn crm-pos-folder-btn${posDetailFolder === f.id ? ' active' : ''}" data-folder-id="${f.id}">
+            <span>📁 ${escHtml(f.name)}</span>
+            <div style="display:flex;align-items:center;gap:4px">
+                <span class="crm-pos-sidebar-count">${f.app_count}</span>
+                <button class="crm-pos-folder-del-btn" data-del-folder="${f.id}" title="Slet mappe" style="background:none;border:none;color:var(--crm-muted);cursor:pointer;padding:0 2px;font-size:12px;line-height:1">×</button>
+            </div>
+        </button>`).join('') : '<div style="color:var(--crm-muted);font-size:12px;padding:6px 10px">Ingen mapper endnu</div>'}
+</div>`;
+
     el('crm-pos-sidebar').innerHTML = `
         <div class="crm-pos-sidebar-section">
             <div class="crm-pos-sidebar-heading">Kandidater</div>
             ${stages.map(s => `
-                <button class="crm-pos-sidebar-btn${posDetailStage === s.key ? ' active' : ''}" data-detail-stage="${s.key}">
+                <button class="crm-pos-sidebar-btn${posDetailStage === s.key && !posDetailFolder ? ' active' : ''}" data-detail-stage="${s.key}">
                     <span>${escHtml(s.label)}</span>
                     <span class="crm-pos-sidebar-count">${s.count}</span>
                 </button>`).join('')}
-        </div>`;
+        </div>` + foldersSection;
 
     qsa('[data-detail-stage]', el('crm-pos-sidebar')).forEach(btn => {
         btn.addEventListener('click', () => {
-            posDetailStage = btn.dataset.detailStage;
+            posDetailStage  = btn.dataset.detailStage;
+            posDetailFolder = null;
             renderPositionDetailView();
         });
     });
 
+    // Folder filter buttons
+    qsa('[data-folder-id]', el('crm-pos-sidebar')).forEach(btn => {
+        btn.addEventListener('click', e => {
+            if (e.target.closest('[data-del-folder]')) return;
+            posDetailFolder = posDetailFolder === +btn.dataset.folderId ? null : +btn.dataset.folderId;
+            posDetailStage  = '';  // clear stage filter when folder selected
+            renderPositionDetailView();
+        });
+    });
+    // Delete folder
+    qsa('[data-del-folder]', el('crm-pos-sidebar')).forEach(btn => {
+        btn.addEventListener('click', async e => {
+            e.stopPropagation();
+            if (!confirm('Slet mappe? Ansøgere forbliver i stillingen.')) return;
+            await api('folders/' + btn.dataset.delFolder, {method:'DELETE'});
+            positiveFolders = await api('positions/' + activePositionId + '/folders');
+            if (posDetailFolder === +btn.dataset.delFolder) posDetailFolder = null;
+            renderPositionDetailView();
+        });
+    });
+    // New folder toggle
+    el('crm-pos-folder-add-btn')?.addEventListener('click', () => {
+        const d = el('crm-pos-folder-new');
+        if (d) { d.style.display = d.style.display === 'none' ? '' : 'none'; }
+        el('crm-pos-folder-name-input')?.focus();
+    });
+    el('crm-pos-folder-cancel-btn')?.addEventListener('click', () => {
+        if (el('crm-pos-folder-new')) el('crm-pos-folder-new').style.display = 'none';
+    });
+    el('crm-pos-folder-save-btn')?.addEventListener('click', async () => {
+        const input = el('crm-pos-folder-name-input');
+        const name  = input?.value.trim();
+        if (!name) { toast('Skriv et mappenavn', 'err'); return; }
+        try {
+            await api('positions/' + activePositionId + '/folders', {method:'POST', body: JSON.stringify({name})});
+            positiveFolders = await api('positions/' + activePositionId + '/folders');
+            if (input) input.value = '';
+            if (el('crm-pos-folder-new')) el('crm-pos-folder-new').style.display = 'none';
+            toast('Mappe oprettet ✓');
+            renderPositionDetailView();
+        } catch(e) { toast('Fejl: '+e.message, 'err'); }
+    });
+
     // Filter apps
-    const visibleApps = posDetailStage
-        ? posApps.filter(a => a.stage === posDetailStage)
-        : posApps;
+    let visibleApps = posApps;
+    if (posDetailFolder) {
+        visibleApps = posApps.filter(a => +a.folder_id === posDetailFolder);
+    } else if (posDetailStage) {
+        visibleApps = posApps.filter(a => a.stage === posDetailStage);
+    }
 
     // Candidates list
     if (!visibleApps.length) {
@@ -1273,36 +1414,83 @@
         <div class="crm-pos-cand-toolbar">
             <span class="crm-pos-cand-count">${visibleApps.length} kandidat${visibleApps.length !== 1 ? 'er' : ''}</span>
         </div>
-        <div class="crm-pos-cand-list">
+        <div class="crm-cand-table-wrap">
+        <table class="crm-cand-table">
+          <thead>
+            <tr>
+              <th class="crm-cth-avatar"></th>
+              <th class="crm-cth-name">Navn</th>
+              <th class="crm-cth-phone">Telefon</th>
+              <th class="crm-cth-birth">Fødselsdag</th>
+              <th class="crm-cth-start">Start dato</th>
+              <th class="crm-cth-score">Kundeservice</th>
+              <th class="crm-cth-score">Outbound</th>
+              <th class="crm-cth-score">Logisk test</th>
+              <th class="crm-cth-video">Video</th>
+              <th class="crm-cth-stage">Status</th>
+              <th class="crm-cth-rating">★</th>
+              <th class="crm-cth-actions"></th>
+            </tr>
+          </thead>
+          <tbody>
             ${visibleApps.map(a => {
                 const initials = ((a.first_name || '?')[0] + (a.last_name || '?')[0]).toUpperCase();
                 const avatarBg = ['#5b8dee','#ff9800','#a78bfa','#34d399','#f472b6','#CCFF00'][a.id % 6];
                 const avatarHtml = a.photo_url
                     ? `<img src="${escHtml(a.photo_url)}" class="crm-cand-avatar crm-cand-avatar-img" alt="">`
                     : `<div class="crm-cand-avatar" style="background:${avatarBg}">${escHtml(initials)}</div>`;
-
-                return `<div class="crm-cand-row" data-app-id="${a.id}">
-                    ${avatarHtml}
-                    <div class="crm-cand-info">
+                const aon = parseAonScores(a.aon_result_json);
+                const scoreCell = v => v != null ? `<span class="crm-score-badge">${escHtml(String(v))}</span>` : '<span class="crm-score-dash">—</span>';
+                return `<tr class="crm-cand-row" data-app-id="${a.id}">
+                    <td class="crm-ctd-avatar">${avatarHtml}</td>
+                    <td class="crm-ctd-name">
                         <div class="crm-cand-name">${escHtml(a.first_name)} ${escHtml(a.last_name)}</div>
                         <div class="crm-cand-email">${escHtml(a.email || '')}</div>
-                    </div>
-                    <div class="crm-cand-meta">
-                        ${a.availability ? `<span class="crm-cand-avail">📅 ${escHtml(a.availability)}</span>` : ''}
-                        ${a.phone ? `<span class="crm-cand-phone">📞 ${escHtml(a.phone)}</span>` : ''}
-                    </div>
-                    <div class="crm-cand-stage">${stagePill(a.stage)}</div>
-                    <div class="crm-cand-rating">${starsHtml(a.rating)}</div>
-                    <div class="crm-cand-actions">
+                    </td>
+                    <td class="crm-ctd-phone">${a.phone ? `<a href="tel:${escHtml(a.phone)}" class="crm-link">${escHtml(a.phone)}</a>` : '—'}</td>
+                    <td class="crm-ctd-birth">${fmtDateShort(a.birthdate)}</td>
+                    <td class="crm-ctd-start">${fmtDateShort(a.availability)}</td>
+                    <td class="crm-ctd-score">${scoreCell(aon.kundeservice)}</td>
+                    <td class="crm-ctd-score">${scoreCell(aon.outbound)}</td>
+                    <td class="crm-ctd-score">${scoreCell(aon.logisk)}</td>
+                    <td class="crm-ctd-video">${a.video_url ? `<a href="${escHtml(a.video_url)}" target="_blank" class="crm-video-icon" title="Se video">🎥</a>` : '<span class="crm-score-dash">—</span>'}</td>
+                    <td class="crm-ctd-stage">${stagePill(a.stage)}</td>
+                    <td class="crm-ctd-rating"><div class="crm-cand-rating">${starsHtml(a.rating)}</div></td>
+                    <td class="crm-ctd-actions">
+                        ${positiveFolders.length ? `
+                        <select class="crm-cand-folder-sel crm-select-xs" data-app-folder-id="${a.id}" title="Flyt til mappe">
+                            <option value="">📁 Mappe…</option>
+                            ${positiveFolders.map(f => `<option value="${f.id}"${+a.folder_id===f.id?' selected':''}>${escHtml(f.name)}</option>`).join('')}
+                            ${a.folder_id ? `<option value="__remove">↩ Fjern fra mappe</option>` : ''}
+                        </select>` : ''}
                         <button class="crm-btn crm-btn-ghost crm-btn-xs crm-cand-open-btn" data-app-id="${a.id}">Åbn →</button>
-                    </div>
-                </div>`;
+                    </td>
+                </tr>`;
             }).join('')}
+          </tbody>
+        </table>
         </div>`;
 
     // Bind open buttons
     qsa('[data-app-id]', el('crm-pos-candidates')).forEach(el2 => {
         el2.addEventListener('click', () => openAppDetail(+el2.dataset.appId));
+    });
+
+    // Bind folder selects
+    qsa('[data-app-folder-id]', el('crm-pos-candidates')).forEach(sel => {
+        sel.addEventListener('change', async () => {
+            const appId    = +sel.dataset.appFolderId;
+            const folderId = sel.value === '__remove' ? null : (+sel.value || null);
+            try {
+                await api('applications/' + appId + '/folder', {method:'PATCH', body: JSON.stringify({folder_id: folderId})});
+                // Update local state
+                const app = allApplications.find(a => a.id === appId);
+                if (app) app.folder_id = folderId;
+                positiveFolders = await api('positions/' + activePositionId + '/folders');
+                toast(folderId ? 'Tilføjet til mappe ✓' : 'Fjernet fra mappe');
+                renderPositionDetailView();
+            } catch(e) { toast('Fejl: '+e.message,'err'); }
+        });
     });
   }
 
@@ -1355,6 +1543,7 @@
     if (!pos) return;
     editingPosId = id;
     el('crm-pos-form-title').textContent = 'Rediger stilling';
+    if (el('pos-job-type')) el('pos-job-type').value = pos.job_type || '';
     el('pos-title').value    = pos.title || '';
     el('pos-dept').value     = pos.department || '';
     el('pos-location').value = pos.location || '';
@@ -1367,6 +1556,7 @@
   async function savePosition() {
     const payload = {
       id:          editingPosId || undefined,
+      job_type:    el('pos-job-type')?.value || '',
       title:       el('pos-title').value.trim(),
       department:  el('pos-dept').value.trim(),
       location:    el('pos-location').value.trim(),

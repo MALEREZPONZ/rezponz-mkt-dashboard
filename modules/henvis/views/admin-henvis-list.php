@@ -16,9 +16,11 @@ if ( isset( $_POST['rzpz_henvis_status_nonce'], $_POST['referral_id'], $_POST['n
 }
 
 // Filters
-$filter_mgr    = sanitize_key( $_GET['mgr'] ?? '' );
-$filter_status = sanitize_key( $_GET['status'] ?? '' );
-$search        = sanitize_text_field( $_GET['s'] ?? '' );
+$filter_mgr    = sanitize_key( $_GET['mgr']        ?? '' );
+$filter_status = sanitize_key( $_GET['status']     ?? '' );
+$search        = sanitize_text_field( $_GET['s']   ?? '' );
+$date_from     = sanitize_text_field( $_GET['date_from'] ?? '' );
+$date_to       = sanitize_text_field( $_GET['date_to']   ?? '' );
 
 $where  = '1=1';
 $params = [];
@@ -36,11 +38,48 @@ if ( $search ) {
     $params[] = '%' . $wpdb->esc_like( $search ) . '%';
     $params[] = '%' . $wpdb->esc_like( $search ) . '%';
 }
+if ( $date_from ) {
+    $where   .= ' AND DATE(submitted_at) >= %s';
+    $params[] = $date_from;
+}
+if ( $date_to ) {
+    $where   .= ' AND DATE(submitted_at) <= %s';
+    $params[] = $date_to;
+}
 
-$query     = "SELECT * FROM {$table} WHERE {$where} ORDER BY CASE WHEN status='pending' THEN 0 ELSE 1 END ASC, submitted_at DESC";
+$query     = "SELECT * FROM {$table} WHERE {$where} ORDER BY submitted_at DESC";
 $referrals = $params
     ? $wpdb->get_results( $wpdb->prepare( $query, ...$params ) )
     : $wpdb->get_results( $query );
+
+// ── Smart bucket sort ──────────────────────────────────────────────────────
+// 1. pending            – afventer behandling     (TOP)
+// 2. hired, no bonus    – ansat, bonus afventer   (MIDDLE)
+// 3. hired + bonus sent – fuldt behandlet         (NEAR BOTTOM)
+// 4. rejected           – afvist                  (VERY BOTTOM)
+$buckets = [ 'pending' => [], 'hired_waiting' => [], 'hired_done' => [], 'rejected' => [], 'other' => [] ];
+foreach ( $referrals as $r ) {
+    $elog_tmp   = json_decode( $r->emails_log ?: '{}', true );
+    $bonus_sent = ! empty( $elog_tmp['bonus_log']['sent_at'] );
+    if ( $r->status === 'pending' ) {
+        $buckets['pending'][] = $r;
+    } elseif ( $r->status === 'hired' && ! $bonus_sent ) {
+        $buckets['hired_waiting'][] = $r;
+    } elseif ( $r->status === 'hired' && $bonus_sent ) {
+        $buckets['hired_done'][] = $r;
+    } elseif ( $r->status === 'rejected' ) {
+        $buckets['rejected'][] = $r;
+    } else {
+        $buckets['other'][] = $r;
+    }
+}
+$referrals = array_merge(
+    $buckets['pending'],
+    $buckets['hired_waiting'],
+    $buckets['hired_done'],
+    $buckets['other'],
+    $buckets['rejected']
+);
 
 $total    = count( $referrals );
 $managers = RZPZ_Henvis::get_managers();
@@ -56,6 +95,8 @@ $total_all  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
 $hired      = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE status='hired'" );
 $pending    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE status='pending'" );
 $this_month = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE submitted_at >= DATE_FORMAT(NOW(),'%Y-%m-01')" );
+
+$has_date_filter = $date_from || $date_to;
 ?>
 <style>
 #wpbody-content { background:#08080b !important; }
@@ -71,14 +112,22 @@ $this_month = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE submitt
 .rzpz-ha-shortcode-box { background:rgba(255,255,255,.03); backdrop-filter:blur(24px); border:1px solid rgba(204,255,0,.25); border-radius:18px; padding:14px 20px; margin-bottom:24px; display:flex; align-items:center; gap:14px; }
 .rzpz-ha-shortcode-box code { background:rgba(255,255,255,.05); color:#CCFF00; padding:6px 14px; border-radius:6px; font-size:15px; font-weight:700; letter-spacing:.5px; border:1px solid rgba(255,255,255,.07); }
 .rzpz-ha-shortcode-box .lbl { color:#8888a0; font-size:13px; }
-.rzpz-ha-filters { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; align-items:center; }
-.rzpz-ha-filters select, .rzpz-ha-filters input[type=search] {
+.rzpz-ha-filters { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; align-items:flex-end; }
+.rzpz-ha-filters select,
+.rzpz-ha-filters input[type=search],
+.rzpz-ha-filters input[type=date] {
     background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); color:#f0f0f2; padding:6px 10px; border-radius:6px; font-size:13px;
+    color-scheme: dark;
 }
-.rzpz-ha-filters .rzpz-btn { background:rgba(255,255,255,.06); color:#CCFF00; border:1px solid rgba(255,255,255,.07); border-radius:999px; padding:6px 18px; font-weight:700; cursor:pointer; font-size:13px; text-decoration:none; display:inline-block; transition:background .15s,border-color .15s; }
+.rzpz-ha-filter-group { display:flex; flex-direction:column; gap:3px; }
+.rzpz-ha-filter-group label { font-size:11px; color:#8888a0; text-transform:uppercase; letter-spacing:.5px; }
+.rzpz-ha-filter-date-row { display:flex; align-items:center; gap:6px; }
+.rzpz-ha-filter-date-row span { font-size:12px; color:#8888a0; }
+.rzpz-ha-filters .rzpz-btn { background:rgba(255,255,255,.06); color:#CCFF00; border:1px solid rgba(255,255,255,.07); border-radius:999px; padding:6px 18px; font-weight:700; cursor:pointer; font-size:13px; text-decoration:none; display:inline-block; transition:background .15s,border-color .15s; align-self:flex-end; }
 .rzpz-ha-filters .rzpz-btn:hover, .rzpz-ha-filters .rzpz-btn:active { background:#CCFF00; color:#0d0d0d; border-color:#CCFF00; }
-.rzpz-ha-filters .rzpz-btn-ghost { background:rgba(255,255,255,.03); color:#8888a0; border:1px solid rgba(255,255,255,.07); border-radius:999px; padding:6px 18px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-block; transition:color .15s,border-color .15s,background .15s; }
+.rzpz-ha-filters .rzpz-btn-ghost { background:rgba(255,255,255,.03); color:#8888a0; border:1px solid rgba(255,255,255,.07); border-radius:999px; padding:6px 18px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-block; transition:color .15s,border-color .15s,background .15s; align-self:flex-end; }
 .rzpz-ha-filters .rzpz-btn-ghost:hover { color:#f0f0f2; border-color:rgba(255,255,255,.2); background:rgba(255,255,255,.06); }
+.rzpz-date-active { border-color:rgba(204,255,0,.4) !important; }
 table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,255,255,.03); backdrop-filter:blur(24px); border-radius:18px; overflow:hidden; border:1px solid rgba(255,255,255,.07); }
 .rzpz-ha-table th { background:rgba(255,255,255,.02); color:#8888a0; font-size:12px; text-transform:uppercase; padding:10px 14px; text-align:left; border-bottom:1px solid rgba(255,255,255,.07); }
 .rzpz-ha-table td { padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.05); color:#f0f0f2; font-size:13px; vertical-align:middle; }
@@ -121,6 +170,8 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
 .rzpz-bonus-sent  { display:inline-block; background:#0a1a2e; color:#60a5fa; border:1px solid #60a5fa30; border-radius:999px; padding:4px 12px; font-size:11px; white-space:nowrap; }
 .rzpz-status.hired-bonus { background:#0a1a2e; color:#60a5fa; }
 .rzpz-section-sep td { background:rgba(255,255,255,.02) !important; padding:6px 14px !important; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#8888a0; border-bottom:2px solid rgba(255,255,255,.07) !important; }
+.rzpz-section-sep.sep-done td { color:#60a5fa55; border-bottom-color:#60a5fa20 !important; }
+.rzpz-section-sep.sep-rejected td { color:#ff555555; border-bottom-color:#ff555520 !important; }
 /* Note row */
 .rzpz-note-row { display:none; background:#08080b; }
 .rzpz-note-row.open { display:table-row; }
@@ -134,6 +185,9 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
 .rzpz-note-inner .note-cancel { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); color:#8888a0; border-radius:999px; padding:5px 14px; font-size:12px; cursor:pointer; transition:color .15s,border-color .15s; }
 .rzpz-note-inner .note-cancel:hover { color:#f0f0f2; border-color:rgba(255,255,255,.2); }
 .rzpz-note-preview { font-size:11px; color:#60a5fa; max-width:160px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+/* Dimmed rows (fuldt behandlede / afviste) */
+.rzpz-row-dimmed td { opacity:.55; }
+.rzpz-row-dimmed:hover td { opacity:.8; }
 </style>
 
 <div class="rzpz-henvis-page">
@@ -158,7 +212,13 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
     <h1 class="rzpz-ha-title">🤝 Henvisninger</h1>
     <span class="rzpz-ha-badge"><?php echo $total_all; ?> total</span>
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <a href="<?php echo esc_url( admin_url( 'admin-post.php?action=rzpz_henvis_export_csv&_wpnonce=' . wp_create_nonce('rzpz_henvis_export_csv') . ( $filter_mgr ? '&mgr=' . urlencode($filter_mgr) : '' ) . ( $filter_status ? '&status=' . urlencode($filter_status) : '' ) . ( $search ? '&s=' . urlencode($search) : '' ) ) ); ?>"
+      <a href="<?php echo esc_url( admin_url( 'admin-post.php?action=rzpz_henvis_export_csv&_wpnonce=' . wp_create_nonce('rzpz_henvis_export_csv')
+          . ( $filter_mgr    ? '&mgr='       . urlencode($filter_mgr)    : '' )
+          . ( $filter_status ? '&status='    . urlencode($filter_status) : '' )
+          . ( $search        ? '&s='         . urlencode($search)        : '' )
+          . ( $date_from     ? '&date_from=' . urlencode($date_from)     : '' )
+          . ( $date_to       ? '&date_to='   . urlencode($date_to)       : '' )
+      ) ); ?>"
          style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);color:#8888a0;padding:6px 16px;border-radius:999px;font-size:12px;text-decoration:none;">⬇ Eksportér CSV</a>
       <a href="<?php echo esc_url( admin_url('admin.php?page=rzpz-henvis-settings') ); ?>"
          style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);color:#8888a0;padding:6px 16px;border-radius:999px;font-size:12px;text-decoration:none;">⚙️ Indstillinger</a>
@@ -189,21 +249,47 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
   <!-- Filters -->
   <form method="get" class="rzpz-ha-filters">
     <input type="hidden" name="page" value="rzpz-henvis">
-    <input type="search" name="s" value="<?php echo esc_attr( $search ); ?>" placeholder="Søg navn eller email…">
-    <select name="mgr">
-      <option value="">Alle managers</option>
-      <?php foreach ( $managers as $k => $m ) : ?>
-        <option value="<?php echo esc_attr($k); ?>" <?php selected($filter_mgr,$k); ?>><?php echo esc_html($m['label']); ?></option>
-      <?php endforeach; ?>
-    </select>
-    <select name="status">
-      <option value="">Alle statusser</option>
-      <?php foreach ( $status_labels as $k => $l ) : ?>
-        <option value="<?php echo esc_attr($k); ?>" <?php selected($filter_status,$k); ?>><?php echo esc_html($l); ?></option>
-      <?php endforeach; ?>
-    </select>
+
+    <div class="rzpz-ha-filter-group">
+      <label>Søg</label>
+      <input type="search" name="s" value="<?php echo esc_attr( $search ); ?>" placeholder="Navn eller email…">
+    </div>
+
+    <div class="rzpz-ha-filter-group">
+      <label>Manager</label>
+      <select name="mgr">
+        <option value="">Alle managers</option>
+        <?php foreach ( $managers as $k => $m ) : ?>
+          <option value="<?php echo esc_attr($k); ?>" <?php selected($filter_mgr,$k); ?>><?php echo esc_html($m['label']); ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+
+    <div class="rzpz-ha-filter-group">
+      <label>Status</label>
+      <select name="status">
+        <option value="">Alle statusser</option>
+        <?php foreach ( $status_labels as $k => $l ) : ?>
+          <option value="<?php echo esc_attr($k); ?>" <?php selected($filter_status,$k); ?>><?php echo esc_html($l); ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+
+    <div class="rzpz-ha-filter-group">
+      <label>Datointerval</label>
+      <div class="rzpz-ha-filter-date-row">
+        <input type="date" name="date_from" value="<?php echo esc_attr( $date_from ); ?>"
+               class="<?php echo $date_from ? 'rzpz-date-active' : ''; ?>"
+               title="Fra dato">
+        <span>→</span>
+        <input type="date" name="date_to" value="<?php echo esc_attr( $date_to ); ?>"
+               class="<?php echo $date_to ? 'rzpz-date-active' : ''; ?>"
+               title="Til dato">
+      </div>
+    </div>
+
     <button type="submit" class="rzpz-btn">Filtrer</button>
-    <?php if ( $filter_mgr || $filter_status || $search ) : ?>
+    <?php if ( $filter_mgr || $filter_status || $search || $has_date_filter ) : ?>
       <a href="?page=rzpz-henvis" class="rzpz-btn-ghost">Nulstil</a>
     <?php endif; ?>
   </form>
@@ -242,29 +328,51 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
     <?php if ( empty( $referrals ) ) : ?>
       <tr><td colspan="8" class="rzpz-ha-empty">Ingen henvisninger fundet.</td></tr>
     <?php else :
-      $pending_count   = count( array_filter( $referrals, fn($x) => $x->status === 'pending' ) );
-      $in_pending_sec  = false;
-      $in_handled_sec  = false;
+      // Track which section headers have been printed
+      $shown_sections = [];
+
+      // Map each row to its display bucket
+      function rzpz_row_bucket( object $r ) : string {
+          $elog = json_decode( $r->emails_log ?: '{}', true );
+          if ( $r->status === 'pending' )  return 'pending';
+          if ( $r->status === 'hired' )    return ! empty( $elog['bonus_log']['sent_at'] ) ? 'hired_done' : 'hired_waiting';
+          if ( $r->status === 'rejected' ) return 'rejected';
+          return 'other';
+      }
+
+      $section_meta = [
+          'pending'       => [ 'label' => '⏳ Afventer behandling', 'cls' => '',             'count_key' => 'pending' ],
+          'hired_waiting' => [ 'label' => '✅ Ansat – bonus afventer', 'cls' => '',          'count_key' => 'hired_waiting' ],
+          'hired_done'    => [ 'label' => '💰 Fuldt behandlet (ansat + bonus sendt)', 'cls' => 'sep-done',    'count_key' => 'hired_done' ],
+          'other'         => [ 'label' => '📋 Andre', 'cls' => '',                           'count_key' => 'other' ],
+          'rejected'      => [ 'label' => '❌ Afvist', 'cls' => 'sep-rejected',              'count_key' => 'rejected' ],
+      ];
+
       foreach ( $referrals as $r ) :
       $mgr        = $managers[ $r->manager_key ] ?? null;
       $label      = $status_labels[ $r->status ] ?? $r->status;
       $cls        = esc_attr( $r->status );
       $elog       = json_decode( $r->emails_log ?: '{}', true );
+      $bonus_sent = ! empty( $elog['bonus_log']['sent_at'] );
       $has_log    = ! empty( $elog['sent_at'] ) || ! empty( $elog['manager'] );
       $has_note   = ! empty( $r->notes );
       $row_id     = (int) $r->id;
+      $bucket     = rzpz_row_bucket( $r );
 
-      // Section separators
-      if ( $r->status === 'pending' && ! $in_pending_sec ) {
-          $in_pending_sec = true;
-          echo '<tr class="rzpz-section-sep"><td colspan="8">⏳ Afventer behandling (' . $pending_count . ')</td></tr>';
-      } elseif ( $r->status !== 'pending' && ! $in_handled_sec ) {
-          $in_handled_sec = true;
-          echo '<tr class="rzpz-section-sep"><td colspan="8">📋 Behandlede</td></tr>';
+      // Print section separator once per bucket
+      if ( ! isset( $shown_sections[ $bucket ] ) ) {
+          $shown_sections[ $bucket ] = true;
+          $sm    = $section_meta[ $bucket ] ?? [ 'label' => $bucket, 'cls' => '' ];
+          $cnt   = count( $buckets[ $bucket ] );
+          echo '<tr class="rzpz-section-sep ' . esc_attr( $sm['cls'] ) . '"><td colspan="8">'
+              . esc_html( $sm['label'] ) . ' (' . $cnt . ')</td></tr>';
       }
+
+      // Dim fully-done rows visually
+      $row_dim_cls = ( $bucket === 'hired_done' || $bucket === 'rejected' ) ? ' rzpz-row-dimmed' : '';
     ?>
       <!-- Data row -->
-      <tr class="rzpz-data-row">
+      <tr class="rzpz-data-row<?php echo $row_dim_cls; ?>">
         <td style="text-align:center">
           <?php if ( $r->status === 'hired' && ! $bonus_sent ) : ?>
             <input type="checkbox" class="rzpz-batch-cb" value="<?php echo $row_id; ?>"
@@ -285,9 +393,7 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
         </td>
         <td><?php echo $mgr ? esc_html( $mgr['label'] ) : esc_html( $r->manager_key ); ?></td>
         <td>
-          <?php
-          $bonus_sent = ! empty( $elog['bonus_log']['sent_at'] );
-          if ( $r->status === 'pending' ) : ?>
+          <?php if ( $r->status === 'pending' ) : ?>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
                 <input type="hidden" name="action" value="rzpz_henvis_approve">
@@ -353,7 +459,6 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
         <td colspan="8">
           <div class="rzpz-email-log-inner">
             <?php
-            // Manager email
             $em = $elog['manager'] ?? null;
             if ( $em ) :
             ?>
@@ -368,7 +473,6 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
             <?php endif; ?>
 
             <?php
-            // Referrer email
             $er = $elog['referrer'] ?? null;
             if ( $er ) :
             ?>
@@ -383,7 +487,6 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
             <?php endif; ?>
 
             <?php
-            // Friend email
             $ef = $elog['friend'] ?? null;
             if ( $ef ) :
             ?>
@@ -398,7 +501,6 @@ table.rzpz-ha-table { width:100%; border-collapse:collapse; background:rgba(255,
             <?php endif; ?>
 
             <?php
-            // CC recipients
             $cc_list = $elog['extra'] ?? [];
             if ( ! empty( $cc_list ) ) :
             ?>
